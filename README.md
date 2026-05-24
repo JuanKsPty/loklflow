@@ -107,9 +107,8 @@ Fase 6 ░░░░░░░░░░░░░░░░░░░░   0%  — Pe
 |-----------|-------------|--------|
 | [Visión del Proyecto (RUP)](./docs/LoklFlow_Vision_v1.0.docx) | Alcance, usuarios, requerimientos y riesgos | ✅ Completo |
 | [Roadmap de Desarrollo](./docs/ROADMAP.md) | Fases, tareas y entregables del proyecto | ✅ Completo |
-| Modelo de Base de Datos | Diagrama ER y esquema completo | 🔄 En progreso |
-| Diseño de API | Endpoints documentados en Swagger | ⏳ Pendiente |
-| Wireframes | Vistas principales del sistema | ⏳ Pendiente |
+| [Modelo de Base de Datos](./docs/DATA_MODEL.md) | 31 tablas, relaciones y decisiones de diseño | ✅ Completo |
+
 | Arquitectura de Infraestructura | Setup local + nube + offline | ✅ Completo |
 
 ---

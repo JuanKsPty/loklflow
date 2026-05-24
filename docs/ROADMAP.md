@@ -10,25 +10,25 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 - [x] Documento de Visión (RUP)
 - [x] Definición de alcance y módulos
 - [x] Arquitectura de infraestructura (local + nube + offline)
-- [ ] Modelo de base de datos (diagrama ER)
-- [ ] Diseño de API (endpoints en Swagger)
-- [ ] Wireframes de las vistas principales
-- [ ] Setup del repositorio y estructura de carpetas
-- [ ] Docker Compose base (NestJS + PostgreSQL + Redis)
-- [ ] README profesional con arquitectura
+- [x] Modelo de base de datos (31 tablas — `docs/DATA_MODEL.md`)
+- [x] README profesional con arquitectura
+- [x] Setup del repositorio y estructura de carpetas
+- [x] Docker Compose base (NestJS + PostgreSQL + Redis)
 
 ---
 
 ## Fase 1 — Columna Vertebral
 > El sistema existe, corre y controla quién accede a qué.
 
-- [ ] Módulo de autenticación (JWT + refresh tokens)
-- [ ] Login rápido por PIN para roles operativos
-- [ ] Módulo de roles y permisos (RBAC granular)
-- [ ] Creación y gestión de roles personalizados
-- [ ] CRUD de empleados
-- [ ] Panel de administración (login + gestión de usuarios)
-- [ ] Guards y decoradores de permisos por módulo
+- [x] Módulo de autenticación (JWT + refresh tokens)
+- [x] Login rápido por PIN para roles operativos
+- [x] Módulo de roles y permisos (RBAC granular)
+- [x] Creación y gestión de roles personalizados (con umbral de descuento por rol)
+- [x] CRUD de empleados
+- [x] Panel de administración (login + gestión de usuarios)
+- [x] Guards y decoradores de permisos por módulo
+- [x] Configuración general del negocio (`business_config`)
+- [x] Log de auditoría de acciones críticas (`audit_logs`)
 - [ ] Deploy en producción (Railway / Render)
 - [ ] Pipeline CI/CD básico con GitHub Actions
 
@@ -42,13 +42,16 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 - [ ] Módulo de menú (categorías, productos, modificadores, combos)
 - [ ] Disponibilidad de productos por horario
 - [ ] Módulo de mesas y sectores (mapa visual)
-- [ ] Estados de mesa en tiempo real
+- [ ] Estados de mesa en tiempo real (`available`, `occupied`, `reserved`, `cleaning`, `maintenance`)
+- [ ] Fusión de mesas para órdenes grupales
+- [ ] Gestión de reservas de mesa
 - [ ] Módulo de órdenes completo
+- [ ] Historial de transiciones de estado (`order_status_history`) para métricas de tiempo
 - [ ] WebSockets — cocina recibe órdenes al instante
 - [ ] Vista de mesero (tomar orden desde móvil)
 - [ ] Vista KDS de cocina (pantalla dedicada)
-- [ ] Flujo de estados de orden (pendiente → en preparación → lista → entregada)
-- [ ] Notificaciones en tiempo real entre roles
+- [ ] Flujo de estados de orden (pendiente → en preparación → lista → entregada → cerrada)
+- [ ] Notificaciones en tiempo real entre roles (WebSocket + persistencia en BD)
 
 **Entregable:** Flujo completo de orden desde mesero hasta cocina en tiempo real.
 
@@ -93,14 +96,15 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 > El negocio controla su stock y los clientes ordenan solos.
 
 - [ ] Catálogo de ingredientes con stock y unidades
+- [ ] Gestión de proveedores (`suppliers`)
 - [ ] Recetas vinculadas a productos del menú
 - [ ] Descuento automático de inventario al cerrar órdenes
 - [ ] Alertas de stock mínimo
-- [ ] Registro de entradas de mercancía
+- [ ] Registro de entradas de mercancía (con proveedor y costo)
 - [ ] Registro de merma
 - [ ] Código QR único por mesa
 - [ ] Vista pública del menú (sin autenticación)
-- [ ] Flujo de orden completa desde QR del cliente
+- [ ] Flujo de orden completa desde QR del cliente (`source: customer_qr`)
 
 **Entregable:** Inventario automatizado y flujo completo de cliente con QR.
 
