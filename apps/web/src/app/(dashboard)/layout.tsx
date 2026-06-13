@@ -2,6 +2,9 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { jwtVerify } from 'jose';
 import type { JwtPayload } from '@loklflow/types';
+import { AppSidebar } from '@/components/app-sidebar';
+import { AppHeader } from '@/components/app-header';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 
 async function getUser(): Promise<JwtPayload | null> {
   const cookieStore = await cookies();
@@ -23,28 +26,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect('/login');
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-100">
-          <span className="font-bold text-gray-900">LoklFlow</span>
-        </div>
-        <nav className="flex-1 p-3 space-y-1">
-          <a href="/admin/users" className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100">
-            Empleados
-          </a>
-          <a href="/admin/roles" className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100">
-            Roles
-          </a>
-          <a href="/admin/settings" className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100">
-            Configuración
-          </a>
-        </nav>
-        <div className="p-4 border-t border-gray-100 text-xs text-gray-400">
-          {user.roleName}
-        </div>
-      </aside>
-
-      <main className="flex-1 overflow-auto p-6">{children}</main>
-    </div>
+    <SidebarProvider>
+      <AppSidebar
+        user={{ name: user.email ?? user.roleName, roleName: user.roleName, permissions: user.permissions }}
+      />
+      <SidebarInset>
+        <AppHeader />
+        <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

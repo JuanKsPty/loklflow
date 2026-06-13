@@ -23,9 +23,6 @@
       ],
       "@loklflow/types": [
         "../../packages/types/src"
-      ],
-      "@loklflow/ui": [
-        "../../packages/ui/src"
       ]
     },
     "noEmit": true,

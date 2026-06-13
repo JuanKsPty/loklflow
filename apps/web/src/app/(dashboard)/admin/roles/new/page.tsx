@@ -1,5 +1,6 @@
 import { serverFetch } from '@/lib/api/server-client';
 import { RoleForm } from '@/components/admin/role-form';
+import { PageHeader } from '@/components/page-header';
 import type { Permission } from '@loklflow/types';
 
 export const metadata = { title: 'Nuevo rol — LoklFlow' };
@@ -14,9 +15,7 @@ export default async function NewRolePage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Nuevo rol</h1>
-      </div>
+      <PageHeader title="Nuevo rol" description="Crea un rol y asígnale permisos." />
       <RoleForm allPermissions={allPermissions} />
     </div>
   );

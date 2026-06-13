@@ -6,12 +6,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import type { RoleWithPermissions, Permission } from '@loklflow/types';
 import { rolesApi } from '@/lib/api/roles.api';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Spinner } from '@/components/ui/spinner';
+import { Field, FieldLabel, FieldError, FieldDescription } from '@/components/ui/field';
 
 const roleSchema = z.object({
   name: z.string().min(2, 'Nombre requerido'),
@@ -28,7 +30,6 @@ interface Props {
 
 export function RoleForm({ role, allPermissions }: Props) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
   const [selectedPerms, setSelectedPerms] = useState<Set<string>>(
     new Set(role?.permissions.map((p) => p.id) ?? []),
   );
@@ -56,7 +57,6 @@ export function RoleForm({ role, allPermissions }: Props) {
   };
 
   const onSubmit = async (values: RoleFormValues) => {
-    setError(null);
     try {
       let roleId = role?.id;
       const body = {
@@ -71,10 +71,11 @@ export function RoleForm({ role, allPermissions }: Props) {
         roleId = created.id;
       }
       await rolesApi.assignPermissions(roleId!, [...selectedPerms]);
+      toast.success(role ? 'Rol actualizado' : 'Rol creado');
       router.push('/admin/roles');
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al guardar');
+      toast.error(err instanceof Error ? err.message : 'Error al guardar');
     }
   };
 
@@ -84,30 +85,17 @@ export function RoleForm({ role, allPermissions }: Props) {
   }, {});
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-2xl">
-      {error && (
-        <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg px-4 py-3">
-          {error}
-        </div>
-      )}
+    <form onSubmit={handleSubmit(onSubmit)} className="max-w-2xl space-y-6">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <Field data-invalid={errors.name ? true : undefined}>
+          <FieldLabel htmlFor="name">Nombre</FieldLabel>
+          <Input id="name" {...register('name')} disabled={role?.isSystem} aria-invalid={errors.name ? true : undefined} />
+          {role?.isSystem && <FieldDescription>Los roles de sistema no pueden renombrarse.</FieldDescription>}
+          <FieldError errors={errors.name ? [errors.name] : undefined} />
+        </Field>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="name">Nombre</Label>
-          <Input
-            id="name"
-            {...register('name')}
-            disabled={role?.isSystem}
-            aria-invalid={errors.name ? true : undefined}
-          />
-          {errors.name && <p className="text-destructive text-xs">{errors.name.message}</p>}
-          {role?.isSystem && (
-            <p className="text-muted-foreground text-xs">Los roles de sistema no pueden renombrarse</p>
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="maxDiscountPercentage">Descuento máx. (%)</Label>
+        <Field data-invalid={errors.maxDiscountPercentage ? true : undefined}>
+          <FieldLabel htmlFor="maxDiscountPercentage">Descuento máx. (%)</FieldLabel>
           <Input
             id="maxDiscountPercentage"
             {...register('maxDiscountPercentage', { valueAsNumber: true })}
@@ -116,46 +104,35 @@ export function RoleForm({ role, allPermissions }: Props) {
             max={100}
             aria-invalid={errors.maxDiscountPercentage ? true : undefined}
           />
-          {errors.maxDiscountPercentage && (
-            <p className="text-destructive text-xs">{errors.maxDiscountPercentage.message}</p>
-          )}
-        </div>
+          <FieldError errors={errors.maxDiscountPercentage ? [errors.maxDiscountPercentage] : undefined} />
+        </Field>
 
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="description">
-            Descripción{' '}
-            <span className="text-muted-foreground font-normal">(opcional)</span>
-          </Label>
+        <Field className="sm:col-span-2">
+          <FieldLabel htmlFor="description">Descripción</FieldLabel>
           <Input
             id="description"
             {...register('description')}
             placeholder="Describe las responsabilidades de este rol"
           />
-        </div>
+          <FieldDescription>Opcional.</FieldDescription>
+        </Field>
       </div>
 
-      <div>
-        <p className="text-sm font-medium mb-3">Permisos</p>
-        <div className="border border-border rounded-xl overflow-hidden">
+      <div className="space-y-3">
+        <p className="text-sm font-medium">Permisos</p>
+        <div className="overflow-hidden rounded-xl border">
           {Object.keys(byModule).length === 0 ? (
-            <p className="text-muted-foreground text-sm text-center py-8">
-              No hay permisos disponibles
-            </p>
+            <p className="py-8 text-center text-sm text-muted-foreground">No hay permisos disponibles</p>
           ) : (
             Object.entries(byModule).map(([module, perms]) => (
-              <div key={module} className="border-b border-border last:border-0">
+              <div key={module} className="border-b last:border-0">
                 <div className="bg-muted/50 px-4 py-2">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    {module}
-                  </span>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{module}</span>
                 </div>
                 <div className="flex flex-wrap gap-x-6 gap-y-3 px-4 py-3">
                   {perms.map((p) => (
-                    <label key={p.id} className="flex items-center gap-2 cursor-pointer">
-                      <Checkbox
-                        checked={selectedPerms.has(p.id)}
-                        onCheckedChange={() => togglePerm(p.id)}
-                      />
+                    <label key={p.id} className="flex cursor-pointer items-center gap-2">
+                      <Checkbox checked={selectedPerms.has(p.id)} onCheckedChange={() => togglePerm(p.id)} />
                       <span className="text-sm">{p.action}</span>
                     </label>
                   ))}
@@ -168,14 +145,12 @@ export function RoleForm({ role, allPermissions }: Props) {
 
       <div className="flex gap-3">
         <Button type="submit" disabled={isSubmitting} size="lg">
+          {isSubmitting && <Spinner />}
           {isSubmitting ? 'Guardando…' : role ? 'Guardar cambios' : 'Crear rol'}
         </Button>
-        <Link
-          href="/admin/roles"
-          className={buttonVariants({ variant: 'ghost', size: 'lg' })}
-        >
+        <Button variant="ghost" size="lg" nativeButton={false} render={<Link href="/admin/roles" />}>
           Cancelar
-        </Link>
+        </Button>
       </div>
     </form>
   );

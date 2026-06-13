@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { serverFetch } from '@/lib/api/server-client';
 import { RoleForm } from '@/components/admin/role-form';
+import { PageHeader } from '@/components/page-header';
 import type { RoleWithPermissions, Permission } from '@loklflow/types';
 
 interface Props {
@@ -18,10 +19,7 @@ export default async function EditRolePage({ params }: Props) {
 
     return (
       <div>
-        <div className="mb-6">
-          <h1 className="text-xl font-bold text-gray-900">Editar rol</h1>
-          <p className="text-sm text-gray-500 mt-1">{role.name}</p>
-        </div>
+        <PageHeader title="Editar rol" description={role.name} />
         <RoleForm role={role} allPermissions={allPermissions} />
       </div>
     );

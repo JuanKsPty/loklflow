@@ -1,23 +1,23 @@
 'use client';
 
-import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import { loginSchema, type LoginFormValues } from '@/lib/validations/login.schema';
 import { authApi } from '@/lib/api/auth.api';
 import { useAuthStore } from '@/stores/auth.store';
 import type { AuthUser } from '@loklflow/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
+import { Field, FieldLabel, FieldError } from '@/components/ui/field';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 
 export function LoginForm() {
   const router = useRouter();
   const setUser = useAuthStore((s) => s.setUser);
-  const [error, setError] = useState<string | null>(null);
 
   const {
     register,
@@ -26,13 +26,12 @@ export function LoginForm() {
   } = useForm<LoginFormValues>({ resolver: zodResolver(loginSchema) });
 
   async function onSubmit(values: LoginFormValues) {
-    setError(null);
     try {
       const user = await authApi.login(values);
       setUser(user as AuthUser);
       router.push('/admin');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Credenciales incorrectas');
+      toast.error(err instanceof Error ? err.message : 'Credenciales incorrectas');
     }
   }
 
@@ -43,9 +42,9 @@ export function LoginForm() {
         <CardDescription>Inicia sesión con tu cuenta</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
+          <Field data-invalid={errors.email ? true : undefined}>
+            <FieldLabel htmlFor="email">Email</FieldLabel>
             <Input
               id="email"
               {...register('email')}
@@ -54,13 +53,11 @@ export function LoginForm() {
               placeholder="admin@loklflow.com"
               aria-invalid={errors.email ? true : undefined}
             />
-            {errors.email && (
-              <p className="text-destructive text-xs">{errors.email.message}</p>
-            )}
-          </div>
+            <FieldError errors={errors.email ? [errors.email] : undefined} />
+          </Field>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Contraseña</Label>
+          <Field data-invalid={errors.password ? true : undefined}>
+            <FieldLabel htmlFor="password">Contraseña</FieldLabel>
             <Input
               id="password"
               {...register('password')}
@@ -68,28 +65,20 @@ export function LoginForm() {
               autoComplete="current-password"
               aria-invalid={errors.password ? true : undefined}
             />
-            {errors.password && (
-              <p className="text-destructive text-xs">{errors.password.message}</p>
-            )}
-          </div>
-
-          {error && (
-            <div className="bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 text-destructive text-sm">
-              {error}
-            </div>
-          )}
+            <FieldError errors={errors.password ? [errors.password] : undefined} />
+          </Field>
 
           <Button type="submit" disabled={isSubmitting} className="w-full" size="lg">
-            {isSubmitting ? 'Ingresando...' : 'Iniciar sesión'}
+            {isSubmitting && <Spinner />}
+            {isSubmitting ? 'Ingresando…' : 'Iniciar sesión'}
           </Button>
-
-          <div className="text-center">
-            <Link href="/pin" className="text-sm text-primary hover:underline">
-              Ingresar con PIN
-            </Link>
-          </div>
         </form>
       </CardContent>
+      <CardFooter className="justify-center">
+        <Link href="/pin" className="text-sm text-primary hover:underline">
+          Ingresar con PIN
+        </Link>
+      </CardFooter>
     </Card>
   );
 }

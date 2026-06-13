@@ -3,17 +3,12 @@ import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
 const PROTECTED_PREFIXES = ['/admin', '/orders', '/kitchen', '/pos'];
-const PUBLIC_PATHS = ['/login', '/pin'];
 
 function isProtected(pathname: string) {
   return PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
-function isPublic(pathname: string) {
-  return PUBLIC_PATHS.some((p) => pathname.startsWith(p));
-}
-
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (!isProtected(pathname)) return NextResponse.next();

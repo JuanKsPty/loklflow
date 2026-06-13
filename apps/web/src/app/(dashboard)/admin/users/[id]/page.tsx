@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { serverFetch } from '@/lib/api/server-client';
 import { UserForm } from '@/components/admin/user-form';
+import { PageHeader } from '@/components/page-header';
 import type { User, Role } from '@loklflow/types';
 
 interface Props {
@@ -18,10 +19,7 @@ export default async function EditUserPage({ params }: Props) {
 
     return (
       <div>
-        <div className="mb-6">
-          <h1 className="text-xl font-bold text-gray-900">Editar empleado</h1>
-          <p className="text-sm text-gray-500 mt-1">{user.name}</p>
-        </div>
+        <PageHeader title="Editar empleado" description={user.name} />
         <UserForm user={user} roles={roles} />
       </div>
     );

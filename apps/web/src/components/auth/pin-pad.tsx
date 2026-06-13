@@ -2,50 +2,49 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { DeleteIcon, CheckIcon } from 'lucide-react';
 import { authApi } from '@/lib/api/auth.api';
 import { useAuthStore } from '@/stores/auth.store';
 import type { AuthUser } from '@loklflow/types';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
 interface PinPadProps {
   userId: string;
   userName: string;
 }
 
-const DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', '✓'];
+const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 export function PinPad({ userId, userName }: PinPadProps) {
   const router = useRouter();
   const setUser = useAuthStore((s) => s.setUser);
   const [pin, setPin] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  function handleDigit(digit: string) {
-    if (digit === '⌫') {
-      setPin((p) => p.slice(0, -1));
-      return;
-    }
-    if (digit === '✓') {
-      void submit();
-      return;
-    }
-    if (pin.length >= 6) return;
-    setPin((p) => p + digit);
+  function append(digit: string) {
+    setPin((p) => (p.length >= 6 ? p : p + digit));
+  }
+
+  function backspace() {
+    setPin((p) => p.slice(0, -1));
   }
 
   async function submit() {
     if (pin.length < 4) {
-      setError('PIN debe tener al menos 4 dígitos');
+      toast.error('El PIN debe tener al menos 4 dígitos');
       return;
     }
     setLoading(true);
-    setError(null);
     try {
       const user = await authApi.pinLogin({ userId, pin });
       setUser(user as AuthUser);
       router.push('/orders');
     } catch {
-      setError('PIN incorrecto');
+      toast.error('PIN incorrecto');
       setPin('');
     } finally {
       setLoading(false);
@@ -53,50 +52,92 @@ export function PinPad({ userId, userName }: PinPadProps) {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
-      <p className="text-gray-500 text-sm mb-1">Bienvenido</p>
-      <h2 className="text-xl font-bold text-gray-900 mb-6">{userName}</h2>
+    <Card>
+      <CardContent className="flex flex-col items-center gap-6 py-2 text-center">
+        <div className="flex flex-col items-center gap-2">
+          <Avatar size="lg">
+            <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+              {userName.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <p className="text-sm text-muted-foreground">Bienvenido</p>
+            <h2 className="text-lg font-semibold">{userName}</h2>
+          </div>
+        </div>
 
-      <div className="flex justify-center gap-3 mb-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div
-            key={i}
-            className={`w-3 h-3 rounded-full border-2 transition-colors ${
-              i < pin.length ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
-            }`}
-          />
-        ))}
-      </div>
+        <InputOTP
+          maxLength={6}
+          value={pin}
+          onChange={setPin}
+          inputMode="numeric"
+          pattern="[0-9]*"
+          containerClassName="justify-center"
+        >
+          <InputOTPGroup>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <InputOTPSlot key={i} index={i} className="size-11 text-lg" />
+            ))}
+          </InputOTPGroup>
+        </InputOTP>
 
-      {error && (
-        <p className="text-red-500 text-sm mb-4">{error}</p>
-      )}
-
-      <div className="grid grid-cols-3 gap-3">
-        {DIGITS.map((d) => (
-          <button
-            key={d}
-            onClick={() => handleDigit(d)}
+        <div className="grid w-full max-w-xs grid-cols-3 gap-3">
+          {KEYS.map((k) => (
+            <Button
+              key={k}
+              type="button"
+              variant="outline"
+              size="lg"
+              className="h-14 text-lg font-semibold"
+              disabled={loading}
+              onClick={() => append(k)}
+            >
+              {k}
+            </Button>
+          ))}
+          <Button
+            type="button"
+            variant="ghost"
+            size="lg"
+            className="h-14"
             disabled={loading}
-            className={`h-14 rounded-xl text-lg font-semibold transition-colors disabled:opacity-50 ${
-              d === '✓'
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : d === '⌫'
-                ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                : 'bg-gray-50 text-gray-900 hover:bg-gray-100'
-            }`}
+            onClick={backspace}
+            aria-label="Borrar"
           >
-            {d}
-          </button>
-        ))}
-      </div>
+            <DeleteIcon className="size-5" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="h-14 text-lg font-semibold"
+            disabled={loading}
+            onClick={() => append('0')}
+          >
+            0
+          </Button>
+          <Button
+            type="button"
+            size="lg"
+            className="h-14"
+            disabled={loading}
+            onClick={submit}
+            aria-label="Confirmar"
+          >
+            <CheckIcon className="size-5" />
+          </Button>
+        </div>
 
-      <button
-        onClick={() => router.back()}
-        className="mt-6 text-sm text-gray-400 hover:text-gray-600"
-      >
-        ← Cambiar empleado
-      </button>
-    </div>
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="text-muted-foreground"
+          onClick={() => router.back()}
+        >
+          ← Cambiar empleado
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

@@ -1,5 +1,9 @@
+import Link from 'next/link';
+import { PlusIcon } from 'lucide-react';
 import { serverFetch } from '@/lib/api/server-client';
 import { UserTable } from '@/components/admin/user-table';
+import { PageHeader } from '@/components/page-header';
+import { Button } from '@/components/ui/button';
 import type { User } from '@loklflow/types';
 
 export const metadata = { title: 'Empleados — LoklFlow' };
@@ -14,15 +18,16 @@ export default async function UsersPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Empleados</h1>
-        <a
-          href="/admin/users/new"
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
-        >
-          + Nuevo empleado
-        </a>
-      </div>
+      <PageHeader
+        title="Empleados"
+        description="Gestiona el personal y sus accesos."
+        action={
+          <Button nativeButton={false} render={<Link href="/admin/users/new" />}>
+            <PlusIcon />
+            Nuevo empleado
+          </Button>
+        }
+      />
       <UserTable users={users} />
     </div>
   );

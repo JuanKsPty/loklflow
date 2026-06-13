@@ -1,5 +1,6 @@
 import { serverFetch } from '@/lib/api/server-client';
 import { UserForm } from '@/components/admin/user-form';
+import { PageHeader } from '@/components/page-header';
 import type { Role } from '@loklflow/types';
 
 export const metadata = { title: 'Nuevo empleado — LoklFlow' };
@@ -14,9 +15,7 @@ export default async function NewUserPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Nuevo empleado</h1>
-      </div>
+      <PageHeader title="Nuevo empleado" description="Registra un nuevo miembro del personal." />
       <UserForm roles={roles} />
     </div>
   );

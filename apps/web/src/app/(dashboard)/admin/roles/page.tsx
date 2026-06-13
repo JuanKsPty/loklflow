@@ -1,4 +1,18 @@
+import Link from 'next/link';
+import { PlusIcon, ShieldIcon } from 'lucide-react';
 import { serverFetch } from '@/lib/api/server-client';
+import { PageHeader } from '@/components/page-header';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
 import type { Role } from '@loklflow/types';
 
 export const metadata = { title: 'Roles — LoklFlow' };
@@ -13,54 +27,59 @@ export default async function RolesPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Roles</h1>
-        <a
-          href="/admin/roles/new"
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
-        >
-          + Nuevo rol
-        </a>
-      </div>
+      <PageHeader
+        title="Roles"
+        description="Define permisos y límites de descuento por rol."
+        action={
+          <Button nativeButton={false} render={<Link href="/admin/roles/new" />}>
+            <PlusIcon />
+            Nuevo rol
+          </Button>
+        }
+      />
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {roles.length === 0 ? (
-          <p className="text-center text-gray-400 py-12">No hay roles registrados</p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Nombre</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Descripción</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Desc. máx.</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Tipo</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
+      {roles.length === 0 ? (
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <ShieldIcon />
+            </EmptyMedia>
+            <EmptyTitle>Sin roles</EmptyTitle>
+            <EmptyDescription>Aún no hay roles registrados.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <div className="rounded-xl border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Descripción</TableHead>
+                <TableHead>Desc. máx.</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead className="w-0" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {roles.map((r) => (
-                <tr key={r.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">{r.name}</td>
-                  <td className="px-4 py-3 text-gray-500">{r.description ?? '—'}</td>
-                  <td className="px-4 py-3 text-gray-700">{r.maxDiscountPercentage}%</td>
-                  <td className="px-4 py-3">
-                    {r.isSystem && (
-                      <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full">
-                        Sistema
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <a href={`/admin/roles/${r.id}`} className="text-blue-600 hover:underline text-xs">
+                <TableRow key={r.id}>
+                  <TableCell className="font-medium">{r.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{r.description ?? '—'}</TableCell>
+                  <TableCell className="font-mono tabular-nums">{r.maxDiscountPercentage}%</TableCell>
+                  <TableCell>
+                    {r.isSystem ? <Badge variant="secondary">Sistema</Badge> : <Badge variant="outline">Personalizado</Badge>}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={`/admin/roles/${r.id}`} />}>
                       Editar
-                    </a>
-                  </td>
-                </tr>
+                    </Button>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   );
 }

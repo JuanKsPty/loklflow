@@ -1,4 +1,8 @@
 import Link from 'next/link';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
+import { UsersIcon } from 'lucide-react';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -14,45 +18,53 @@ export default async function PinSelectPage() {
   let users: OperationalUser[] = [];
   try {
     const res = await fetch(`${BASE_URL}/api/users/operational`, { cache: 'no-store' });
-    if (res.ok) users = await res.json() as OperationalUser[];
+    if (res.ok) users = (await res.json()) as OperationalUser[];
   } catch {
     // muestra pantalla vacía si la API no está disponible
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Selecciona tu perfil</h1>
-        <p className="text-gray-500 text-sm mt-1">¿Quién eres?</p>
-      </div>
-
-      {users.length === 0 ? (
-        <p className="text-gray-400 text-sm text-center py-8">
-          No hay empleados con PIN configurado
-        </p>
-      ) : (
-        <div className="grid grid-cols-2 gap-3">
-          {users.map((u) => (
-            <Link
-              key={u.id}
-              href={`/pin/${u.id}`}
-              className="flex flex-col items-center justify-center p-4 rounded-xl border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors"
-            >
-              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-lg mb-2">
-                {u.name.charAt(0).toUpperCase()}
-              </div>
-              <span className="font-medium text-gray-900 text-sm">{u.name}</span>
-              <span className="text-gray-400 text-xs">{u.role.name}</span>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-6 text-center">
-        <Link href="/login" className="text-sm text-gray-400 hover:text-gray-600">
+    <Card>
+      <CardHeader>
+        <CardTitle>Selecciona tu perfil</CardTitle>
+        <CardDescription>¿Quién eres?</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {users.length === 0 ? (
+          <Empty className="border">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <UsersIcon />
+              </EmptyMedia>
+              <EmptyTitle>Sin empleados con PIN</EmptyTitle>
+              <EmptyDescription>No hay empleados con PIN configurado todavía.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {users.map((u) => (
+              <Link
+                key={u.id}
+                href={`/pin/${u.id}`}
+                className="flex flex-col items-center justify-center gap-2 rounded-xl border p-4 transition-colors hover:border-primary/40 hover:bg-primary/5"
+              >
+                <Avatar size="lg">
+                  <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                    {u.name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-sm font-medium">{u.name}</span>
+                <span className="text-xs text-muted-foreground">{u.role.name}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </CardContent>
+      <CardFooter className="justify-center">
+        <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground">
           Iniciar sesión con email
         </Link>
-      </div>
-    </div>
+      </CardFooter>
+    </Card>
   );
 }
