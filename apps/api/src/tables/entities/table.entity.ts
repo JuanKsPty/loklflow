@@ -8,7 +8,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import type { TableStatus } from '@loklflow/types';
+import type { TableStatus } from '../status.constants';
 import { Sector } from './sector.entity';
 
 @Entity('tables')

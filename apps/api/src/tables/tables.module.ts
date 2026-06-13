@@ -12,7 +12,10 @@ import { ReservationsService } from './reservations.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Sector, RestaurantTable, Reservation])],
-  controllers: [SectorsController, TablesController, ReservationsController],
+  // Los controladores de sub-recursos (rutas literales tables/sectors y
+  // tables/reservations) deben registrarse ANTES que TablesController, cuyo
+  // @Get(':id') captaría esas rutas y fallaría el ParseUuidPipe.
+  controllers: [SectorsController, ReservationsController, TablesController],
   providers: [SectorsService, TablesService, ReservationsService],
   exports: [SectorsService, TablesService, ReservationsService],
 })

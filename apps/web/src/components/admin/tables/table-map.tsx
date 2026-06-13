@@ -10,6 +10,7 @@ import { TABLE_STATUS_LABELS, TABLE_STATUS_MAP_CLASSES } from './constants';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -78,7 +79,9 @@ export function TableMap({ sectors, tables }: Props) {
                   <span className="text-[11px] font-medium">{TABLE_STATUS_LABELS[table.status]}</span>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
-                  <DropdownMenuLabel>Mesa {table.number} — cambiar estado</DropdownMenuLabel>
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>Mesa {table.number} — cambiar estado</DropdownMenuLabel>
+                  </DropdownMenuGroup>
                   <DropdownMenuSeparator />
                   {TABLE_STATUSES.map((status) => (
                     <DropdownMenuItem

@@ -9,7 +9,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { RESERVATION_STATUSES, type ReservationStatus } from '@loklflow/types';
+import { RESERVATION_STATUSES, type ReservationStatus } from '../status.constants';
 
 export class CreateReservationDto {
   @IsUUID()

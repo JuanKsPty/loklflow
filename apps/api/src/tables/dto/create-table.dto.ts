@@ -1,5 +1,5 @@
 import { IsBoolean, IsIn, IsInt, IsOptional, IsUUID, Min } from 'class-validator';
-import { TABLE_STATUSES, type TableStatus } from '@loklflow/types';
+import { TABLE_STATUSES, type TableStatus } from '../status.constants';
 
 export class CreateTableDto {
   @IsInt()

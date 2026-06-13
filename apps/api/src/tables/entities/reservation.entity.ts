@@ -7,7 +7,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import type { ReservationStatus } from '@loklflow/types';
+import type { ReservationStatus } from '../status.constants';
 import { RestaurantTable } from './table.entity';
 
 @Entity('reservations')
