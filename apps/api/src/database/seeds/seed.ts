@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { seedPermissions } from './permissions.seed';
 import { seedRoles } from './roles.seed';
 import { seedMenu } from './menu.seed';
+import { seedTables } from './tables.seed';
 import { User } from '../../users/entities/user.entity';
 import { Role } from '../../roles/entities/role.entity';
 import { Permission } from '../../roles/entities/permission.entity';
@@ -19,6 +20,9 @@ import { Modifier } from '../../menu/entities/modifier.entity';
 import { ModifierOption } from '../../menu/entities/modifier-option.entity';
 import { Combo } from '../../menu/entities/combo.entity';
 import { ComboItem } from '../../menu/entities/combo-item.entity';
+import { Sector } from '../../tables/entities/sector.entity';
+import { RestaurantTable } from '../../tables/entities/table.entity';
+import { Reservation } from '../../tables/entities/reservation.entity';
 
 dotenv.config();
 
@@ -44,6 +48,9 @@ const dataSource = new DataSource({
     ModifierOption,
     Combo,
     ComboItem,
+    Sector,
+    RestaurantTable,
+    Reservation,
   ],
   synchronize: true,
 });
@@ -99,6 +106,7 @@ async function main() {
   await seedAdmin(dataSource);
   await seedBusinessConfig(dataSource);
   await seedMenu(dataSource);
+  await seedTables(dataSource);
 
   await dataSource.destroy();
   console.log('\nAll seeds completed successfully.');
