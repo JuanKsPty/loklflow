@@ -39,8 +39,8 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 ## Fase 2 — Core del Negocio
 > Un mesero toma una orden y cocina la ve en tiempo real.
 
-- [ ] Módulo de menú (categorías, productos, modificadores, combos)
-- [ ] Disponibilidad de productos por horario
+- [x] Módulo de menú (categorías, productos, modificadores, combos)
+- [x] Disponibilidad de productos por horario
 - [ ] Módulo de mesas y sectores (mapa visual)
 - [ ] Estados de mesa en tiempo real (`available`, `occupied`, `reserved`, `cleaning`, `maintenance`)
 - [ ] Fusión de mesas para órdenes grupales

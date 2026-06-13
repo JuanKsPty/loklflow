@@ -13,6 +13,7 @@ import { UsersModule } from './users/users.module';
 import { RolesModule } from './roles/roles.module';
 import { BusinessConfigModule } from './business-config/business-config.module';
 import { AuditModule } from './audit/audit.module';
+import { MenuModule } from './menu/menu.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 
@@ -31,6 +32,7 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
     RolesModule,
     BusinessConfigModule,
     AuditModule,
+    MenuModule,
   ],
   controllers: [AppController],
   providers: [

@@ -35,6 +35,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { title: 'Menú', href: '/admin/menu', icon: UtensilsCrossedIcon, permission: 'menu:read' },
   { title: 'Empleados', href: '/admin/users', icon: UsersIcon, permission: 'users:read' },
   { title: 'Roles', href: '/admin/roles', icon: ShieldIcon, permission: 'roles:read' },
   { title: 'Configuración', href: '/admin/settings', icon: SettingsIcon, permission: 'business_config:read' },

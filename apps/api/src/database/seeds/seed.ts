@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { seedPermissions } from './permissions.seed';
 import { seedRoles } from './roles.seed';
+import { seedMenu } from './menu.seed';
 import { User } from '../../users/entities/user.entity';
 import { Role } from '../../roles/entities/role.entity';
 import { Permission } from '../../roles/entities/permission.entity';
@@ -11,6 +12,13 @@ import { RolePermission } from '../../roles/entities/role-permission.entity';
 import { RefreshToken } from '../../auth/entities/refresh-token.entity';
 import { BusinessConfig } from '../../business-config/entities/business-config.entity';
 import { AuditLog } from '../../audit/entities/audit-log.entity';
+import { Category } from '../../menu/entities/category.entity';
+import { Product } from '../../menu/entities/product.entity';
+import { ProductAvailability } from '../../menu/entities/product-availability.entity';
+import { Modifier } from '../../menu/entities/modifier.entity';
+import { ModifierOption } from '../../menu/entities/modifier-option.entity';
+import { Combo } from '../../menu/entities/combo.entity';
+import { ComboItem } from '../../menu/entities/combo-item.entity';
 
 dotenv.config();
 
@@ -21,7 +29,22 @@ const dataSource = new DataSource({
   username: process.env.DATABASE_USER ?? 'loklflow',
   password: process.env.DATABASE_PASSWORD ?? 'loklflow',
   database: process.env.DATABASE_NAME ?? 'loklflow_db',
-  entities: [User, Role, Permission, RolePermission, RefreshToken, BusinessConfig, AuditLog],
+  entities: [
+    User,
+    Role,
+    Permission,
+    RolePermission,
+    RefreshToken,
+    BusinessConfig,
+    AuditLog,
+    Category,
+    Product,
+    ProductAvailability,
+    Modifier,
+    ModifierOption,
+    Combo,
+    ComboItem,
+  ],
   synchronize: true,
 });
 
@@ -75,6 +98,7 @@ async function main() {
   await seedRoles(dataSource);
   await seedAdmin(dataSource);
   await seedBusinessConfig(dataSource);
+  await seedMenu(dataSource);
 
   await dataSource.destroy();
   console.log('\nAll seeds completed successfully.');
