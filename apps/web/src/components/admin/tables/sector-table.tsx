@@ -1,8 +1,6 @@
-import Link from 'next/link';
 import { LayersIcon } from 'lucide-react';
 import type { Sector } from '@loklflow/types';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -12,6 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
+import { RowActions } from './row-actions';
 
 interface Props {
   sectors: Sector[];
@@ -58,9 +57,13 @@ export function SectorTable({ sectors }: Props) {
                 )}
               </TableCell>
               <TableCell className="text-right">
-                <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={`/admin/tables/sectors/${s.id}`} />}>
-                  Editar
-                </Button>
+                <RowActions
+                  kind="sector"
+                  id={s.id}
+                  editHref={`/admin/tables/sectors/${s.id}`}
+                  confirmTitle={`¿Eliminar el sector "${s.name}"?`}
+                  confirmDescription="Se eliminará el sector y todas las mesas que contiene. Esta acción no se puede deshacer."
+                />
               </TableCell>
             </TableRow>
           ))}

@@ -1,8 +1,6 @@
-import Link from 'next/link';
 import { LayoutGridIcon } from 'lucide-react';
 import type { RestaurantTable } from '@loklflow/types';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -13,6 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
 import { TABLE_STATUS_LABELS } from './constants';
+import { RowActions } from './row-actions';
 
 interface Props {
   tables: RestaurantTable[];
@@ -55,9 +54,13 @@ export function TableList({ tables }: Props) {
                 <Badge variant="secondary">{TABLE_STATUS_LABELS[t.status]}</Badge>
               </TableCell>
               <TableCell className="text-right">
-                <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={`/admin/tables/tables/${t.id}`} />}>
-                  Editar
-                </Button>
+                <RowActions
+                  kind="table"
+                  id={t.id}
+                  editHref={`/admin/tables/tables/${t.id}`}
+                  confirmTitle={`¿Eliminar la mesa ${t.number}?`}
+                  confirmDescription="Se eliminará la mesa de forma permanente. Esta acción no se puede deshacer."
+                />
               </TableCell>
             </TableRow>
           ))}

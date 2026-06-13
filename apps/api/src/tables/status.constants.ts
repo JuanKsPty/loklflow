@@ -17,3 +17,6 @@ export const RESERVATION_STATUSES = [
   'no_show',
 ] as const;
 export type ReservationStatus = (typeof RESERVATION_STATUSES)[number];
+
+export const TABLE_SHAPES = ['square', 'round'] as const;
+export type TableShape = (typeof TABLE_SHAPES)[number];

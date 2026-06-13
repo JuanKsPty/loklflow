@@ -2,22 +2,21 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import type { TableStatus } from '../status.constants';
+import type { TableStatus, TableShape } from '../status.constants';
 import { Sector } from './sector.entity';
 
 @Entity('tables')
-@Index(['sectorId', 'number'], { unique: true })
 export class RestaurantTable {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'int' })
+  // Número de mesa único en todo el negocio.
+  @Column({ type: 'int', unique: true })
   number!: number;
 
   @ManyToOne(() => Sector, (sector) => sector.tables, { onDelete: 'CASCADE' })
@@ -36,6 +35,19 @@ export class RestaurantTable {
     default: 'available',
   })
   status!: TableStatus;
+
+  @Column({
+    type: 'enum',
+    enum: ['square', 'round'],
+    default: 'square',
+  })
+  shape!: TableShape;
+
+  @Column({ name: 'position_x', type: 'int', nullable: true })
+  positionX!: number | null;
+
+  @Column({ name: 'position_y', type: 'int', nullable: true })
+  positionY!: number | null;
 
   @Column({ name: 'qr_code', type: 'varchar', length: 100, unique: true })
   qrCode!: string;

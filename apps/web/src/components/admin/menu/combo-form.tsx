@@ -143,7 +143,11 @@ export function ComboForm({ combo, products }: Props) {
                     control={control}
                     name={`items.${i}.productId`}
                     render={({ field }) => (
-                      <Select value={field.value || null} onValueChange={(v) => field.onChange(v ?? '')}>
+                      <Select
+                        items={products.map((p) => ({ value: p.id, label: p.name }))}
+                        value={field.value || null}
+                        onValueChange={(v) => field.onChange(v ?? '')}
+                      >
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Selecciona" />
                         </SelectTrigger>

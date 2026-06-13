@@ -113,7 +113,11 @@ export function ProductForm({ product, categories, modifiers }: Props) {
               control={control}
               name="categoryId"
               render={({ field }) => (
-                <Select value={field.value || null} onValueChange={(val) => field.onChange(val ?? '')}>
+                <Select
+                  items={categories.map((c) => ({ value: c.id, label: c.name }))}
+                  value={field.value || null}
+                  onValueChange={(val) => field.onChange(val ?? '')}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Sin categoría" />
                   </SelectTrigger>
@@ -202,6 +206,7 @@ export function ProductForm({ product, categories, modifiers }: Props) {
                     name={`availabilities.${i}.dayOfWeek`}
                     render={({ field }) => (
                       <Select
+                        items={DAYS.map((d, idx) => ({ value: String(idx), label: d }))}
                         value={String(field.value)}
                         onValueChange={(val) => field.onChange(Number(val))}
                       >

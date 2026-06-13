@@ -122,7 +122,11 @@ export function UserForm({ user, roles }: Props) {
             control={control}
             name="roleId"
             render={({ field }) => (
-              <Select value={field.value || null} onValueChange={(val) => field.onChange(val ?? '')}>
+              <Select
+                items={roles.map((r) => ({ value: r.id, label: r.name }))}
+                value={field.value || null}
+                onValueChange={(val) => field.onChange(val ?? '')}
+              >
                 <SelectTrigger className="w-full" aria-invalid={errors.roleId ? true : undefined}>
                   <SelectValue placeholder="Selecciona un rol" />
                 </SelectTrigger>

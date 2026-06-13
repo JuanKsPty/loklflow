@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TABLE_STATUSES, RESERVATION_STATUSES } from '@loklflow/types';
+import { TABLE_STATUSES, TABLE_SHAPES, RESERVATION_STATUSES } from '@loklflow/types';
 
 export const sectorSchema = z.object({
   name: z.string().min(2, 'Nombre requerido'),
@@ -13,6 +13,7 @@ export const tableSchema = z.object({
   sectorId: z.string().uuid('Selecciona un sector'),
   capacity: z.number().int().min(1, 'Capacidad inválida'),
   status: z.enum(TABLE_STATUSES as [string, ...string[]]),
+  shape: z.enum(TABLE_SHAPES as [string, ...string[]]),
   isActive: z.boolean(),
 });
 export type TableFormValues = z.infer<typeof tableSchema>;

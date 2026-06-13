@@ -1,4 +1,4 @@
-import type { ReservationStatus, TableStatus } from '@loklflow/types';
+import type { ReservationStatus, TableShape, TableStatus } from '@loklflow/types';
 
 export const TABLE_STATUS_LABELS: Record<TableStatus, string> = {
   available: 'Disponible',
@@ -15,6 +15,11 @@ export const TABLE_STATUS_MAP_CLASSES: Record<TableStatus, string> = {
   reserved: 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/20',
   cleaning: 'border-amber-500/40 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20',
   maintenance: 'border-muted-foreground/40 bg-muted text-muted-foreground hover:bg-muted/80',
+};
+
+export const TABLE_SHAPE_LABELS: Record<TableShape, string> = {
+  square: 'Cuadrada',
+  round: 'Redonda',
 };
 
 export const RESERVATION_STATUS_LABELS: Record<ReservationStatus, string> = {

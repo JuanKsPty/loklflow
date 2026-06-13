@@ -5,15 +5,22 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { TABLE_STATUSES, type RestaurantTable, type Sector, type TableStatus } from '@loklflow/types';
+import {
+  TABLE_STATUSES,
+  TABLE_SHAPES,
+  type RestaurantTable,
+  type Sector,
+  type TableStatus,
+  type TableShape,
+} from '@loklflow/types';
 import { tablesApi } from '@/lib/api/tables.api';
 import { tableSchema, type TableFormValues } from '@/lib/validations/tables.schema';
-import { TABLE_STATUS_LABELS } from './constants';
+import { TABLE_STATUS_LABELS, TABLE_SHAPE_LABELS } from './constants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
-import { Field, FieldLabel, FieldError, FieldGroup } from '@/components/ui/field';
+import { Field, FieldLabel, FieldError, FieldDescription, FieldGroup } from '@/components/ui/field';
 import {
   Select,
   SelectContent,
@@ -25,9 +32,10 @@ import {
 interface Props {
   table?: RestaurantTable;
   sectors: Sector[];
+  defaultNumber?: number;
 }
 
-export function TableForm({ table, sectors }: Props) {
+export function TableForm({ table, sectors, defaultNumber }: Props) {
   const router = useRouter();
 
   const {
@@ -38,10 +46,11 @@ export function TableForm({ table, sectors }: Props) {
   } = useForm<TableFormValues>({
     resolver: zodResolver(tableSchema),
     defaultValues: {
-      number: table?.number ?? 1,
+      number: table?.number ?? defaultNumber ?? 1,
       sectorId: table?.sectorId ?? '',
       capacity: table?.capacity ?? 4,
       status: table?.status ?? 'available',
+      shape: table?.shape ?? 'square',
       isActive: table?.isActive ?? true,
     },
   });
@@ -53,6 +62,7 @@ export function TableForm({ table, sectors }: Props) {
         sectorId: values.sectorId,
         capacity: values.capacity,
         status: values.status as TableStatus,
+        shape: values.shape as TableShape,
         isActive: values.isActive,
       };
       if (table) {
@@ -75,6 +85,7 @@ export function TableForm({ table, sectors }: Props) {
           <Field data-invalid={errors.number ? true : undefined} className="max-w-32">
             <FieldLabel htmlFor="number">Número</FieldLabel>
             <Input id="number" type="number" min={1} {...register('number', { valueAsNumber: true })} aria-invalid={errors.number ? true : undefined} />
+            {!table && <FieldDescription>Sugerido automáticamente.</FieldDescription>}
             <FieldError errors={errors.number ? [errors.number] : undefined} />
           </Field>
 
@@ -91,7 +102,11 @@ export function TableForm({ table, sectors }: Props) {
             control={control}
             name="sectorId"
             render={({ field }) => (
-              <Select value={field.value || null} onValueChange={(val) => field.onChange(val ?? '')}>
+              <Select
+                items={sectors.map((s) => ({ value: s.id, label: s.name }))}
+                value={field.value || null}
+                onValueChange={(val) => field.onChange(val ?? '')}
+              >
                 <SelectTrigger className="w-full" aria-invalid={errors.sectorId ? true : undefined}>
                   <SelectValue placeholder="Selecciona un sector" />
                 </SelectTrigger>
@@ -114,7 +129,11 @@ export function TableForm({ table, sectors }: Props) {
             control={control}
             name="status"
             render={({ field }) => (
-              <Select value={field.value} onValueChange={(val) => field.onChange(val ?? 'available')}>
+              <Select
+                items={TABLE_STATUSES.map((s) => ({ value: s, label: TABLE_STATUS_LABELS[s] }))}
+                value={field.value}
+                onValueChange={(val) => field.onChange(val ?? 'available')}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -122,6 +141,32 @@ export function TableForm({ table, sectors }: Props) {
                   {TABLE_STATUSES.map((status) => (
                     <SelectItem key={status} value={status}>
                       {TABLE_STATUS_LABELS[status]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+        </Field>
+
+        <Field>
+          <FieldLabel>Forma</FieldLabel>
+          <Controller
+            control={control}
+            name="shape"
+            render={({ field }) => (
+              <Select
+                items={TABLE_SHAPES.map((s) => ({ value: s, label: TABLE_SHAPE_LABELS[s] }))}
+                value={field.value}
+                onValueChange={(val) => field.onChange(val ?? 'square')}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TABLE_SHAPES.map((shape) => (
+                    <SelectItem key={shape} value={shape}>
+                      {TABLE_SHAPE_LABELS[shape]}
                     </SelectItem>
                   ))}
                 </SelectContent>

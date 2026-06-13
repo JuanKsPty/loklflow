@@ -1,8 +1,6 @@
-import Link from 'next/link';
 import { CalendarClockIcon } from 'lucide-react';
 import type { Reservation } from '@loklflow/types';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -13,6 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
 import { RESERVATION_STATUS_LABELS } from './constants';
+import { RowActions } from './row-actions';
 
 interface Props {
   reservations: Reservation[];
@@ -64,9 +63,13 @@ export function ReservationTable({ reservations }: Props) {
                 <Badge variant="secondary">{RESERVATION_STATUS_LABELS[r.status]}</Badge>
               </TableCell>
               <TableCell className="text-right">
-                <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={`/admin/tables/reservations/${r.id}`} />}>
-                  Editar
-                </Button>
+                <RowActions
+                  kind="reservation"
+                  id={r.id}
+                  editHref={`/admin/tables/reservations/${r.id}`}
+                  confirmTitle={`¿Eliminar la reserva de ${r.customerName}?`}
+                  confirmDescription="Se eliminará la reserva de forma permanente. Esta acción no se puede deshacer."
+                />
               </TableCell>
             </TableRow>
           ))}

@@ -110,7 +110,11 @@ export function ReservationForm({ reservation, tables }: Props) {
             control={control}
             name="tableId"
             render={({ field }) => (
-              <Select value={field.value || null} onValueChange={(val) => field.onChange(val ?? '')}>
+              <Select
+                items={tables.map((t) => ({ value: t.id, label: `Mesa ${t.number}` }))}
+                value={field.value || null}
+                onValueChange={(val) => field.onChange(val ?? '')}
+              >
                 <SelectTrigger className="w-full" aria-invalid={errors.tableId ? true : undefined}>
                   <SelectValue placeholder="Selecciona una mesa" />
                 </SelectTrigger>
@@ -140,7 +144,11 @@ export function ReservationForm({ reservation, tables }: Props) {
             control={control}
             name="status"
             render={({ field }) => (
-              <Select value={field.value} onValueChange={(val) => field.onChange(val ?? 'pending')}>
+              <Select
+                items={RESERVATION_STATUSES.map((s) => ({ value: s, label: RESERVATION_STATUS_LABELS[s] }))}
+                value={field.value}
+                onValueChange={(val) => field.onChange(val ?? 'pending')}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>

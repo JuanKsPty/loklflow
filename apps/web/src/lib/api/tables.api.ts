@@ -6,7 +6,9 @@ import type {
   RestaurantTable,
   CreateTablePayload,
   UpdateTablePayload,
+  BulkCreateTablePayload,
   TableStatus,
+  SaveLayoutPayload,
   Reservation,
   CreateReservationPayload,
   UpdateReservationPayload,
@@ -25,10 +27,14 @@ export const tablesApi = {
   getAll: () => api.get<RestaurantTable[]>('/tables'),
   getOne: (id: string) => api.get<RestaurantTable>(`/tables/${id}`),
   create: (payload: CreateTablePayload) => api.post<RestaurantTable>('/tables', payload),
+  createMany: (payload: BulkCreateTablePayload) =>
+    api.post<RestaurantTable[]>('/tables/bulk', payload),
   update: (id: string, payload: UpdateTablePayload) =>
     api.patch<RestaurantTable>(`/tables/${id}`, payload),
   updateStatus: (id: string, status: TableStatus) =>
     api.patch<RestaurantTable>(`/tables/${id}/status`, { status }),
+  saveLayout: (payload: SaveLayoutPayload) =>
+    api.patch<RestaurantTable[]>('/tables/layout', payload),
   remove: (id: string) => api.delete<void>(`/tables/${id}`),
 };
 

@@ -1,11 +1,13 @@
 import { randomUUID } from 'crypto';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { In, QueryFailedError, Repository } from 'typeorm';
 import type { TableStatus } from './status.constants';
 import { RestaurantTable } from './entities/table.entity';
 import { CreateTableDto } from './dto/create-table.dto';
 import { UpdateTableDto } from './dto/update-table.dto';
+import { LayoutPositionDto } from './dto/update-layout.dto';
+import { BulkCreateTableDto } from './dto/bulk-create-table.dto';
 
 @Injectable()
 export class TablesService {
@@ -30,17 +32,56 @@ export class TablesService {
     return table;
   }
 
+  async nextNumber(): Promise<number> {
+    const row = await this.tablesRepo
+      .createQueryBuilder('t')
+      .select('MAX(t.number)', 'max')
+      .getRawOne<{ max: number | null }>();
+    return (row?.max ?? 0) + 1;
+  }
+
   async create(dto: CreateTableDto) {
+    const number = dto.number ?? (await this.nextNumber());
     const table = this.tablesRepo.create({
-      number: dto.number,
+      number,
       sectorId: dto.sectorId,
       capacity: dto.capacity,
       status: dto.status ?? 'available',
+      shape: dto.shape ?? 'square',
+      positionX: dto.positionX ?? null,
+      positionY: dto.positionY ?? null,
       isActive: dto.isActive ?? true,
       qrCode: randomUUID(),
     });
     const saved = await this.saveUnique(table);
     return this.findOne(saved.id);
+  }
+
+  async createMany(dto: BulkCreateTableDto) {
+    const start = await this.nextNumber();
+    const capacity = dto.capacity ?? 4;
+    const shape = dto.shape ?? 'square';
+    const tables = Array.from({ length: dto.count }, (_, i) =>
+      this.tablesRepo.create({
+        number: start + i,
+        sectorId: dto.sectorId,
+        capacity,
+        shape,
+        status: 'available',
+        positionX: null,
+        positionY: null,
+        qrCode: randomUUID(),
+      }),
+    );
+    try {
+      await this.tablesRepo.save(tables);
+    } catch (err) {
+      if (err instanceof QueryFailedError && /unique|duplicate/i.test(err.message)) {
+        throw new BadRequestException('Conflicto de números al crear las mesas, intenta de nuevo');
+      }
+      throw err;
+    }
+    return this.findAll();
   }
 
   async update(id: string, dto: UpdateTableDto) {
@@ -62,14 +103,29 @@ export class TablesService {
     await this.tablesRepo.remove(table);
   }
 
+  async saveLayout(positions: LayoutPositionDto[]) {
+    const ids = positions.map((p) => p.id);
+    const tables = await this.tablesRepo.find({ where: { id: In(ids) } });
+    const byId = new Map(tables.map((t) => [t.id, t]));
+
+    for (const pos of positions) {
+      const table = byId.get(pos.id);
+      if (!table) continue;
+      table.positionX = pos.positionX;
+      table.positionY = pos.positionY;
+      if (pos.shape) table.shape = pos.shape;
+    }
+
+    await this.tablesRepo.save([...byId.values()]);
+    return this.findAll();
+  }
+
   private async saveUnique(table: RestaurantTable) {
     try {
       return await this.tablesRepo.save(table);
     } catch (err) {
       if (err instanceof QueryFailedError && /unique|duplicate/i.test(err.message)) {
-        throw new BadRequestException(
-          `Ya existe una mesa con el número ${table.number} en ese sector`,
-        );
+        throw new BadRequestException(`Ya existe una mesa con el número ${table.number}`);
       }
       throw err;
     }

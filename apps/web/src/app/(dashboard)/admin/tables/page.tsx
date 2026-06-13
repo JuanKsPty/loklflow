@@ -3,8 +3,10 @@ import { PlusIcon } from 'lucide-react';
 import { serverFetch } from '@/lib/api/server-client';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
+import { hasPermission } from '@/lib/auth/server-user';
 import { TablesTabs } from '@/components/admin/tables/tables-tabs';
-import { TableMap } from '@/components/admin/tables/table-map';
+import { TableFloorPlan } from '@/components/admin/tables/table-floor-plan';
+import { BulkTablesDialog } from '@/components/admin/tables/bulk-tables-dialog';
 import { TableList } from '@/components/admin/tables/table-table';
 import { SectorTable } from '@/components/admin/tables/sector-table';
 import { ReservationTable } from '@/components/admin/tables/reservation-table';
@@ -34,6 +36,8 @@ export default async function TablesPage({ searchParams }: Props) {
   const { tab } = await searchParams;
   const active: Tab = TABS.includes(tab as Tab) ? (tab as Tab) : 'map';
 
+  const canEdit = await hasPermission('tables:update');
+
   let sectors: Sector[] = [];
   let tables: RestaurantTable[] = [];
   let reservations: Reservation[] = [];
@@ -53,10 +57,16 @@ export default async function TablesPage({ searchParams }: Props) {
 
       <TablesTabs
         initial={active}
-        map={<TableMap sectors={sectors} tables={tables} />}
+        map={<TableFloorPlan sectors={sectors} tables={tables} canEdit={canEdit} />}
         tables={
           <>
-            <TabAction href="/admin/tables/tables/new" label="Nueva mesa" />
+            <div className="mb-3 flex justify-end gap-2">
+              <BulkTablesDialog sectors={sectors} />
+              <Button nativeButton={false} render={<Link href="/admin/tables/tables/new" />}>
+                <PlusIcon />
+                Nueva mesa
+              </Button>
+            </div>
             <TableList tables={tables} />
           </>
         }
