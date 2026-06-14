@@ -92,7 +92,7 @@ Detalle completo en [docs/ROADMAP.md](./docs/ROADMAP.md).
 ```
 Fase 0 ████████████████████ 100%  — Completada
 Fase 1 ████████████████████ 100%  — Completada (deploy/CI diferidos)
-Fase 2 █████████████░░░░░░░   65%  — En progreso (2.1·2.2·2.3·2.4 hechos)
+Fase 2 ████████████████░░░░   80%  — En progreso (2.1·2.2·2.3·2.4·2.5 hechos)
 Fase 3 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 Fase 4 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 Fase 5 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
@@ -108,8 +108,9 @@ Fase 6 ░░░░░░░░░░░░░░░░░░░░    0%  — P
 | **Mesas y Sectores** | Sectores, mesas (número único global, estados), reservas y **editor visual de distribución** (drag-and-drop, zonas, formas, creación masiva) |
 | **Órdenes** | Órdenes con ítems y modificadores, cálculo de totales, flujo de estados con historial de transiciones |
 | **Tiempo real** | WebSockets (Socket.io) con handshake autenticado por cookie; órdenes y estado de mesas se actualizan en vivo en el panel sin recargar |
+| **Vista de mesero** | App móvil (`/waiter`, login por PIN): salón con mesas por sector, tomar orden con modificadores, avanzar estados y cambiar estado de mesa, todo en vivo |
 
-> En camino (Fase 2): vista de mesero (móvil), KDS de cocina y notificaciones persistidas entre roles.
+> En camino (Fase 2): KDS de cocina (pantalla dedicada) y notificaciones persistidas entre roles.
 
 ---
 

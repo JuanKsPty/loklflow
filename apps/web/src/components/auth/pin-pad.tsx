@@ -42,7 +42,7 @@ export function PinPad({ userId, userName }: PinPadProps) {
     try {
       const user = await authApi.pinLogin({ userId, pin });
       setUser(user as AuthUser);
-      router.push('/orders');
+      router.push('/waiter');
     } catch {
       toast.error('PIN incorrecto');
       setPin('');

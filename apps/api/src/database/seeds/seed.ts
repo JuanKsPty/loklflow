@@ -90,6 +90,33 @@ async function seedAdmin(ds: DataSource) {
   }
 }
 
+async function seedWaiter(ds: DataSource) {
+  const usersRepo = ds.getRepository(User);
+  const rolesRepo = ds.getRepository(Role);
+
+  const waiterRole = await rolesRepo.findOne({ where: { name: 'Mesero' } });
+  if (!waiterRole) {
+    console.error('Mesero role not found — run roles seed first');
+    return;
+  }
+
+  const existing = await usersRepo.findOne({ where: { email: 'mesero@loklflow.com' } });
+  if (!existing) {
+    await usersRepo.save(
+      usersRepo.create({
+        name: 'Mesero Demo',
+        email: 'mesero@loklflow.com',
+        pin: await bcrypt.hash('1234', 10),
+        role: waiterRole,
+        isActive: true,
+      }),
+    );
+    console.log('✓ Waiter user seeded — login por PIN: Mesero Demo / PIN: 1234');
+  } else {
+    console.log('✓ Waiter user already exists');
+  }
+}
+
 async function seedBusinessConfig(ds: DataSource) {
   const repo = ds.getRepository(BusinessConfig);
   const existing = await repo.findOne({ where: {} });
@@ -112,6 +139,7 @@ async function main() {
   await seedPermissions(dataSource);
   await seedRoles(dataSource);
   await seedAdmin(dataSource);
+  await seedWaiter(dataSource);
   await seedBusinessConfig(dataSource);
   await seedMenu(dataSource);
   await seedTables(dataSource);
