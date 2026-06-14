@@ -92,7 +92,7 @@ Detalle completo en [docs/ROADMAP.md](./docs/ROADMAP.md).
 ```
 Fase 0 ████████████████████ 100%  — Completada
 Fase 1 ████████████████████ 100%  — Completada (deploy/CI diferidos)
-Fase 2 ██████████████████░░   90%  — En progreso (KDS listo; faltan fusión de mesas y notif. persistidas)
+Fase 2 ███████████████████░   95%  — Casi lista (solo fusión de mesas, diferida)
 Fase 3 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 Fase 4 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 Fase 5 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
@@ -110,8 +110,9 @@ Fase 6 ░░░░░░░░░░░░░░░░░░░░    0%  — P
 | **Tiempo real** | WebSockets (Socket.io) con handshake autenticado por cookie; órdenes y estado de mesas se actualizan en vivo en el panel sin recargar |
 | **Vista de mesero** | App móvil (`/waiter`, login por PIN): salón con mesas por sector, tomar orden con modificadores, avanzar estados y cambiar estado de mesa, todo en vivo |
 | **KDS de cocina** | Pantalla dedicada (`/kitchen`, login por PIN): tablero por columnas (pendientes/en preparación/listas) con tiempo transcurrido, avance por orden en vivo |
+| **Notificaciones** | Avisos persistidos entre roles (campana con no leídas + bandeja): cocina recibe órdenes nuevas, el mesero recibe "orden lista"; push por WebSocket y persistencia en BD |
 
-> En camino (Fase 2): fusión de mesas y notificaciones persistidas entre roles.
+> Pendiente diferido de Fase 2: fusión de mesas para órdenes grupales.
 
 ---
 

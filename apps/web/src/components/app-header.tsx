@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -64,7 +65,8 @@ export function AppHeader() {
           ))}
         </BreadcrumbList>
       </Breadcrumb>
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-1">
+        <NotificationBell area="admin" />
         <ThemeToggle />
       </div>
     </header>

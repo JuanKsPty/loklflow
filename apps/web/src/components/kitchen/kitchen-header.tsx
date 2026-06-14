@@ -6,6 +6,7 @@ import { authApi } from '@/lib/api/auth.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 
 export function KitchenHeader({ name, roleName }: { name: string; roleName: string }) {
   const router = useRouter();
@@ -32,6 +33,7 @@ export function KitchenHeader({ name, roleName }: { name: string; roleName: stri
         </p>
       </div>
       <div className="ml-auto flex items-center gap-1">
+        <NotificationBell area="kitchen" />
         <ThemeToggle />
         <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Cerrar sesión">
           <LogOutIcon />

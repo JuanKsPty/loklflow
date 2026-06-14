@@ -43,7 +43,7 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 - [x] Disponibilidad de productos por horario
 - [x] Módulo de mesas y sectores (mapa visual)
 - [x] Estados de mesa en tiempo real (`available`, `occupied`, `reserved`, `cleaning`, `maintenance`)
-- [ ] Fusión de mesas para órdenes grupales
+- [ ] Fusión de mesas para órdenes grupales _(diferida — columna `merged_into_order_id` ya existe)_
 - [x] Gestión de reservas de mesa
 - [x] Módulo de órdenes completo
 - [x] Historial de transiciones de estado (`order_status_history`) para métricas de tiempo
@@ -51,7 +51,7 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 - [x] Vista de mesero (tomar orden desde móvil)
 - [x] Vista KDS de cocina (pantalla dedicada)
 - [x] Flujo de estados de orden (pendiente → en preparación → lista → entregada → cerrada)
-- [ ] Notificaciones en tiempo real entre roles (WebSocket + persistencia en BD)
+- [x] Notificaciones en tiempo real entre roles (WebSocket + persistencia en BD)
 
 **Entregable:** Flujo completo de orden desde mesero hasta cocina en tiempo real.
 

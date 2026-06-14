@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 
 export function WaiterHeader({ name, roleName }: { name: string; roleName: string }) {
   const router = useRouter();
@@ -34,6 +35,7 @@ export function WaiterHeader({ name, roleName }: { name: string; roleName: strin
         <p className="truncate text-sm font-medium">{name}</p>
         <p className="truncate text-xs text-muted-foreground">{roleName}</p>
       </div>
+      <NotificationBell area="waiter" />
       <ThemeToggle />
       <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Cerrar sesión">
         <LogOutIcon />

@@ -17,6 +17,7 @@ import { MenuModule } from './menu/menu.module';
 import { TablesModule } from './tables/tables.module';
 import { OrdersModule } from './orders/orders.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 
@@ -39,6 +40,7 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
     TablesModule,
     OrdersModule,
     RealtimeModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [

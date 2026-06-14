@@ -27,6 +27,10 @@ export interface TableEvent {
   status?: string;
 }
 
+export interface NotificationEvent {
+  title: string;
+}
+
 @WebSocketGateway({ cors: { origin: CORS_ORIGINS, credentials: true } })
 export class RealtimeGateway implements OnGatewayConnection {
   private readonly logger = new Logger(RealtimeGateway.name);
@@ -50,6 +54,9 @@ export class RealtimeGateway implements OnGatewayConnection {
       const perms = payload.permissions ?? [];
       if (perms.includes('orders:read')) void socket.join('orders');
       if (perms.includes('tables:read')) void socket.join('tables');
+      // Salas personales para notificaciones dirigidas.
+      if (payload.sub) void socket.join(`user:${payload.sub}`);
+      if (payload.roleName) void socket.join(`role:${payload.roleName}`);
     } catch {
       socket.disconnect();
     }
@@ -61,6 +68,14 @@ export class RealtimeGateway implements OnGatewayConnection {
 
   emitTable(payload: TableEvent) {
     this.server.to('tables').emit('table:changed', payload);
+  }
+
+  pushToUser(userId: string, payload: NotificationEvent) {
+    this.server.to(`user:${userId}`).emit('notification:new', payload);
+  }
+
+  pushToRole(roleName: string, payload: NotificationEvent) {
+    this.server.to(`role:${roleName}`).emit('notification:new', payload);
   }
 
   /** Extrae el access_token de la cookie del handshake (httpOnly) o del header Bearer. */

@@ -14,6 +14,7 @@ import { UpdateItemDto } from './dto/update-item.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { UpdateItemStatusDto } from './dto/update-item-status.dto';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const ORDER_RELATIONS = {
   table: true,
@@ -29,6 +30,7 @@ export class OrdersService {
     @InjectRepository(Product) private productsRepo: Repository<Product>,
     @InjectRepository(ModifierOption) private optionsRepo: Repository<ModifierOption>,
     private readonly realtime: RealtimeGateway,
+    private readonly notifications: NotificationsService,
   ) {}
 
   findAll(filters?: { status?: OrderStatus; tableId?: string }) {
@@ -88,6 +90,13 @@ export class OrdersService {
     }
     const result = await this.findOne(saved.id);
     this.emit(result, 'created');
+    void this.notifications.notifyRole('Cocina', {
+      type: 'order_new',
+      title: `Nueva orden #${result.orderNumber}`,
+      body: this.orderLocation(result),
+      resourceType: 'order',
+      resourceId: result.id,
+    });
     return result;
   }
 
@@ -156,6 +165,17 @@ export class OrdersService {
     await this.ordersRepo.save(order);
     const result = await this.findOne(orderId);
     this.emit(result, 'status');
+    if (result.status === 'ready') {
+      const payload = {
+        type: 'order_ready' as const,
+        title: `Orden #${result.orderNumber} lista`,
+        body: this.orderLocation(result),
+        resourceType: 'order',
+        resourceId: result.id,
+      };
+      if (result.waiterId) void this.notifications.notifyUser(result.waiterId, payload);
+      else void this.notifications.notifyRole('Mesero', payload);
+    }
     return result;
   }
 
@@ -171,6 +191,10 @@ export class OrdersService {
   }
 
   // ---- helpers ----
+
+  private orderLocation(order: Order): string {
+    return order.table ? `Mesa ${order.table.number}` : 'Para llevar';
+  }
 
   private emit(order: Order, type: 'created' | 'item' | 'status') {
     this.realtime.emitOrder({

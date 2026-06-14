@@ -7,6 +7,7 @@ import { OrderStatusHistory } from './entities/order-status-history.entity';
 import { Product } from '../menu/entities/product.entity';
 import { ModifierOption } from '../menu/entities/modifier-option.entity';
 import { RealtimeModule } from '../realtime/realtime.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 
@@ -21,6 +22,7 @@ import { OrdersService } from './orders.service';
       ModifierOption,
     ]),
     RealtimeModule,
+    NotificationsModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

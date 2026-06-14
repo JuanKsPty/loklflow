@@ -55,6 +55,17 @@ export class UsersService {
       .getMany();
   }
 
+  /** Usuarios activos de un rol por nombre (para fan-out de notificaciones). */
+  async findActiveByRoleName(roleName: string) {
+    return this.usersRepo
+      .createQueryBuilder('user')
+      .leftJoin('user.role', 'role')
+      .where('user.isActive = :active', { active: true })
+      .andWhere('role.name = :roleName', { roleName })
+      .select(['user.id'])
+      .getMany();
+  }
+
   async create(dto: CreateUserDto) {
     if (!dto.email && !dto.pin) {
       throw new BadRequestException('User must have either an email or a PIN');
