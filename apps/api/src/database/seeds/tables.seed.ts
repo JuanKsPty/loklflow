@@ -12,6 +12,12 @@ export async function seedTables(dataSource: DataSource) {
   const sectorsRepo = dataSource.getRepository(Sector);
   const tablesRepo = dataSource.getRepository(RestaurantTable);
 
+  // Idempotente: si ya hay mesas, no sembramos (los números son únicos globales).
+  if ((await tablesRepo.count()) > 0) {
+    console.log('✓ Tables seed omitido (ya existen mesas)');
+    return;
+  }
+
   let placed = 0;
   for (const s of SECTORS) {
     let sector = await sectorsRepo.findOne({ where: { name: s.name } });

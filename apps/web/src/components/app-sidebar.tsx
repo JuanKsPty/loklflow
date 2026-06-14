@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { UsersIcon, ShieldIcon, SettingsIcon, ChevronsUpDownIcon, LogOutIcon, UtensilsCrossedIcon, LayoutGridIcon } from 'lucide-react';
+import { UsersIcon, ShieldIcon, SettingsIcon, ChevronsUpDownIcon, LogOutIcon, UtensilsCrossedIcon, LayoutGridIcon, ReceiptTextIcon } from 'lucide-react';
 import { authApi } from '@/lib/api/auth.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -37,6 +37,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { title: 'Menú', href: '/admin/menu', icon: UtensilsCrossedIcon, permission: 'menu:read' },
   { title: 'Mesas', href: '/admin/tables', icon: LayoutGridIcon, permission: 'tables:read' },
+  { title: 'Órdenes', href: '/admin/orders', icon: ReceiptTextIcon, permission: 'orders:read' },
   { title: 'Empleados', href: '/admin/users', icon: UsersIcon, permission: 'users:read' },
   { title: 'Roles', href: '/admin/roles', icon: ShieldIcon, permission: 'roles:read' },
   { title: 'Configuración', href: '/admin/settings', icon: SettingsIcon, permission: 'business_config:read' },

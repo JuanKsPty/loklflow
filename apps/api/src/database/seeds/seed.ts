@@ -23,6 +23,10 @@ import { ComboItem } from '../../menu/entities/combo-item.entity';
 import { Sector } from '../../tables/entities/sector.entity';
 import { RestaurantTable } from '../../tables/entities/table.entity';
 import { Reservation } from '../../tables/entities/reservation.entity';
+import { Order } from '../../orders/entities/order.entity';
+import { OrderItem } from '../../orders/entities/order-item.entity';
+import { OrderItemModifier } from '../../orders/entities/order-item-modifier.entity';
+import { OrderStatusHistory } from '../../orders/entities/order-status-history.entity';
 
 dotenv.config();
 
@@ -51,6 +55,10 @@ const dataSource = new DataSource({
     Sector,
     RestaurantTable,
     Reservation,
+    Order,
+    OrderItem,
+    OrderItemModifier,
+    OrderStatusHistory,
   ],
   synchronize: true,
 });

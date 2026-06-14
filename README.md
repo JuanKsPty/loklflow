@@ -8,7 +8,7 @@
 
 ![Status](https://img.shields.io/badge/estado-en%20desarrollo-yellow?style=flat-square)
 ![License](https://img.shields.io/badge/licencia-MIT-blue?style=flat-square)
-![Phase](https://img.shields.io/badge/fase%20actual-0%20%E2%80%94%20Fundaci%C3%B3n-orange?style=flat-square)
+![Phase](https://img.shields.io/badge/fase%20actual-2%20%E2%80%94%20Core%20del%20Negocio-blue?style=flat-square)
 ![Stack](https://img.shields.io/badge/stack-NestJS%20%7C%20Next.js%20%7C%20PostgreSQL-informational?style=flat-square)
 ![Monorepo](https://img.shields.io/badge/monorepo-Turborepo-EF4444?style=flat-square&logo=turborepo)
 
@@ -90,14 +90,25 @@ Detalle completo en [docs/ROADMAP.md](./docs/ROADMAP.md).
 ## Estado Actual
 
 ```
-Fase 0 ████░░░░░░░░░░░░░░░░  20%  — En progreso
-Fase 1 ░░░░░░░░░░░░░░░░░░░░   0%  — Pendiente
-Fase 2 ░░░░░░░░░░░░░░░░░░░░   0%  — Pendiente
-Fase 3 ░░░░░░░░░░░░░░░░░░░░   0%  — Pendiente
-Fase 4 ░░░░░░░░░░░░░░░░░░░░   0%  — Pendiente
-Fase 5 ░░░░░░░░░░░░░░░░░░░░   0%  — Pendiente
-Fase 6 ░░░░░░░░░░░░░░░░░░░░   0%  — Pendiente
+Fase 0 ████████████████████ 100%  — Completada
+Fase 1 ████████████████████ 100%  — Completada (deploy/CI diferidos)
+Fase 2 ██████████░░░░░░░░░░   50%  — En progreso (2.1·2.2·2.3 hechos)
+Fase 3 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
+Fase 4 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
+Fase 5 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
+Fase 6 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 ```
+
+### Módulos implementados
+
+| Módulo | Descripción |
+|--------|-------------|
+| **Auth + RBAC** | Login email/PIN, JWT + refresh, roles y permisos granulares, panel admin, auditoría |
+| **Menú** | Categorías, productos, modificadores, combos y disponibilidad por horario |
+| **Mesas y Sectores** | Sectores, mesas (número único global, estados), reservas y **editor visual de distribución** (drag-and-drop, zonas, formas, creación masiva) |
+| **Órdenes** | Órdenes con ítems y modificadores, cálculo de totales, flujo de estados con historial de transiciones |
+
+> En camino (Fase 2): WebSockets en tiempo real, vista de mesero (móvil) y KDS de cocina.
 
 ---
 
@@ -153,8 +164,6 @@ loklflow/
 ---
 
 ## Cómo Correr el Proyecto
-
-> ⚠️ Instrucciones disponibles a partir de la Fase 1.
 
 ```bash
 # Clonar el repositorio
