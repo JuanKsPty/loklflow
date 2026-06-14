@@ -40,9 +40,13 @@ export function PinPad({ userId, userName }: PinPadProps) {
     }
     setLoading(true);
     try {
-      const user = await authApi.pinLogin({ userId, pin });
-      setUser(user as AuthUser);
-      router.push('/waiter');
+      const user = (await authApi.pinLogin({ userId, pin })) as AuthUser;
+      setUser(user);
+      // Rol-aware: cocina entra al KDS; meseros (orders:create) al salón.
+      const perms = user.permissions ?? [];
+      if (perms.includes('orders:create')) router.push('/waiter');
+      else if (perms.includes('orders:update')) router.push('/kitchen');
+      else router.push('/admin');
     } catch {
       toast.error('PIN incorrecto');
       setPin('');

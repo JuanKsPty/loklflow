@@ -117,6 +117,33 @@ async function seedWaiter(ds: DataSource) {
   }
 }
 
+async function seedKitchen(ds: DataSource) {
+  const usersRepo = ds.getRepository(User);
+  const rolesRepo = ds.getRepository(Role);
+
+  const kitchenRole = await rolesRepo.findOne({ where: { name: 'Cocina' } });
+  if (!kitchenRole) {
+    console.error('Cocina role not found — run roles seed first');
+    return;
+  }
+
+  const existing = await usersRepo.findOne({ where: { email: 'cocina@loklflow.com' } });
+  if (!existing) {
+    await usersRepo.save(
+      usersRepo.create({
+        name: 'Cocina Demo',
+        email: 'cocina@loklflow.com',
+        pin: await bcrypt.hash('5678', 10),
+        role: kitchenRole,
+        isActive: true,
+      }),
+    );
+    console.log('✓ Kitchen user seeded — login por PIN: Cocina Demo / PIN: 5678');
+  } else {
+    console.log('✓ Kitchen user already exists');
+  }
+}
+
 async function seedBusinessConfig(ds: DataSource) {
   const repo = ds.getRepository(BusinessConfig);
   const existing = await repo.findOne({ where: {} });
@@ -140,6 +167,7 @@ async function main() {
   await seedRoles(dataSource);
   await seedAdmin(dataSource);
   await seedWaiter(dataSource);
+  await seedKitchen(dataSource);
   await seedBusinessConfig(dataSource);
   await seedMenu(dataSource);
   await seedTables(dataSource);

@@ -49,7 +49,7 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 - [x] Historial de transiciones de estado (`order_status_history`) para métricas de tiempo
 - [x] WebSockets — cocina recibe órdenes al instante
 - [x] Vista de mesero (tomar orden desde móvil)
-- [ ] Vista KDS de cocina (pantalla dedicada)
+- [x] Vista KDS de cocina (pantalla dedicada)
 - [x] Flujo de estados de orden (pendiente → en preparación → lista → entregada → cerrada)
 - [ ] Notificaciones en tiempo real entre roles (WebSocket + persistencia en BD)
 
