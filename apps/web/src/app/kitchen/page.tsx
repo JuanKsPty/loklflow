@@ -18,10 +18,10 @@ export default async function KitchenPage() {
     // tablero vacío si la API no responde
   }
 
-  // Lo más viejo primero para priorizar en cocina.
-  const sorted = [...orders].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-  );
+  // Solo órdenes con algún ítem de cocina; lo más viejo primero para priorizar.
+  const sorted = [...orders]
+    .filter((o) => (o.items ?? []).some((i) => i.product?.station === 'kitchen'))
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   const byStatus = (status: OrderStatus) => sorted.filter((o) => o.status === status);
 
   return (

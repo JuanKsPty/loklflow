@@ -33,6 +33,7 @@ export interface OrderStatusHistory {
 export interface Order {
   id: string;
   orderNumber: number;
+  label: string | null;
   tableId: string | null;
   table?: RestaurantTable | null;
   waiterId: string | null;
@@ -60,6 +61,7 @@ export interface CreateOrderItemPayload {
 
 export interface CreateOrderPayload {
   tableId?: string;
+  label?: string;
   source?: OrderSource;
   notes?: string;
   items: CreateOrderItemPayload[];

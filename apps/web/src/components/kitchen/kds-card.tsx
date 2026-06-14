@@ -22,6 +22,8 @@ export function KdsCard({ order }: { order: Order }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const advance = ADVANCE[order.status];
+  // En cocina solo se muestran (y preparan) los ítems de estación cocina.
+  const kitchenItems = (order.items ?? []).filter((i) => i.product?.station === 'kitchen');
 
   async function run(next: OrderStatus, okMsg: string) {
     setBusy(true);
@@ -41,7 +43,10 @@ export function KdsCard({ order }: { order: Order }) {
       <CardContent className="flex flex-col gap-3 py-4">
         <div className="flex items-center justify-between gap-2">
           <div className="leading-tight">
-            <p className="text-base font-bold">#{order.orderNumber}</p>
+            <p className="text-base font-bold">
+              #{order.orderNumber}
+              {order.label && <span className="ml-1.5 text-sm font-medium text-muted-foreground">· {order.label}</span>}
+            </p>
             <p className="text-xs text-muted-foreground">
               {order.table ? `Mesa ${order.table.number}` : 'Para llevar'}
             </p>
@@ -50,7 +55,7 @@ export function KdsCard({ order }: { order: Order }) {
         </div>
 
         <ul className="flex flex-col gap-1.5 border-t pt-2 text-sm">
-          {(order.items ?? []).map((item) => (
+          {kitchenItems.map((item) => (
             <li key={item.id}>
               <span className="font-medium">
                 {item.quantity}× {item.product?.name ?? 'Producto'}

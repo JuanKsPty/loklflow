@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { ChevronLeftIcon } from 'lucide-react';
 import { serverFetch } from '@/lib/api/server-client';
 import { Button } from '@/components/ui/button';
-import { MobileOrderBuilder } from '@/components/waiter/mobile-order-builder';
-import type { Modifier, Product, RestaurantTable } from '@loklflow/types';
+import { PosOrderBuilder } from '@/components/waiter/pos-order-builder';
+import type { Category, Modifier, Product } from '@loklflow/types';
 
 interface Props {
   searchParams: Promise<{ tableId?: string }>;
@@ -12,12 +12,12 @@ interface Props {
 export default async function WaiterNewOrderPage({ searchParams }: Props) {
   const { tableId } = await searchParams;
 
-  let tables: RestaurantTable[] = [];
+  let categories: Category[] = [];
   let products: Product[] = [];
   let modifiers: Modifier[] = [];
   try {
-    [tables, products, modifiers] = await Promise.all([
-      serverFetch<RestaurantTable[]>('/tables'),
+    [categories, products, modifiers] = await Promise.all([
+      serverFetch<Category[]>('/menu/categories'),
       serverFetch<Product[]>('/menu/products'),
       serverFetch<Modifier[]>('/menu/modifiers'),
     ]);
@@ -28,18 +28,22 @@ export default async function WaiterNewOrderPage({ searchParams }: Props) {
   const backHref = tableId ? `/waiter/mesa/${tableId}` : '/waiter';
 
   return (
-    <div>
-      <Button variant="ghost" size="sm" className="mb-2 -ml-2" nativeButton={false} render={<Link href={backHref} />}>
-        <ChevronLeftIcon />
-        Volver
-      </Button>
-      <h1 className="mb-4 text-xl font-semibold">Tomar orden</h1>
-      <MobileOrderBuilder
-        tables={tables}
-        products={products.filter((p) => p.isActive)}
-        modifiers={modifiers}
-        defaultTableId={tableId}
-      />
+    <div className="flex h-full flex-col">
+      <div className="mb-3 flex items-center gap-2">
+        <Button variant="ghost" size="sm" className="-ml-2" nativeButton={false} render={<Link href={backHref} />}>
+          <ChevronLeftIcon />
+          Volver
+        </Button>
+        <h1 className="text-lg font-semibold">Nueva cuenta</h1>
+      </div>
+      <div className="min-h-0 flex-1">
+        <PosOrderBuilder
+          tableId={tableId}
+          categories={categories.filter((c) => c.isActive)}
+          products={products.filter((p) => p.isActive)}
+          modifiers={modifiers}
+        />
+      </div>
     </div>
   );
 }

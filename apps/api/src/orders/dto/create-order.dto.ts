@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -34,6 +35,11 @@ export class CreateOrderDto {
   @IsOptional()
   @IsUUID()
   tableId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  label?: string;
 
   @IsOptional()
   @IsIn(ORDER_SOURCES)

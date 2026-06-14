@@ -1,5 +1,6 @@
 import type { Category } from './category.interface';
 import type { Modifier } from './modifier.interface';
+import type { PreparationStation } from './preparation-station';
 
 export interface ProductAvailability {
   id: string;
@@ -17,6 +18,7 @@ export interface Product {
   imageUrl: string | null;
   categoryId: string | null;
   category?: Category | null;
+  station: PreparationStation;
   isActive: boolean;
   modifiers?: Modifier[];
   availabilities?: ProductAvailability[];
@@ -37,6 +39,7 @@ export interface CreateProductPayload {
   price: number;
   imageUrl?: string;
   categoryId?: string;
+  station?: PreparationStation;
   isActive?: boolean;
   modifierIds?: string[];
   availabilities?: ProductAvailabilityPayload[];

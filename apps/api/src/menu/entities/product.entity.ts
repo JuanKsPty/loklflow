@@ -14,6 +14,7 @@ import { Category } from './category.entity';
 import { Modifier } from './modifier.entity';
 import { ProductAvailability } from './product-availability.entity';
 import { DecimalTransformer } from '../../common/transformers/decimal.transformer';
+import type { PreparationStation } from '../preparation-station.constants';
 
 @Entity('products')
 export class Product {
@@ -38,6 +39,9 @@ export class Product {
 
   @Column({ name: 'category_id', type: 'uuid', nullable: true })
   categoryId!: string | null;
+
+  @Column({ type: 'varchar', length: 20, default: 'kitchen' })
+  station!: PreparationStation;
 
   @Column({ name: 'is_active', default: true })
   isActive!: boolean;

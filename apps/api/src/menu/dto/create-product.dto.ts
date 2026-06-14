@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -13,6 +14,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+import { PREPARATION_STATIONS, type PreparationStation } from '../preparation-station.constants';
 
 export class ProductAvailabilityDto {
   @IsInt()
@@ -51,6 +53,10 @@ export class CreateProductDto {
   @IsOptional()
   @IsUUID()
   categoryId?: string;
+
+  @IsOptional()
+  @IsIn(PREPARATION_STATIONS)
+  station?: PreparationStation;
 
   @IsOptional()
   @IsBoolean()

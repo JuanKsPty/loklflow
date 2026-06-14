@@ -10,7 +10,7 @@ import type {
   OrderStatus,
   Product,
 } from '@loklflow/types';
-import { ORDER_ITEM_STATUSES } from '@loklflow/types';
+import { ORDER_ITEM_STATUSES, PREPARATION_STATION_LABELS } from '@loklflow/types';
 import { ordersApi } from '@/lib/api/orders.api';
 import { formatPrice } from '@/lib/format';
 import {
@@ -71,8 +71,9 @@ export function MobileOrderDetail({ order, products }: Props) {
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Orden #{order.orderNumber}</h1>
+          <h1 className="text-2xl font-semibold">{order.label || `Orden #${order.orderNumber}`}</h1>
           <p className="text-sm text-muted-foreground">
+            {order.label && `#${order.orderNumber} · `}
             {order.table ? `Mesa ${order.table.number}` : 'Para llevar'}
           </p>
         </div>
@@ -114,6 +115,11 @@ export function MobileOrderDetail({ order, products }: Props) {
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">
                     {item.quantity}× {item.product?.name ?? 'Producto'}
+                    {item.product?.station && item.product.station !== 'kitchen' && (
+                      <Badge variant="outline" className="ml-2 align-middle text-[10px]">
+                        {PREPARATION_STATION_LABELS[item.product.station]}
+                      </Badge>
+                    )}
                   </p>
                   {(item.modifiers ?? []).length > 0 && (
                     <p className="text-xs text-muted-foreground">

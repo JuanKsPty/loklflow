@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
 import { Category } from '../../menu/entities/category.entity';
 import { Product } from '../../menu/entities/product.entity';
+import type { PreparationStation } from '../../menu/preparation-station.constants';
 
 const CATEGORIES = [
   { name: 'Entradas', description: 'Para empezar', sortOrder: 1 },
@@ -8,18 +9,25 @@ const CATEGORIES = [
   { name: 'Bebidas', description: 'Frías y calientes', sortOrder: 3 },
 ];
 
-const PRODUCTS: Record<string, { name: string; price: number; description?: string }[]> = {
+type SeedProduct = {
+  name: string;
+  price: number;
+  description?: string;
+  station: PreparationStation;
+};
+
+const PRODUCTS: Record<string, SeedProduct[]> = {
   Entradas: [
-    { name: 'Guacamole', price: 85, description: 'Con totopos' },
-    { name: 'Sopa de tortilla', price: 70 },
+    { name: 'Guacamole', price: 85, description: 'Con totopos', station: 'kitchen' },
+    { name: 'Sopa de tortilla', price: 70, station: 'kitchen' },
   ],
   'Platos fuertes': [
-    { name: 'Tacos al pastor (orden)', price: 95 },
-    { name: 'Enchiladas verdes', price: 120 },
+    { name: 'Tacos al pastor (orden)', price: 95, station: 'kitchen' },
+    { name: 'Enchiladas verdes', price: 120, station: 'kitchen' },
   ],
   Bebidas: [
-    { name: 'Agua de horchata', price: 35 },
-    { name: 'Refresco', price: 30 },
+    { name: 'Agua de horchata', price: 35, station: 'bar' },
+    { name: 'Refresco', price: 30, station: 'immediate' },
   ],
 };
 
@@ -42,8 +50,13 @@ export async function seedMenu(dataSource: DataSource) {
             price: p.price,
             description: p.description ?? null,
             categoryId: category.id,
+            station: p.station,
           }),
         );
+      } else if (existing.station !== p.station) {
+        // Mantener al día la estación de los productos demo ya existentes.
+        existing.station = p.station;
+        await productsRepo.save(existing);
       }
     }
   }

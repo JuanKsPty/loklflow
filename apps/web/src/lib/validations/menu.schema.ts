@@ -24,6 +24,7 @@ export const productSchema = z.object({
   price: z.number().min(0, 'Precio inválido'),
   imageUrl: z.string().url('URL inválida').optional().or(z.literal('')),
   categoryId: z.string().uuid().optional().or(z.literal('')),
+  station: z.enum(['kitchen', 'bar', 'immediate']),
   isActive: z.boolean(),
   modifierIds: z.array(z.string().uuid()),
   availabilities: z.array(availabilitySchema),

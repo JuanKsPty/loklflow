@@ -11,8 +11,9 @@ export function OrderCard({ order }: { order: Order }) {
       <Card className="transition-colors hover:bg-accent/50">
         <CardContent className="flex items-center justify-between gap-3 py-4">
           <div className="min-w-0">
-            <p className="font-medium">Orden #{order.orderNumber}</p>
+            <p className="font-medium">{order.label || `Orden #${order.orderNumber}`}</p>
             <p className="text-sm text-muted-foreground">
+              {order.label && `#${order.orderNumber} · `}
               {order.table ? `Mesa ${order.table.number}` : 'Para llevar'} ·{' '}
               {(order.items ?? []).length} ítem(s)
             </p>

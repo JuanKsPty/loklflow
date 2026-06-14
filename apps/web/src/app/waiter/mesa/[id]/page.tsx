@@ -35,7 +35,9 @@ export default async function WaiterTablePage({ params }: Props) {
     notFound();
   }
 
-  const activeOrder = orders.find((o) => !CLOSED.has(o.status));
+  const openAccounts = orders
+    .filter((o) => !CLOSED.has(o.status))
+    .sort((a, b) => a.orderNumber - b.orderNumber);
 
   return (
     <div className="flex flex-col gap-5">
@@ -61,34 +63,49 @@ export default async function WaiterTablePage({ params }: Props) {
       </div>
 
       <div>
-        <p className="mb-2 text-sm font-medium text-muted-foreground">Orden activa</p>
-        {activeOrder ? (
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-sm font-medium text-muted-foreground">
+            Cuentas {openAccounts.length > 0 && `(${openAccounts.length})`}
+          </p>
+          <Button size="sm" nativeButton={false} render={<Link href={`/waiter/nueva?tableId=${table.id}`} />}>
+            <PlusIcon />
+            Nueva cuenta
+          </Button>
+        </div>
+
+        {openAccounts.length === 0 ? (
           <Card>
-            <CardContent className="flex items-center justify-between gap-3 py-4">
-              <div>
-                <p className="font-medium">Orden #{activeOrder.orderNumber}</p>
-                <Badge variant="outline" className={ORDER_STATUS_BADGE[activeOrder.status]}>
-                  {ORDER_STATUS_LABELS[activeOrder.status]}
-                </Badge>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {(activeOrder.items ?? []).length} ítem(s) · {formatPrice(activeOrder.total)}
-                </p>
-              </div>
-              <Button nativeButton={false} render={<Link href={`/waiter/orden/${activeOrder.id}`} />}>
-                Ver
+            <CardContent className="flex flex-col items-center gap-3 py-8 text-center">
+              <p className="text-sm text-muted-foreground">No hay cuentas abiertas en esta mesa.</p>
+              <Button nativeButton={false} render={<Link href={`/waiter/nueva?tableId=${table.id}`} />}>
+                <PlusIcon />
+                Tomar orden
               </Button>
             </CardContent>
           </Card>
         ) : (
-          <Button
-            size="lg"
-            className="w-full"
-            nativeButton={false}
-            render={<Link href={`/waiter/nueva?tableId=${table.id}`} />}
-          >
-            <PlusIcon />
-            Tomar orden
-          </Button>
+          <div className="flex flex-col gap-3">
+            {openAccounts.map((account) => (
+              <Link key={account.id} href={`/waiter/orden/${account.id}`}>
+                <Card className="transition-colors hover:bg-accent/50">
+                  <CardContent className="flex items-center justify-between gap-3 py-4">
+                    <div className="min-w-0">
+                      <p className="font-medium">{account.label || `Cuenta #${account.orderNumber}`}</p>
+                      {account.label && (
+                        <p className="text-xs text-muted-foreground">#{account.orderNumber}</p>
+                      )}
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {(account.items ?? []).length} ítem(s) · {formatPrice(account.total)}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className={ORDER_STATUS_BADGE[account.status]}>
+                      {ORDER_STATUS_LABELS[account.status]}
+                    </Badge>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
         )}
       </div>
 

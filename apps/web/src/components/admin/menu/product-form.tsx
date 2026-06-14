@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { PlusIcon, Trash2Icon } from 'lucide-react';
 import type { Category, Modifier, Product } from '@loklflow/types';
+import { PREPARATION_STATIONS, PREPARATION_STATION_LABELS } from '@loklflow/types';
 import { productsApi } from '@/lib/api/menu.api';
 import { productSchema, type ProductFormValues } from '@/lib/validations/menu.schema';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,7 @@ export function ProductForm({ product, categories, modifiers }: Props) {
       price: product?.price ?? 0,
       imageUrl: product?.imageUrl ?? '',
       categoryId: product?.categoryId ?? '',
+      station: product?.station ?? 'kitchen',
       isActive: product?.isActive ?? true,
       modifierIds: product?.modifiers?.map((m) => m.id) ?? [],
       availabilities:
@@ -66,6 +68,7 @@ export function ProductForm({ product, categories, modifiers }: Props) {
       const payload = {
         name: values.name,
         price: values.price,
+        station: values.station,
         isActive: values.isActive,
         modifierIds: values.modifierIds,
         availabilities: values.availabilities,
@@ -133,6 +136,33 @@ export function ProductForm({ product, categories, modifiers }: Props) {
             />
           </Field>
         </div>
+
+        <Field className="max-w-xs">
+          <FieldLabel>Estación de preparación</FieldLabel>
+          <Controller
+            control={control}
+            name="station"
+            render={({ field }) => (
+              <Select
+                items={PREPARATION_STATIONS.map((s) => ({ value: s, label: PREPARATION_STATION_LABELS[s] }))}
+                value={field.value}
+                onValueChange={(val) => field.onChange(val ?? 'kitchen')}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PREPARATION_STATIONS.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {PREPARATION_STATION_LABELS[s]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <FieldDescription>A dónde se envía: Cocina al KDS, Barra, o Inmediato (sin preparación).</FieldDescription>
+        </Field>
 
         <Field data-invalid={errors.imageUrl ? true : undefined}>
           <FieldLabel htmlFor="imageUrl">URL de imagen</FieldLabel>

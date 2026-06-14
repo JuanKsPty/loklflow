@@ -22,6 +22,9 @@ export class Order {
   @Column({ name: 'order_number', type: 'int', unique: true })
   orderNumber!: number;
 
+  @Column({ type: 'varchar', length: 80, nullable: true })
+  label!: string | null;
+
   @ManyToOne(() => RestaurantTable, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'table_id' })
   table!: RestaurantTable | null;

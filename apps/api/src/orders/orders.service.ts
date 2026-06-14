@@ -15,6 +15,7 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { UpdateItemStatusDto } from './dto/update-item-status.dto';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TablesService } from '../tables/tables.service';
 
 const ORDER_RELATIONS = {
   table: true,
@@ -31,6 +32,7 @@ export class OrdersService {
     @InjectRepository(ModifierOption) private optionsRepo: Repository<ModifierOption>,
     private readonly realtime: RealtimeGateway,
     private readonly notifications: NotificationsService,
+    private readonly tables: TablesService,
   ) {}
 
   findAll(filters?: { status?: OrderStatus; tableId?: string }) {
@@ -58,6 +60,7 @@ export class OrdersService {
 
     const order = this.ordersRepo.create({
       orderNumber: await this.nextOrderNumber(),
+      label: dto.label ?? null,
       tableId: dto.tableId ?? null,
       waiterId,
       source: dto.source ?? 'staff',
@@ -90,13 +93,24 @@ export class OrdersService {
     }
     const result = await this.findOne(saved.id);
     this.emit(result, 'created');
-    void this.notifications.notifyRole('Cocina', {
-      type: 'order_new',
-      title: `Nueva orden #${result.orderNumber}`,
-      body: this.orderLocation(result),
-      resourceType: 'order',
-      resourceId: result.id,
-    });
+    // Al abrir una cuenta en una mesa, marcarla ocupada (best-effort; emite table:changed).
+    if (result.table && result.table.status !== 'occupied') {
+      try {
+        await this.tables.updateStatus(result.table.id, 'occupied');
+      } catch {
+        // no bloquea la creación de la orden si falla
+      }
+    }
+    // Solo avisar a Cocina si la orden tiene algún ítem que se prepara en cocina.
+    if (result.items.some((i) => i.product?.station === 'kitchen')) {
+      void this.notifications.notifyRole('Cocina', {
+        type: 'order_new',
+        title: `Nueva orden #${result.orderNumber}`,
+        body: this.orderLocation(result),
+        resourceType: 'order',
+        resourceId: result.id,
+      });
+    }
     return result;
   }
 
@@ -193,7 +207,8 @@ export class OrdersService {
   // ---- helpers ----
 
   private orderLocation(order: Order): string {
-    return order.table ? `Mesa ${order.table.number}` : 'Para llevar';
+    const place = order.table ? `Mesa ${order.table.number}` : 'Para llevar';
+    return order.label ? `${place} · ${order.label}` : place;
   }
 
   private emit(order: Order, type: 'created' | 'item' | 'status') {
