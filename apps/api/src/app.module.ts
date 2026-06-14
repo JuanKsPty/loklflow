@@ -16,6 +16,7 @@ import { AuditModule } from './audit/audit.module';
 import { MenuModule } from './menu/menu.module';
 import { TablesModule } from './tables/tables.module';
 import { OrdersModule } from './orders/orders.module';
+import { RealtimeModule } from './realtime/realtime.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 
@@ -37,6 +38,7 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
     MenuModule,
     TablesModule,
     OrdersModule,
+    RealtimeModule,
   ],
   controllers: [AppController],
   providers: [

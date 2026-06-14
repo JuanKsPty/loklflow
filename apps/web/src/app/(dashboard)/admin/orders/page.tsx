@@ -4,6 +4,7 @@ import { serverFetch } from '@/lib/api/server-client';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { OrderTable } from '@/components/admin/orders/order-table';
+import { RealtimeRefresher } from '@/components/realtime/realtime-refresher';
 import type { Order } from '@loklflow/types';
 
 export const metadata = { title: 'Órdenes — LoklFlow' };
@@ -29,6 +30,7 @@ export default async function OrdersPage() {
         }
       />
       <OrderTable orders={orders} />
+      <RealtimeRefresher events={['order:changed']} toastOnNewOrder />
     </div>
   );
 }

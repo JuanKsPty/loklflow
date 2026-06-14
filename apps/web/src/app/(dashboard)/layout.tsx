@@ -5,6 +5,7 @@ import type { JwtPayload } from '@loklflow/types';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppHeader } from '@/components/app-header';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { SocketProvider } from '@/components/realtime/socket-provider';
 
 async function getUser(): Promise<JwtPayload | null> {
   const cookieStore = await cookies();
@@ -26,14 +27,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect('/login');
 
   return (
-    <SidebarProvider>
-      <AppSidebar
-        user={{ name: user.email ?? user.roleName, roleName: user.roleName, permissions: user.permissions }}
-      />
-      <SidebarInset>
-        <AppHeader />
-        <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
-      </SidebarInset>
-    </SidebarProvider>
+    <SocketProvider>
+      <SidebarProvider>
+        <AppSidebar
+          user={{ name: user.email ?? user.roleName, roleName: user.roleName, permissions: user.permissions }}
+        />
+        <SidebarInset>
+          <AppHeader />
+          <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
+        </SidebarInset>
+      </SidebarProvider>
+    </SocketProvider>
   );
 }

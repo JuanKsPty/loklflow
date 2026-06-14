@@ -10,6 +10,7 @@ import { BulkTablesDialog } from '@/components/admin/tables/bulk-tables-dialog';
 import { TableList } from '@/components/admin/tables/table-table';
 import { SectorTable } from '@/components/admin/tables/sector-table';
 import { ReservationTable } from '@/components/admin/tables/reservation-table';
+import { RealtimeRefresher } from '@/components/realtime/realtime-refresher';
 import type { Reservation, RestaurantTable, Sector } from '@loklflow/types';
 
 export const metadata = { title: 'Mesas — LoklFlow' };
@@ -83,6 +84,7 @@ export default async function TablesPage({ searchParams }: Props) {
           </>
         }
       />
+      <RealtimeRefresher events={['table:changed', 'order:changed']} />
     </div>
   );
 }

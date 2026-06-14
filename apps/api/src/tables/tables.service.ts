@@ -8,12 +8,14 @@ import { CreateTableDto } from './dto/create-table.dto';
 import { UpdateTableDto } from './dto/update-table.dto';
 import { LayoutPositionDto } from './dto/update-layout.dto';
 import { BulkCreateTableDto } from './dto/bulk-create-table.dto';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 @Injectable()
 export class TablesService {
   constructor(
     @InjectRepository(RestaurantTable)
     private tablesRepo: Repository<RestaurantTable>,
+    private readonly realtime: RealtimeGateway,
   ) {}
 
   findAll() {
@@ -88,14 +90,18 @@ export class TablesService {
     const table = await this.findOne(id);
     Object.assign(table, dto);
     const saved = await this.saveUnique(table);
-    return this.findOne(saved.id);
+    const result = await this.findOne(saved.id);
+    this.realtime.emitTable({ type: 'update', tableId: result.id, status: result.status });
+    return result;
   }
 
   async updateStatus(id: string, status: TableStatus) {
     const table = await this.findOne(id);
     table.status = status;
     await this.tablesRepo.save(table);
-    return this.findOne(id);
+    const result = await this.findOne(id);
+    this.realtime.emitTable({ type: 'status', tableId: result.id, status: result.status });
+    return result;
   }
 
   async remove(id: string) {
@@ -117,6 +123,7 @@ export class TablesService {
     }
 
     await this.tablesRepo.save([...byId.values()]);
+    this.realtime.emitTable({ type: 'layout' });
     return this.findAll();
   }
 

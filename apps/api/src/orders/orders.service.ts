@@ -13,6 +13,7 @@ import { AddItemDto } from './dto/add-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { UpdateItemStatusDto } from './dto/update-item-status.dto';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 const ORDER_RELATIONS = {
   table: true,
@@ -27,6 +28,7 @@ export class OrdersService {
     @InjectRepository(OrderItem) private itemsRepo: Repository<OrderItem>,
     @InjectRepository(Product) private productsRepo: Repository<Product>,
     @InjectRepository(ModifierOption) private optionsRepo: Repository<ModifierOption>,
+    private readonly realtime: RealtimeGateway,
   ) {}
 
   findAll(filters?: { status?: OrderStatus; tableId?: string }) {
@@ -72,18 +74,21 @@ export class OrdersService {
     });
     this.applyTotals(order);
 
+    let saved: Order;
     try {
-      const saved = await this.ordersRepo.save(order);
-      return this.findOne(saved.id);
+      saved = await this.ordersRepo.save(order);
     } catch (err) {
       if (err instanceof QueryFailedError && /unique|duplicate/i.test(err.message)) {
         // colisión rara de order_number por concurrencia: reintenta una vez
         order.orderNumber = await this.nextOrderNumber();
-        const saved = await this.ordersRepo.save(order);
-        return this.findOne(saved.id);
+        saved = await this.ordersRepo.save(order);
+      } else {
+        throw err;
       }
-      throw err;
     }
+    const result = await this.findOne(saved.id);
+    this.emit(result, 'created');
+    return result;
   }
 
   async addItem(orderId: string, dto: AddItemDto) {
@@ -94,7 +99,9 @@ export class OrdersService {
     order.items.push(item);
     this.applyTotals(order);
     await this.ordersRepo.save(order);
-    return this.findOne(orderId);
+    const result = await this.findOne(orderId);
+    this.emit(result, 'item');
+    return result;
   }
 
   async updateItem(orderId: string, itemId: string, dto: UpdateItemDto) {
@@ -109,7 +116,9 @@ export class OrdersService {
 
     this.applyTotals(order);
     await this.ordersRepo.save(order);
-    return this.findOne(orderId);
+    const result = await this.findOne(orderId);
+    this.emit(result, 'item');
+    return result;
   }
 
   async removeItem(orderId: string, itemId: string) {
@@ -122,7 +131,9 @@ export class OrdersService {
     const fresh = await this.findOne(orderId);
     this.applyTotals(fresh);
     await this.ordersRepo.save(fresh);
-    return this.findOne(orderId);
+    const result = await this.findOne(orderId);
+    this.emit(result, 'item');
+    return result;
   }
 
   async updateStatus(orderId: string, dto: UpdateOrderStatusDto, userId: string) {
@@ -143,7 +154,9 @@ export class OrdersService {
     order.status = dto.status;
     order.statusHistory = [...(order.statusHistory ?? []), history];
     await this.ordersRepo.save(order);
-    return this.findOne(orderId);
+    const result = await this.findOne(orderId);
+    this.emit(result, 'status');
+    return result;
   }
 
   async updateItemStatus(orderId: string, itemId: string, dto: UpdateItemStatusDto) {
@@ -152,10 +165,22 @@ export class OrdersService {
     if (!item) throw new NotFoundException(`Item ${itemId} not found in order`);
     item.status = dto.status;
     await this.itemsRepo.save(item);
-    return this.findOne(orderId);
+    const result = await this.findOne(orderId);
+    this.emit(result, 'status');
+    return result;
   }
 
   // ---- helpers ----
+
+  private emit(order: Order, type: 'created' | 'item' | 'status') {
+    this.realtime.emitOrder({
+      type,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      tableId: order.tableId,
+      status: order.status,
+    });
+  }
 
   private async nextOrderNumber(): Promise<number> {
     const row = await this.ordersRepo

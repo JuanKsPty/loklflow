@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { serverFetch } from '@/lib/api/server-client';
 import { OrderDetail } from '@/components/admin/orders/order-detail';
 import { PageHeader } from '@/components/page-header';
+import { RealtimeRefresher } from '@/components/realtime/realtime-refresher';
 import type { Order, Product } from '@loklflow/types';
 
 interface Props {
@@ -22,6 +23,7 @@ export default async function OrderDetailPage({ params }: Props) {
           description="Detalle, flujo de estados e ítems."
         />
         <OrderDetail order={order} products={products.filter((p) => p.isActive)} />
+        <RealtimeRefresher events={['order:changed']} />
       </div>
     );
   } catch {

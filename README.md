@@ -92,7 +92,7 @@ Detalle completo en [docs/ROADMAP.md](./docs/ROADMAP.md).
 ```
 Fase 0 ████████████████████ 100%  — Completada
 Fase 1 ████████████████████ 100%  — Completada (deploy/CI diferidos)
-Fase 2 ██████████░░░░░░░░░░   50%  — En progreso (2.1·2.2·2.3 hechos)
+Fase 2 █████████████░░░░░░░   65%  — En progreso (2.1·2.2·2.3·2.4 hechos)
 Fase 3 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 Fase 4 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 Fase 5 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
@@ -107,8 +107,9 @@ Fase 6 ░░░░░░░░░░░░░░░░░░░░    0%  — P
 | **Menú** | Categorías, productos, modificadores, combos y disponibilidad por horario |
 | **Mesas y Sectores** | Sectores, mesas (número único global, estados), reservas y **editor visual de distribución** (drag-and-drop, zonas, formas, creación masiva) |
 | **Órdenes** | Órdenes con ítems y modificadores, cálculo de totales, flujo de estados con historial de transiciones |
+| **Tiempo real** | WebSockets (Socket.io) con handshake autenticado por cookie; órdenes y estado de mesas se actualizan en vivo en el panel sin recargar |
 
-> En camino (Fase 2): WebSockets en tiempo real, vista de mesero (móvil) y KDS de cocina.
+> En camino (Fase 2): vista de mesero (móvil), KDS de cocina y notificaciones persistidas entre roles.
 
 ---
 
