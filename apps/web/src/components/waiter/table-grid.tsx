@@ -36,7 +36,7 @@ export function TableGrid({ sectors, tables }: Props) {
         return (
           <section key={sector.id}>
             <h2 className="mb-2 text-sm font-semibold text-muted-foreground">{sector.name}</h2>
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-4 gap-3 sm:grid-cols-6 lg:grid-cols-8">
               {sectorTables.map((table) => (
                 <Link
                   key={table.id}

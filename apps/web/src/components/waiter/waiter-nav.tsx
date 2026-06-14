@@ -14,7 +14,7 @@ export function WaiterNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-10 mx-auto flex w-full max-w-md border-t bg-background/95 backdrop-blur">
+    <nav className="fixed inset-x-0 bottom-0 z-10 mx-auto flex w-full max-w-5xl border-t bg-background/95 backdrop-blur">
       {TABS.map(({ href, label, icon: Icon, match }) => {
         const active = match(pathname);
         return (
