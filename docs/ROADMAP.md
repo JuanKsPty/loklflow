@@ -66,8 +66,8 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 - [ ] Descuentos con flujo de aprobación por rol
 - [x] Propina digital
 - [ ] Impresión / envío de recibo
-- [ ] Apertura y cierre de turno
-- [ ] Resumen automático del turno
+- [x] Apertura y cierre de turno
+- [x] Resumen automático del turno
 - [ ] Dashboard de métricas en tiempo real
 - [ ] Reportes históricos exportables (PDF / Excel)
 

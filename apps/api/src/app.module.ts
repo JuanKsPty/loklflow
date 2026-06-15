@@ -19,6 +19,7 @@ import { OrdersModule } from './orders/orders.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PaymentsModule } from './payments/payments.module';
+import { ShiftsModule } from './shifts/shifts.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 
@@ -43,6 +44,7 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
     RealtimeModule,
     NotificationsModule,
     PaymentsModule,
+    ShiftsModule,
   ],
   controllers: [AppController],
   providers: [

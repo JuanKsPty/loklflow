@@ -2,14 +2,24 @@
 
 import { useRouter } from 'next/navigation';
 import { LogOutIcon } from 'lucide-react';
+import type { ShiftSummary } from '@loklflow/types';
 import { authApi } from '@/lib/api/auth.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { NotificationBell } from '@/components/notifications/notification-bell';
+import { ShiftControl } from '@/components/pos/shift-control';
 
-export function WaiterHeader({ name, roleName }: { name: string; roleName: string }) {
+export function WaiterHeader({
+  name,
+  roleName,
+  shift,
+}: {
+  name: string;
+  roleName: string;
+  shift: ShiftSummary | null;
+}) {
   const router = useRouter();
   const clearUser = useAuthStore((s) => s.clearUser);
 
@@ -35,6 +45,7 @@ export function WaiterHeader({ name, roleName }: { name: string; roleName: strin
         <p className="truncate text-sm font-medium">{name}</p>
         <p className="truncate text-xs text-muted-foreground">{roleName}</p>
       </div>
+      <ShiftControl current={shift} />
       <NotificationBell area="waiter" />
       <ThemeToggle />
       <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Cerrar sesión">

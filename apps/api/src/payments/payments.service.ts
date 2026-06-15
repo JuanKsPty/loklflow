@@ -5,6 +5,7 @@ import { Payment } from './entities/payment.entity';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { OrdersService } from '../orders/orders.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { ShiftsService } from '../shifts/shifts.service';
 
 const EPSILON = 0.001;
 
@@ -14,6 +15,7 @@ export class PaymentsService {
     @InjectRepository(Payment) private readonly paymentsRepo: Repository<Payment>,
     private readonly orders: OrdersService,
     private readonly realtime: RealtimeGateway,
+    private readonly shifts: ShiftsService,
   ) {}
 
   async summary(orderId: string) {
@@ -30,6 +32,11 @@ export class PaymentsService {
       throw new BadRequestException('La cuenta ya está cerrada o cancelada');
     }
 
+    const shift = await this.shifts.currentForUser(userId);
+    if (!shift) {
+      throw new BadRequestException('No hay un turno de caja abierto. Abre tu turno para cobrar.');
+    }
+
     const paid = Number((order.payments ?? []).reduce((s, p) => s + Number(p.amount), 0).toFixed(2));
     const remaining = Number((order.total - paid).toFixed(2));
     if (dto.amount > remaining + EPSILON) {
@@ -43,6 +50,7 @@ export class PaymentsService {
         amount: dto.amount,
         reference: dto.reference ?? null,
         processedBy: userId,
+        shiftId: shift.id,
       }),
     );
 

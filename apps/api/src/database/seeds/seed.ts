@@ -29,6 +29,7 @@ import { OrderItemModifier } from '../../orders/entities/order-item-modifier.ent
 import { OrderStatusHistory } from '../../orders/entities/order-status-history.entity';
 import { Notification } from '../../notifications/entities/notification.entity';
 import { Payment } from '../../payments/entities/payment.entity';
+import { Shift } from '../../shifts/entities/shift.entity';
 
 dotenv.config();
 
@@ -63,6 +64,7 @@ const dataSource = new DataSource({
     OrderStatusHistory,
     Notification,
     Payment,
+    Shift,
   ],
   synchronize: true,
 });

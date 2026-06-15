@@ -93,7 +93,7 @@ Detalle completo en [docs/ROADMAP.md](./docs/ROADMAP.md).
 Fase 0 ████████████████████ 100%  — Completada
 Fase 1 ████████████████████ 100%  — Completada (deploy/CI diferidos)
 Fase 2 ███████████████████░   95%  — Casi lista (solo fusión de mesas, diferida)
-Fase 3 ██████░░░░░░░░░░░░░░░   30%  — En progreso (cobro/POS hecho; faltan turnos, descuentos y reportes)
+Fase 3 █████████░░░░░░░░░░░░   45%  — En progreso (cobro/POS y turnos de caja hechos; faltan descuentos y reportes)
 Fase 4 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 Fase 5 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 Fase 6 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
@@ -112,6 +112,7 @@ Fase 6 ░░░░░░░░░░░░░░░░░░░░    0%  — P
 | **KDS de cocina** | Pantalla dedicada (`/kitchen`, login por PIN): tablero por columnas (pendientes/en preparación/listas) con tiempo transcurrido, avance por orden en vivo |
 | **Notificaciones** | Avisos persistidos entre roles (campana con no leídas + bandeja): cocina recibe órdenes nuevas, el mesero recibe "orden lista"; push por WebSocket y persistencia en BD |
 | **Caja / POS** | Cobro de cuentas (`/pos` del cajero y desde la cuenta del mesero): múltiples métodos, split en pagos parciales, propina; cierra la cuenta y libera la mesa automáticamente |
+| **Turnos de caja** | Apertura/cierre de turno por cobrador con fondo inicial; cada pago se sella al turno y el cobro exige turno abierto; al cerrar, arqueo automático (ventas por método, efectivo esperado vs. contado y diferencia) |
 
 > Pendiente diferido de Fase 2: fusión de mesas para órdenes grupales.
 

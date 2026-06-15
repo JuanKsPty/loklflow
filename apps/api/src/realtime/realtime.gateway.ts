@@ -31,6 +31,10 @@ export interface NotificationEvent {
   title: string;
 }
 
+export interface ShiftEvent {
+  userId: string;
+}
+
 @WebSocketGateway({ cors: { origin: CORS_ORIGINS, credentials: true } })
 export class RealtimeGateway implements OnGatewayConnection {
   private readonly logger = new Logger(RealtimeGateway.name);
@@ -76,6 +80,11 @@ export class RealtimeGateway implements OnGatewayConnection {
 
   pushToRole(roleName: string, payload: NotificationEvent) {
     this.server.to(`role:${roleName}`).emit('notification:new', payload);
+  }
+
+  /** Avisa al propio cobrador que su turno de caja cambió (abrir/cerrar). */
+  emitShift(userId: string) {
+    this.server.to(`user:${userId}`).emit('shift:changed', { userId } satisfies ShiftEvent);
   }
 
   /** Extrae el access_token de la cookie del handshake (httpOnly) o del header Bearer. */

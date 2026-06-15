@@ -36,6 +36,10 @@ export class Payment {
   @Column({ name: 'processed_by', type: 'uuid', nullable: true })
   processedBy!: string | null;
 
+  @Index()
+  @Column({ name: 'shift_id', type: 'uuid', nullable: true })
+  shiftId!: string | null;
+
   @CreateDateColumn({ name: 'processed_at' })
   processedAt!: Date;
 }

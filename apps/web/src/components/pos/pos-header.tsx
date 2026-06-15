@@ -2,13 +2,23 @@
 
 import { useRouter } from 'next/navigation';
 import { LogOutIcon, WalletIcon } from 'lucide-react';
+import type { ShiftSummary } from '@loklflow/types';
 import { authApi } from '@/lib/api/auth.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { NotificationBell } from '@/components/notifications/notification-bell';
+import { ShiftControl } from '@/components/pos/shift-control';
 
-export function PosHeader({ name, roleName }: { name: string; roleName: string }) {
+export function PosHeader({
+  name,
+  roleName,
+  shift,
+}: {
+  name: string;
+  roleName: string;
+  shift: ShiftSummary | null;
+}) {
   const router = useRouter();
   const clearUser = useAuthStore((s) => s.clearUser);
 
@@ -33,6 +43,7 @@ export function PosHeader({ name, roleName }: { name: string; roleName: string }
         </p>
       </div>
       <div className="ml-auto flex items-center gap-1">
+        <ShiftControl current={shift} />
         <NotificationBell area="admin" />
         <ThemeToggle />
         <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Cerrar sesión">
