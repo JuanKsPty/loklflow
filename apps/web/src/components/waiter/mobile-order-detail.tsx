@@ -11,6 +11,8 @@ import type {
   Product,
 } from '@loklflow/types';
 import { ORDER_ITEM_STATUSES, PREPARATION_STATION_LABELS } from '@loklflow/types';
+import { CreditCardIcon } from 'lucide-react';
+import { CheckoutPanel } from '@/components/pos/checkout-panel';
 import { ordersApi } from '@/lib/api/orders.api';
 import { formatPrice } from '@/lib/format';
 import {
@@ -102,6 +104,8 @@ export function MobileOrderDetail({ order, products }: Props) {
           ))}
         </div>
       )}
+
+      {open && order.total > 0 && <CobrarDialog order={order} onSettled={() => router.refresh()} />}
 
       <div>
         <div className="mb-2 flex items-center justify-between">
@@ -256,6 +260,34 @@ function AddItemDialog({
             Agregar
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CobrarDialog({ order, onSettled }: { order: Order; onSettled: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button size="lg" className="w-full">
+            <CreditCardIcon />
+            Cobrar
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Cobrar {order.label || `Orden #${order.orderNumber}`}</DialogTitle>
+        </DialogHeader>
+        <CheckoutPanel
+          order={order}
+          onSettled={() => {
+            setOpen(false);
+            onSettled();
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

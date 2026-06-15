@@ -42,9 +42,11 @@ export function PinPad({ userId, userName }: PinPadProps) {
     try {
       const user = (await authApi.pinLogin({ userId, pin })) as AuthUser;
       setUser(user);
-      // Rol-aware: cocina entra al KDS; meseros (orders:create) al salón.
+      // Rol-aware: mesero (tables:update) → salón; cajero (pos:create) → caja;
+      // cocina (orders:update) → KDS; resto → admin.
       const perms = user.permissions ?? [];
-      if (perms.includes('orders:create')) router.push('/waiter');
+      if (perms.includes('tables:update')) router.push('/waiter');
+      else if (perms.includes('pos:create')) router.push('/pos');
       else if (perms.includes('orders:update')) router.push('/kitchen');
       else router.push('/admin');
     } catch {

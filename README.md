@@ -93,7 +93,7 @@ Detalle completo en [docs/ROADMAP.md](./docs/ROADMAP.md).
 Fase 0 ████████████████████ 100%  — Completada
 Fase 1 ████████████████████ 100%  — Completada (deploy/CI diferidos)
 Fase 2 ███████████████████░   95%  — Casi lista (solo fusión de mesas, diferida)
-Fase 3 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
+Fase 3 ██████░░░░░░░░░░░░░░░   30%  — En progreso (cobro/POS hecho; faltan turnos, descuentos y reportes)
 Fase 4 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 Fase 5 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 Fase 6 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
@@ -111,6 +111,7 @@ Fase 6 ░░░░░░░░░░░░░░░░░░░░    0%  — P
 | **Vista de mesero** | App móvil (`/waiter`, login por PIN): salón con mesas por sector, tomar orden con modificadores, avanzar estados y cambiar estado de mesa, todo en vivo |
 | **KDS de cocina** | Pantalla dedicada (`/kitchen`, login por PIN): tablero por columnas (pendientes/en preparación/listas) con tiempo transcurrido, avance por orden en vivo |
 | **Notificaciones** | Avisos persistidos entre roles (campana con no leídas + bandeja): cocina recibe órdenes nuevas, el mesero recibe "orden lista"; push por WebSocket y persistencia en BD |
+| **Caja / POS** | Cobro de cuentas (`/pos` del cajero y desde la cuenta del mesero): múltiples métodos, split en pagos parciales, propina; cierra la cuenta y libera la mesa automáticamente |
 
 > Pendiente diferido de Fase 2: fusión de mesas para órdenes grupales.
 

@@ -13,6 +13,7 @@ import { RestaurantTable } from '../../tables/entities/table.entity';
 import { DecimalTransformer } from '../../common/transformers/decimal.transformer';
 import { OrderItem } from './order-item.entity';
 import { OrderStatusHistory } from './order-status-history.entity';
+import { Payment } from '../../payments/entities/payment.entity';
 
 @Entity('orders')
 export class Order {
@@ -85,6 +86,9 @@ export class Order {
 
   @OneToMany(() => OrderStatusHistory, (h) => h.order, { cascade: true })
   statusHistory!: OrderStatusHistory[];
+
+  @OneToMany(() => Payment, (p) => p.order)
+  payments!: Payment[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

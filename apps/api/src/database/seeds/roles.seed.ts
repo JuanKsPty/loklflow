@@ -49,6 +49,7 @@ const SYSTEM_ROLES: {
       'orders:create', 'orders:read', 'orders:update',
       'menu:read',
       'tables:read', 'tables:update',
+      'pos:create', 'pos:read',
     ],
   },
   {

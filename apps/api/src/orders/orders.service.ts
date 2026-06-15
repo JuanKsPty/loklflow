@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, QueryFailedError, Repository } from 'typeorm';
+import { In, Not, QueryFailedError, Repository } from 'typeorm';
 import { Product } from '../menu/entities/product.entity';
 import { ModifierOption } from '../menu/entities/modifier-option.entity';
 import { Order } from './entities/order.entity';
@@ -21,7 +21,10 @@ const ORDER_RELATIONS = {
   table: true,
   items: { product: true, modifiers: true },
   statusHistory: true,
+  payments: true,
 };
+
+const OPEN_STATUSES: OrderStatus[] = ['pending', 'preparing', 'ready', 'delivered'];
 
 @Injectable()
 export class OrdersService {
@@ -190,7 +193,59 @@ export class OrdersService {
       if (result.waiterId) void this.notifications.notifyUser(result.waiterId, payload);
       else void this.notifications.notifyRole('Mesero', payload);
     }
+    if (result.status === 'closed' || result.status === 'cancelled') {
+      await this.maybeFreeTable(result);
+    }
     return result;
+  }
+
+  // ---- cobro / cierre ----
+
+  /** Fija la propina y recalcula el total. */
+  async setTip(orderId: string, tipAmount: number, _userId: string) {
+    const order = await this.findOne(orderId);
+    this.assertOpen(order);
+    order.tipAmount = Number(tipAmount.toFixed(2));
+    this.applyTotals(order);
+    await this.ordersRepo.save(order);
+    const result = await this.findOne(orderId);
+    this.emit(result, 'status');
+    return result;
+  }
+
+  /** Cierra la orden tras saldarse el pago (desacoplado del flujo de cocina). */
+  async closeFromPayment(orderId: string, userId: string) {
+    const order = await this.findOne(orderId);
+    if (order.status === 'closed' || order.status === 'cancelled') return order;
+    const history = Object.assign(new OrderStatusHistory(), {
+      orderId: order.id,
+      fromStatus: order.status,
+      toStatus: 'closed',
+      changedBy: userId,
+      notes: 'Cuenta cobrada',
+    });
+    order.status = 'closed';
+    order.statusHistory = [...(order.statusHistory ?? []), history];
+    await this.ordersRepo.save(order);
+    const result = await this.findOne(orderId);
+    this.emit(result, 'status');
+    await this.maybeFreeTable(result);
+    return result;
+  }
+
+  /** Libera la mesa si ya no le quedan cuentas abiertas. */
+  private async maybeFreeTable(order: Order) {
+    if (!order.tableId) return;
+    const open = await this.ordersRepo.count({
+      where: { tableId: order.tableId, status: In(OPEN_STATUSES), id: Not(order.id) },
+    });
+    if (open === 0) {
+      try {
+        await this.tables.updateStatus(order.tableId, 'available');
+      } catch {
+        // best-effort
+      }
+    }
   }
 
   async updateItemStatus(orderId: string, itemId: string, dto: UpdateItemStatusDto) {

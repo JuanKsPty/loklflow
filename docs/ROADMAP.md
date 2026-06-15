@@ -60,11 +60,11 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 ## Fase 3 — Caja y Reportes
 > El cajero cobra y el dueño ve qué pasó en el día.
 
-- [ ] Módulo de POS y cobro
-- [ ] Múltiples métodos de pago (efectivo, tarjeta, transferencia)
-- [ ] Split de cuenta entre comensales
+- [x] Módulo de POS y cobro (cierre de cuenta + liberación de mesa)
+- [x] Múltiples métodos de pago (efectivo, tarjeta, transferencia, billetera)
+- [x] Split de cuenta entre comensales (pagos parciales por método)
 - [ ] Descuentos con flujo de aprobación por rol
-- [ ] Propina digital
+- [x] Propina digital
 - [ ] Impresión / envío de recibo
 - [ ] Apertura y cierre de turno
 - [ ] Resumen automático del turno

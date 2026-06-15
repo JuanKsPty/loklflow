@@ -28,6 +28,7 @@ import { OrderItem } from '../../orders/entities/order-item.entity';
 import { OrderItemModifier } from '../../orders/entities/order-item-modifier.entity';
 import { OrderStatusHistory } from '../../orders/entities/order-status-history.entity';
 import { Notification } from '../../notifications/entities/notification.entity';
+import { Payment } from '../../payments/entities/payment.entity';
 
 dotenv.config();
 
@@ -61,6 +62,7 @@ const dataSource = new DataSource({
     OrderItemModifier,
     OrderStatusHistory,
     Notification,
+    Payment,
   ],
   synchronize: true,
 });
@@ -146,6 +148,33 @@ async function seedKitchen(ds: DataSource) {
   }
 }
 
+async function seedCashier(ds: DataSource) {
+  const usersRepo = ds.getRepository(User);
+  const rolesRepo = ds.getRepository(Role);
+
+  const cashierRole = await rolesRepo.findOne({ where: { name: 'Cajero' } });
+  if (!cashierRole) {
+    console.error('Cajero role not found — run roles seed first');
+    return;
+  }
+
+  const existing = await usersRepo.findOne({ where: { email: 'cajero@loklflow.com' } });
+  if (!existing) {
+    await usersRepo.save(
+      usersRepo.create({
+        name: 'Cajero Demo',
+        email: 'cajero@loklflow.com',
+        pin: await bcrypt.hash('4321', 10),
+        role: cashierRole,
+        isActive: true,
+      }),
+    );
+    console.log('✓ Cashier user seeded — login por PIN: Cajero Demo / PIN: 4321');
+  } else {
+    console.log('✓ Cashier user already exists');
+  }
+}
+
 async function seedBusinessConfig(ds: DataSource) {
   const repo = ds.getRepository(BusinessConfig);
   const existing = await repo.findOne({ where: {} });
@@ -170,6 +199,7 @@ async function main() {
   await seedAdmin(dataSource);
   await seedWaiter(dataSource);
   await seedKitchen(dataSource);
+  await seedCashier(dataSource);
   await seedBusinessConfig(dataSource);
   await seedMenu(dataSource);
   await seedTables(dataSource);

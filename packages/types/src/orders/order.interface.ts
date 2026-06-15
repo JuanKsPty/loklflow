@@ -1,5 +1,6 @@
 import type { RestaurantTable } from '../tables/table.interface';
 import type { Product } from '../menu/product.interface';
+import type { Payment } from '../payments/payment.interface';
 import type { OrderItemStatus, OrderSource, OrderStatus } from './order-status';
 
 export interface OrderItemModifier {
@@ -48,6 +49,7 @@ export interface Order {
   mergedIntoOrderId: string | null;
   items?: OrderItem[];
   statusHistory?: OrderStatusHistory[];
+  payments?: Payment[];
   createdAt: string;
   updatedAt: string;
 }
