@@ -15,7 +15,9 @@ import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { AssignPermissionsDto } from './dto/assign-permissions.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
+import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 
 @Controller('roles')
 export class RolesController {
@@ -39,23 +41,29 @@ export class RolesController {
     return this.rolesService.findOne(id);
   }
 
+  // Estos cuatro no llevan @Audit(): se auditan dentro del service, que es el único
+  // sitio donde el estado anterior todavía existe.
   @Post()
   @RequirePermissions('roles:create')
-  create(@Body() dto: CreateRoleDto) {
-    return this.rolesService.create(dto);
+  create(@Body() dto: CreateRoleDto, @CurrentUser() user: JwtPayload) {
+    return this.rolesService.create(dto, user);
   }
 
   @Patch(':id')
   @RequirePermissions('roles:update')
-  update(@Param('id', ParseUuidPipe) id: string, @Body() dto: UpdateRoleDto) {
-    return this.rolesService.update(id, dto);
+  update(
+    @Param('id', ParseUuidPipe) id: string,
+    @Body() dto: UpdateRoleDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.rolesService.update(id, dto, user);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermissions('roles:delete')
-  remove(@Param('id', ParseUuidPipe) id: string) {
-    return this.rolesService.remove(id);
+  remove(@Param('id', ParseUuidPipe) id: string, @CurrentUser() user: JwtPayload) {
+    return this.rolesService.remove(id, user);
   }
 
   @Put(':id/permissions')
@@ -63,7 +71,8 @@ export class RolesController {
   assignPermissions(
     @Param('id', ParseUuidPipe) id: string,
     @Body() dto: AssignPermissionsDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.rolesService.assignPermissions(id, dto);
+    return this.rolesService.assignPermissions(id, dto, user);
   }
 }

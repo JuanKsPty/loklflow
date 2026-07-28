@@ -9,6 +9,7 @@ import { ModifierOption } from '../menu/entities/modifier-option.entity';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { TablesModule } from '../tables/tables.module';
+import { AuditModule } from '../audit/audit.module';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 
@@ -25,6 +26,7 @@ import { OrdersService } from './orders.service';
     RealtimeModule,
     NotificationsModule,
     TablesModule,
+    AuditModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

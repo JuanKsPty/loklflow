@@ -7,6 +7,7 @@ import { CloseShiftDto } from './dto/close-shift.dto';
 import { Payment } from '../payments/entities/payment.entity';
 import { PAYMENT_METHODS, type PaymentMethod } from '../payments/payment-method.constants';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class ShiftsService {
@@ -14,6 +15,7 @@ export class ShiftsService {
     @InjectRepository(Shift) private readonly shiftsRepo: Repository<Shift>,
     @InjectRepository(Payment) private readonly paymentsRepo: Repository<Payment>,
     private readonly realtime: RealtimeGateway,
+    private readonly audit: AuditService,
   ) {}
 
   /** Turno abierto del usuario, o null. */
@@ -35,6 +37,15 @@ export class ShiftsService {
       }),
     );
     this.realtime.emitShift(userId);
+    // Auditado aquí y no con @Audit(): el handler devuelve el summary, no el turno,
+    // así que el interceptor no podría sacar el id del turno recién abierto.
+    await this.audit.createLog({
+      userId,
+      action: 'shift.opened',
+      entityType: 'shift',
+      entityId: shift.id,
+      newValue: { openingCash: shift.openingCash, notes: shift.notes },
+    });
     return this.summary(shift.id);
   }
 
@@ -58,7 +69,26 @@ export class ShiftsService {
     await this.shiftsRepo.save(shift);
 
     this.realtime.emitShift(userId);
-    return this.summary(shiftId);
+
+    // El arqueo entero va a la bitácora: es el dato que se revisa cuando la caja no cuadra.
+    const closed = await this.summary(shiftId);
+    await this.audit.createLog({
+      userId,
+      action: 'shift.closed',
+      entityType: 'shift',
+      entityId: shiftId,
+      oldValue: { status: 'open', openingCash: shift.openingCash },
+      newValue: {
+        status: 'closed',
+        closingCash: shift.closingCash,
+        totalSales: closed.totalSales,
+        expectedCash: closed.expectedCash,
+        difference: closed.difference,
+        byMethod: closed.byMethod,
+        paymentsCount: closed.paymentsCount,
+      },
+    });
+    return closed;
   }
 
   listForUser(userId: string) {

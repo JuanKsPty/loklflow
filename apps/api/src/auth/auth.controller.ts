@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Ip,
   Post,
   Res,
   UseGuards,
@@ -24,15 +25,23 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
-    return this.authService.login(dto, res);
+  login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+    @Ip() ip: string,
+  ) {
+    return this.authService.login(dto, res, ip);
   }
 
   @Public()
   @Post('pin')
   @HttpCode(HttpStatus.OK)
-  pinLogin(@Body() dto: PinLoginDto, @Res({ passthrough: true }) res: Response) {
-    return this.authService.pinLogin(dto, res);
+  pinLogin(
+    @Body() dto: PinLoginDto,
+    @Res({ passthrough: true }) res: Response,
+    @Ip() ip: string,
+  ) {
+    return this.authService.pinLogin(dto, res, ip);
   }
 
   @Public()
@@ -51,8 +60,9 @@ export class AuthController {
   logout(
     @CurrentUser() user: JwtPayload,
     @Res({ passthrough: true }) res: Response,
+    @Ip() ip: string,
   ) {
-    return this.authService.logout(user.sub, res);
+    return this.authService.logout(user.sub, res, ip);
   }
 
   @Get('me')

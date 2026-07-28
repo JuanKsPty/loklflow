@@ -20,6 +20,10 @@ const SEGMENT_LABELS: Record<string, string> = {
   admin: 'Administración',
   users: 'Empleados',
   roles: 'Roles',
+  audit: 'Auditoría',
+  menu: 'Menú',
+  tables: 'Mesas',
+  orders: 'Órdenes',
   settings: 'Configuración',
   new: 'Nuevo',
 };

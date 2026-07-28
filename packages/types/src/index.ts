@@ -7,4 +7,5 @@ export * from './orders';
 export * from './notifications';
 export * from './payments';
 export * from './shifts';
+export * from './audit';
 

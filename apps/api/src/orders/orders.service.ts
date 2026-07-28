@@ -17,6 +17,7 @@ import { UpdateItemStatusDto } from './dto/update-item-status.dto';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TablesService } from '../tables/tables.service';
+import { AuditService } from '../audit/audit.service';
 
 const ORDER_RELATIONS = {
   table: true,
@@ -37,6 +38,7 @@ export class OrdersService {
     private readonly realtime: RealtimeGateway,
     private readonly notifications: NotificationsService,
     private readonly tables: TablesService,
+    private readonly audit: AuditService,
   ) {}
 
   findAll(filters?: { status?: OrderStatus; tableId?: string }) {
@@ -196,6 +198,24 @@ export class OrdersService {
     }
     if (result.status === 'closed' || result.status === 'cancelled') {
       await this.maybeFreeTable(result);
+    }
+    // Solo la cancelación va a la bitácora: el resto del ciclo de vida ya queda en
+    // order_status_history. Se registra aquí, después del early-return de arriba, para
+    // no anotar un cambio cuando el estado no cambió.
+    if (result.status === 'cancelled') {
+      await this.audit.createLog({
+        userId,
+        action: 'order.cancelled',
+        entityType: 'order',
+        entityId: result.id,
+        oldValue: { status: history.fromStatus },
+        newValue: {
+          status: 'cancelled',
+          orderNumber: result.orderNumber,
+          total: result.total,
+          notes: dto.notes ?? null,
+        },
+      });
     }
     return result;
   }

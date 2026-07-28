@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import { Response } from 'express';
 import { UsersService } from '../users/users.service';
 import { RolesService } from '../roles/roles.service';
+import { AuditService } from '../audit/audit.service';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 import { LoginDto } from './dto/login.dto';
@@ -20,31 +21,63 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly rolesService: RolesService,
+    private readonly audit: AuditService,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
     @InjectRepository(RefreshToken)
     private readonly refreshTokenRepo: Repository<RefreshToken>,
   ) {}
 
-  async login(dto: LoginDto, res: Response) {
+  async login(dto: LoginDto, res: Response, ip?: string) {
+    // Los login se auditan aquí y no con @Audit() porque el handler es @Public()
+    // (no hay request.user que atribuir) y los fallos salen como excepción, que un
+    // interceptor no llega a ver.
     const user = await this.usersService.findByEmail(dto.email);
-    if (!user || !user.isActive) throw new UnauthorizedException('Invalid credentials');
-    if (!user.password) throw new UnauthorizedException('Password login not configured for this user');
+    if (!user || !user.isActive) {
+      await this.auditLoginFailure({ email: dto.email }, 'credenciales inválidas', ip);
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    if (!user.password) {
+      await this.auditLoginFailure(
+        { email: dto.email, userId: user.id },
+        'sin contraseña configurada',
+        ip,
+      );
+      throw new UnauthorizedException('Password login not configured for this user');
+    }
 
     const valid = await bcrypt.compare(dto.password, user.password);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
+    if (!valid) {
+      await this.auditLoginFailure(
+        { email: dto.email, userId: user.id },
+        'credenciales inválidas',
+        ip,
+      );
+      throw new UnauthorizedException('Invalid credentials');
+    }
 
+    await this.auditLoginSuccess(user.id, user.name, 'email', ip);
     return this.issueTokens(user.id, user.name, user.email, user.role.id, user.role.name, 'email', res);
   }
 
-  async pinLogin(dto: PinLoginDto, res: Response) {
+  async pinLogin(dto: PinLoginDto, res: Response, ip?: string) {
     const user = await this.usersService.findByIdWithCredentials(dto.userId);
-    if (!user || !user.isActive) throw new UnauthorizedException('User not found or inactive');
-    if (!user.pin) throw new UnauthorizedException('PIN login not configured for this user');
+    if (!user || !user.isActive) {
+      await this.auditLoginFailure({ userId: dto.userId }, 'usuario inexistente o inactivo', ip);
+      throw new UnauthorizedException('User not found or inactive');
+    }
+    if (!user.pin) {
+      await this.auditLoginFailure({ userId: dto.userId }, 'sin PIN configurado', ip);
+      throw new UnauthorizedException('PIN login not configured for this user');
+    }
 
     const valid = await bcrypt.compare(dto.pin, user.pin);
-    if (!valid) throw new UnauthorizedException('Invalid PIN');
+    if (!valid) {
+      await this.auditLoginFailure({ userId: dto.userId }, 'PIN incorrecto', ip);
+      throw new UnauthorizedException('Invalid PIN');
+    }
 
+    await this.auditLoginSuccess(user.id, user.name, 'pin', ip);
     return this.issueTokens(user.id, user.name, user.email, user.role.id, user.role.name, 'pin', res, true);
   }
 
@@ -65,9 +98,50 @@ export class AuthService {
     return this.issueTokens(user.id, user.name, user.email, user.role.id, user.role.name, 'email', res);
   }
 
-  async logout(userId: string, res: Response) {
+  async logout(userId: string, res: Response, ip?: string) {
     await this.refreshTokenRepo.update({ user: { id: userId } }, { isRevoked: true });
     this.clearCookies(res);
+    // Se audita aquí y no con @Audit() porque el handler responde 204 sin cuerpo.
+    await this.audit.createLog({
+      userId,
+      action: 'auth.logout',
+      entityType: 'session',
+      entityId: userId,
+      ipAddress: ip,
+    });
+  }
+
+  /** Nunca recibe la contraseña ni el PIN: solo el identificador intentado y el motivo. */
+  private auditLoginFailure(
+    attempted: { email?: string; userId?: string },
+    reason: string,
+    ip?: string,
+  ) {
+    return this.audit.createLog({
+      userId: attempted.userId,
+      action: 'auth.login_failed',
+      entityType: 'session',
+      entityId: attempted.userId,
+      newValue: { ...attempted, reason },
+      ipAddress: ip,
+    });
+  }
+
+  private auditLoginSuccess(
+    userId: string,
+    name: string,
+    method: 'email' | 'pin',
+    ip?: string,
+  ) {
+    return this.audit.createLog({
+      userId,
+      userName: name,
+      action: 'auth.login',
+      entityType: 'session',
+      entityId: userId,
+      newValue: { loginMethod: method },
+      ipAddress: ip,
+    });
   }
 
   async me(payload: JwtPayload) {
@@ -96,7 +170,7 @@ export class AuthService {
   ) {
     const permissions = await this.rolesService.getPermissionsForRole(roleId);
 
-    const payload: JwtPayload = { sub: userId, email, roleId, roleName, permissions, loginMethod };
+    const payload: JwtPayload = { sub: userId, name, email, roleId, roleName, permissions, loginMethod };
 
     const accessExpiresIn = pinOnly
       ? (this.config.get<string>('jwt.pinExpiresIn') ?? '4h')

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import appConfig from './config/app.config';
@@ -22,6 +22,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { ShiftsModule } from './shifts/shifts.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
+import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 
 @Module({
   imports: [
@@ -54,6 +55,9 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
     AppService,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    // APP_INTERCEPTOR y no useGlobalInterceptors en main.ts, porque así el
+    // interceptor puede recibir AuditService por inyección.
+    { provide: APP_INTERCEPTOR, useClass: AuditLogInterceptor },
   ],
 })
 export class AppModule {}

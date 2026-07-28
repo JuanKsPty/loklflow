@@ -6,6 +6,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { OrdersService } from '../orders/orders.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { ShiftsService } from '../shifts/shifts.service';
+import { AuditService } from '../audit/audit.service';
 
 const EPSILON = 0.001;
 
@@ -16,6 +17,7 @@ export class PaymentsService {
     private readonly orders: OrdersService,
     private readonly realtime: RealtimeGateway,
     private readonly shifts: ShiftsService,
+    private readonly audit: AuditService,
   ) {}
 
   async summary(orderId: string) {
@@ -43,7 +45,7 @@ export class PaymentsService {
       throw new BadRequestException(`El monto excede el restante (${remaining.toFixed(2)})`);
     }
 
-    await this.paymentsRepo.save(
+    const payment = await this.paymentsRepo.save(
       this.paymentsRepo.create({
         orderId,
         method: dto.method,
@@ -53,6 +55,23 @@ export class PaymentsService {
         shiftId: shift.id,
       }),
     );
+
+    // Auditado aquí porque el handler devuelve el resumen de la cuenta, sin el id del
+    // pago: el interceptor no podría identificar el movimiento registrado.
+    await this.audit.createLog({
+      userId,
+      action: 'payment.recorded',
+      entityType: 'payment',
+      entityId: payment.id,
+      newValue: {
+        orderId,
+        orderNumber: order.orderNumber,
+        method: payment.method,
+        amount: payment.amount,
+        reference: payment.reference,
+        shiftId: shift.id,
+      },
+    });
 
     const newPaid = Number((paid + dto.amount).toFixed(2));
     if (newPaid >= order.total - EPSILON) {
