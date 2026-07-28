@@ -27,6 +27,9 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      // El .env vive en la raíz del monorepo, pero el CWD al arrancar es apps/api.
+      // Sin esta ruta explícita nada del .env se cargaba y todo caía en los defaults.
+      envFilePath: ['../../.env'],
       load: [appConfig, databaseConfig, jwtConfig, redisConfig],
     }),
     TypeOrmModule.forRootAsync({

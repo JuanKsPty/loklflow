@@ -1,29 +1,12 @@
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { jwtVerify } from 'jose';
-import type { JwtPayload } from '@loklflow/types';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppHeader } from '@/components/app-header';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { SocketProvider } from '@/components/realtime/socket-provider';
-
-async function getUser(): Promise<JwtPayload | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('access_token')?.value;
-  if (!token) return null;
-  try {
-    const secret = new TextEncoder().encode(
-      process.env.JWT_SECRET ?? 'change-this-secret-in-production',
-    );
-    const { payload } = await jwtVerify(token, secret);
-    return payload as unknown as JwtPayload;
-  } catch {
-    return null;
-  }
-}
+import { getServerUser } from '@/lib/auth/server-user';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const user = await getUser();
+  const user = await getServerUser();
   if (!user) redirect('/login');
 
   return (

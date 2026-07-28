@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { jwtVerify } from 'jose';
+import { verifyToken } from '@/lib/auth/jwt';
 
-const PROTECTED_PREFIXES = ['/admin', '/orders', '/kitchen', '/pos'];
+// /waiter estaba fuera de la lista: quedaba cubierto solo por el redirect del layout
+// de servidor, sin defensa en profundidad, y es la superficie con más rutas de la app.
+const PROTECTED_PREFIXES = ['/admin', '/orders', '/kitchen', '/pos', '/waiter'];
 
 function isProtected(pathname: string) {
   return PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
@@ -19,17 +21,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  try {
-    const secret = new TextEncoder().encode(
-      process.env.JWT_SECRET ?? 'change-this-secret-in-production',
-    );
-    await jwtVerify(token, secret);
-    return NextResponse.next();
-  } catch {
-    const response = NextResponse.redirect(new URL('/login', request.url));
-    response.cookies.delete('access_token');
-    return response;
-  }
+  if (await verifyToken(token)) return NextResponse.next();
+
+  const response = NextResponse.redirect(new URL('/login', request.url));
+  response.cookies.delete('access_token');
+  return response;
 }
 
 export const config = {

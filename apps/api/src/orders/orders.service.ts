@@ -8,6 +8,7 @@ import { OrderItem } from './entities/order-item.entity';
 import { OrderItemModifier } from './entities/order-item-modifier.entity';
 import { OrderStatusHistory } from './entities/order-status-history.entity';
 import { ALLOWED_TRANSITIONS, type OrderStatus } from './order-status.constants';
+import { computeTotals, itemSubtotal } from './order-totals';
 import { CreateOrderDto, CreateOrderItemDto } from './dto/create-order.dto';
 import { AddItemDto } from './dto/add-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
@@ -138,7 +139,7 @@ export class OrdersService {
 
     if (dto.quantity !== undefined) item.quantity = dto.quantity;
     if (dto.notes !== undefined) item.notes = dto.notes ?? null;
-    item.subtotal = this.itemSubtotal(item.quantity, item.unitPrice, item.modifiers ?? []);
+    item.subtotal = itemSubtotal(item.quantity, item.unitPrice, item.modifiers ?? []);
 
     this.applyTotals(order);
     await this.ordersRepo.save(order);
@@ -309,24 +310,21 @@ export class OrdersService {
       productId: product.id,
       quantity: dto.quantity,
       unitPrice,
-      subtotal: this.itemSubtotal(dto.quantity, unitPrice, modifiers),
+      subtotal: itemSubtotal(dto.quantity, unitPrice, modifiers),
       notes: dto.notes ?? null,
       status: 'pending',
       modifiers,
     });
   }
 
-  private itemSubtotal(quantity: number, unitPrice: number, modifiers: OrderItemModifier[]): number {
-    const adjustments = modifiers.reduce((sum, m) => sum + Number(m.priceAdjustment), 0);
-    return Number(((unitPrice + adjustments) * quantity).toFixed(2));
-  }
-
   private applyTotals(order: Order) {
-    const active = order.items.filter((i) => i.status !== 'cancelled');
-    const discount = Number(order.discountAmount) || 0;
-    const tip = Number(order.tipAmount) || 0;
-    order.subtotal = Number(active.reduce((sum, i) => sum + Number(i.subtotal), 0).toFixed(2));
-    order.total = Number((order.subtotal - discount + tip).toFixed(2));
+    const { subtotal, total } = computeTotals(
+      order.items,
+      order.discountAmount,
+      order.tipAmount,
+    );
+    order.subtotal = subtotal;
+    order.total = total;
   }
 
   private assertOpen(order: Order) {

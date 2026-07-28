@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Spinner } from '@/components/ui/spinner';
-import { Field, FieldLabel, FieldError, FieldGroup, FieldLegend } from '@/components/ui/field';
+import { Field, FieldLabel, FieldGroup, FieldLegend } from '@/components/ui/field';
 import {
   Select,
   SelectContent,

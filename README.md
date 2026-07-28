@@ -8,7 +8,7 @@
 
 ![Status](https://img.shields.io/badge/estado-en%20desarrollo-yellow?style=flat-square)
 ![License](https://img.shields.io/badge/licencia-MIT-blue?style=flat-square)
-![Phase](https://img.shields.io/badge/fase%20actual-2%20%E2%80%94%20Core%20del%20Negocio-blue?style=flat-square)
+![Phase](https://img.shields.io/badge/fase%20actual-3%20%E2%80%94%20Caja%20y%20Reportes-blue?style=flat-square)
 ![Stack](https://img.shields.io/badge/stack-NestJS%20%7C%20Next.js%20%7C%20PostgreSQL-informational?style=flat-square)
 ![Monorepo](https://img.shields.io/badge/monorepo-Turborepo-EF4444?style=flat-square&logo=turborepo)
 
@@ -31,8 +31,8 @@ Diseñado para funcionar **aunque se caiga el WiFi o la luz**, con sincronizaci�
 | **Monorepo** | Turborepo |
 | **Backend** | NestJS · TypeScript · PostgreSQL · Redis |
 | **Frontend** | Next.js · TypeScript · Tailwind CSS |
-| **Infra** | Docker · GitHub Actions · Railway/AWS |
-| **Documentación** | Swagger / OpenAPI |
+| **Infra** | Docker Compose (PostgreSQL + Redis) |
+| **Calidad** | ESLint 10 (flat config) · TypeScript strict · Jest |
 
 ---
 
@@ -91,13 +91,16 @@ Detalle completo en [docs/ROADMAP.md](./docs/ROADMAP.md).
 
 ```
 Fase 0 ████████████████████ 100%  — Completada
-Fase 1 ████████████████████ 100%  — Completada (deploy/CI diferidos)
+Fase 1 █████████████████░░░   85%  — Faltan CI/CD y deploy en producción
 Fase 2 ███████████████████░   95%  — Casi lista (solo fusión de mesas, diferida)
-Fase 3 █████████░░░░░░░░░░░░   45%  — En progreso (cobro/POS y turnos de caja hechos; faltan descuentos y reportes)
+Fase 3 ████████████░░░░░░░░   60%  — En progreso (cobro/POS, split, propina y turnos de caja hechos)
 Fase 4 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 Fase 5 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 Fase 6 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 ```
+
+**Lo que falta para cerrar la Fase 3:** descuentos con flujo de aprobación por rol,
+impresión/envío de recibo, dashboard de métricas en tiempo real y reportes exportables.
 
 ### Módulos implementados
 
@@ -126,7 +129,8 @@ Fase 6 ░░░░░░░░░░░░░░░░░░░░    0%  — P
 | [Roadmap de Desarrollo](./docs/ROADMAP.md) | Fases, tareas y entregables del proyecto | ✅ Completo |
 | [Modelo de Base de Datos](./docs/DATA_MODEL.md) | 31 tablas, relaciones y decisiones de diseño | ✅ Completo |
 
-| Arquitectura de Infraestructura | Setup local + nube + offline | ✅ Completo |
+> El modelo documenta 31 tablas; hay **25 creadas** (ver `apps/api/src/database/migrations/`).
+> Las 6 restantes son de inventario y proveedores, previstas para la Fase 5.
 
 ---
 
@@ -135,32 +139,37 @@ Fase 6 ░░░░░░░░░░░░░░░░░░░░    0%  — P
 ```
 loklflow/
 ├── apps/
-│   ├── api/               # Backend NestJS
-│   │   ├── src/
-│   │   │   ├── auth/
-│   │   │   ├── users/
-│   │   │   ├── roles/
-│   │   │   ├── menu/
-│   │   │   ├── tables/
-│   │   │   ├── orders/
-│   │   │   ├── pos/
-│   │   │   ├── inventory/
-│   │   │   ├── reports/
-│   │   │   └── websockets/
-│   │   └── test/
-│   └── web/               # Frontend Next.js
-│       ├── app/
-│       │   ├── (admin)/   # Panel de administración
-│       │   ├── (pos)/     # Vista del cajero
-│       │   ├── (waiter)/  # Vista del mesero
-│       │   ├── (kitchen)/ # KDS de cocina
-│       │   └── menu/      # Menú público QR
-│       └── public/
+│   ├── api/                    # Backend NestJS — 81 endpoints
+│   │   └── src/
+│   │       ├── auth/           # JWT + refresh, login por email y por PIN
+│   │       ├── users/
+│   │       ├── roles/          # RBAC granular por módulo:acción
+│   │       ├── business-config/
+│   │       ├── audit/
+│   │       ├── menu/           # categorías, productos, modificadores, combos
+│   │       ├── tables/         # sectores, mesas, reservas
+│   │       ├── orders/
+│   │       ├── payments/       # cobro, split, propina
+│   │       ├── shifts/         # turnos de caja y arqueo
+│   │       ├── notifications/
+│   │       ├── realtime/       # gateway de Socket.io
+│   │       ├── common/         # guards, decoradores, filtros, pipes
+│   │       └── database/       # migraciones y seeds
+│   └── web/                    # Frontend Next.js
+│       └── src/
+│           ├── app/
+│           │   ├── (auth)/     # login y login por PIN
+│           │   ├── (dashboard)/admin/   # panel de administración
+│           │   ├── pos/        # vista del cajero
+│           │   ├── waiter/     # vista del mesero (móvil)
+│           │   └── kitchen/    # KDS de cocina
+│           ├── components/     # incluye ui/ (shadcn) por app
+│           ├── hooks/
+│           └── lib/
 ├── packages/
-│   ├── ui/                # Componentes compartidos
-│   ├── types/             # Tipos TypeScript compartidos
-│   └── config/            # ESLint, TSConfig base
-├── docs/                  # Documentación técnica
+│   ├── types/                  # tipos TypeScript compartidos
+│   └── config/                 # ESLint flat config y TSConfig base
+├── docs/                       # documentación técnica
 ├── turbo.json
 ├── docker-compose.yml
 ├── .env.example
@@ -179,11 +188,19 @@ cd loklflow
 # Copiar variables de entorno
 cp .env.example .env
 
-# Levantar servicios con Docker
-docker-compose up -d
+# Generar los secretos JWT — la API se niega a arrancar con los valores de ejemplo
+openssl rand -base64 48    # → JWT_SECRET
+openssl rand -base64 48    # → JWT_REFRESH_SECRET
+
+# Levantar PostgreSQL y Redis (las apps corren en local)
+docker compose up -d
 
 # Instalar dependencias (pnpm gestiona el monorepo con Turborepo)
 pnpm install
+
+# Crear el esquema y cargar los datos iniciales
+pnpm --filter=api migration:run
+pnpm --filter=api seed
 
 # Correr todos los servicios en desarrollo
 pnpm dev
@@ -192,6 +209,18 @@ pnpm dev
 pnpm dev --filter=api
 pnpm dev --filter=web
 ```
+
+### Calidad
+
+```bash
+pnpm lint         # ESLint 10 en las 3 workspaces
+pnpm typecheck    # tsc --noEmit
+pnpm test         # Jest (apps/api)
+```
+
+En desarrollo el esquema se sincroniza solo (`synchronize: true` cuando
+`NODE_ENV=development`). Fuera de desarrollo el esquema se aplica **solo** con
+migraciones — nunca con `synchronize`.
 
 ---
 

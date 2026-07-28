@@ -1,4 +1,12 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+  "exclude": [
+    "node_modules",
+    "test",
+    "dist",
+    "**/*spec.ts",
+    // Fuera a propósito: al vivir en la raíz del paquete eleva el rootDir que infiere
+    // tsc y la salida pasa de dist/main.js a dist/src/main.js, rompiendo `start`.
+    "jest.config.ts"
+  ]
 }

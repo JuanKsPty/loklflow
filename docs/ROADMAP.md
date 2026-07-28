@@ -28,7 +28,11 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 - [x] Panel de administración (login + gestión de usuarios)
 - [x] Guards y decoradores de permisos por módulo
 - [x] Configuración general del negocio (`business_config`)
-- [x] Log de auditoría de acciones críticas (`audit_logs`)
+- [ ] Log de auditoría de acciones críticas (`audit_logs`) _(solo el andamiaje: entidad,
+      endpoint de lectura y permiso. El interceptor no se registra y `createLog()` no se
+      llama nunca, así que la tabla no recibe filas)_
+- [x] Esquema versionado con migraciones TypeORM (`synchronize` solo en desarrollo)
+- [x] ESLint 10 con flat config compartida, `typecheck` y primeros tests en verde
 - [ ] Deploy en producción (Railway / Render)
 - [ ] Pipeline CI/CD básico con GitHub Actions
 
