@@ -27,6 +27,19 @@ export class Order {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
+  /**
+   * El valor lo pide el servicio a la secuencia `orders_order_number_seq` (ver
+   * `OrdersService.nextOrderNumber`), no un `MAX(order_number) + 1`, que se pisaba con dos
+   * peticiones simultáneas.
+   *
+   * La columna se declara limpia, sin `default`: la secuencia es un objeto que TypeORM no
+   * conoce. Poner el default aquí y en la columna hacía que `synchronize` lo detectara como
+   * diferencia y rompiera el arranque en desarrollo.
+   *
+   * Consecuencia asumida para el modo sin conexión: el dispositivo no conoce el número hasta
+   * que el servidor confirma la orden, así que mientras esté pendiente de sincronizar la
+   * interfaz muestra la mesa o la etiqueta en su lugar.
+   */
   @Column({ name: 'order_number', type: 'int', unique: true })
   orderNumber!: number;
 

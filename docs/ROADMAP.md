@@ -33,10 +33,16 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
       posterior, redacción de credenciales, filtros y vista en `/admin/audit`
 - [x] Esquema versionado con migraciones TypeORM (`synchronize` solo en desarrollo)
 - [x] ESLint 10 con flat config compartida, `typecheck` y primeros tests en verde
-- [ ] Deploy en producción (Railway / Render)
-- [ ] Pipeline CI/CD básico con GitHub Actions
+- [x] Pipeline CI/CD con GitHub Actions — tres jobs: `verify` (lint, tipos, 127 tests y
+      build), `integration` (55 tests contra un Postgres real, con las migraciones aplicadas
+      desde cero) e `images` (construye las dos imágenes, aplica migraciones y seed desde la
+      imagen, y las arranca para comprobar `/api/health` y los assets)
+- [x] Imágenes de Docker de las dos apps, listas para desplegar
+- [ ] Deploy en producción _(aplazado a propósito: no hay piloto ni demo agendada, y la
+      arquitectura del producto pone el servidor dentro del establecimiento, no en la nube.
+      El repo queda listo y CI lo verifica sin alquilar nada)_
 
-**Entregable:** Sistema de auth con RBAC funcionando en producción.
+**Entregable:** Sistema de auth con RBAC verificado automáticamente y empaquetado.
 
 ---
 
@@ -88,9 +94,18 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 ## Fase 4 — Offline y Resiliencia
 > El sistema funciona aunque se caiga el WiFi.
 
+- [x] Idempotencia en el servidor, hecha antes que la cola porque retrofitarla después
+      significaría reescribir la cola: `POST /orders` y sus ítems aceptan el uuid que genera
+      el dispositivo como clave primaria, y `POST /orders/:id/payments` acepta
+      `clientRequestId`. Reenviar una operación devuelve el estado en lugar de duplicarla
+- [x] `order_number` por secuencia de Postgres, en lugar de un `MAX+1` que con dos meseros
+      simultáneos devolvía 500 y perdía la orden
 - [ ] Service Worker registrado y funcional
 - [ ] Persistencia de operaciones en IndexedDB
 - [ ] Cola de sincronización ordenada por timestamp
+- [ ] Migrar las vistas operativas (`/waiter`, `/kitchen`, `/pos`) a datos en cliente: hoy las
+      42 páginas son Server Components con `serverFetch` y `cache: 'no-store'`, así que sin
+      servidor no renderizan
 - [ ] Detección automática de pérdida de conexión
 - [ ] Activación del modo offline sin intervención del usuario
 - [ ] Resolución de conflictos en sincronización

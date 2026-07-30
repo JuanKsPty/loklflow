@@ -1,0 +1,195 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Un push nuevo sobre la misma rama cancela la ejecución anterior: no tiene sentido
+# terminar de verificar un commit que ya quedó atrás.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─── Lo que ya existía y nadie ejecutaba automáticamente ────────────────────────
+  verify:
+    name: Lint, tipos, tests y build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        # La versión sale del campo packageManager de package.json.
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Sin secretos JWT a propósito: compilar no los necesita. `verifyToken` los lee en
+      # cada petición y `requireSecret()` corre al arrancar la API, no al construirla.
+      # Si algún día hicieran falta aquí, sería la señal de que algo se evalúa demasiado pronto.
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  # ─── El hueco que no cubría nada: guards, controladores y migraciones reales ────
+  integration:
+    name: Integración contra Postgres
+    runs-on: ubuntu-latest
+
+    services:
+      # Solo Postgres. Redis no hace falta: está declarado en la configuración pero
+      # ningún módulo del backend abre una conexión.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: loklflow
+          POSTGRES_PASSWORD: loklflow
+          POSTGRES_DB: loklflow_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U loklflow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      # NODE_ENV=test y no development: con development se activaría `synchronize` y el
+      # esquema lo crearía TypeORM en vez de las migraciones, que es justo lo que se quiere
+      # comprobar. El arranque de la suite redirige la base a loklflow_test.
+      DATABASE_URL: postgresql://loklflow:loklflow@localhost:5432/loklflow_db
+      DATABASE_SSL: 'false'
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Secretos de un solo uso: la API se niega a arrancar si faltan o si conservan el
+      # valor de ejemplo "change-this-*".
+      - name: Generar secretos JWT para esta ejecución
+        run: |
+          echo "JWT_SECRET=$(openssl rand -base64 48)" >> "$GITHUB_ENV"
+          echo "JWT_REFRESH_SECRET=$(openssl rand -base64 48)" >> "$GITHUB_ENV"
+
+      - run: pnpm --filter=api test:int
+
+  # ─── Que las imágenes se construyan y arranquen de verdad ───────────────────────
+  images:
+    name: Imágenes de Docker
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: loklflow
+          POSTGRES_PASSWORD: loklflow
+          POSTGRES_DB: loklflow_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U loklflow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+
+      # No se publican en ningún registro: el objetivo es que el repo esté siempre listo
+      # para desplegar, no desplegar. `load: true` las deja en el docker local del runner
+      # para poder arrancarlas en el paso siguiente.
+      - name: Construir la imagen de la API
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          tags: loklflow-api:ci
+          load: true
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Construir la imagen del web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          build-args: |
+            NEXT_PUBLIC_API_URL=http://localhost:3001
+          tags: loklflow-web:ci
+          load: true
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      # Que compile no prueba que arranque. Esto detecta lo que el build no ve: rutas mal
+      # copiadas, dependencias que faltaban en producción o migraciones que no aplican.
+      - name: Migraciones y seed desde la imagen, contra una base vacía
+        run: |
+          docker run --rm --network host \
+            -e NODE_ENV=production \
+            -e DATABASE_URL=postgresql://loklflow:loklflow@localhost:5432/loklflow_db \
+            loklflow-api:ci pnpm migration:run:prod
+          docker run --rm --network host \
+            -e NODE_ENV=production \
+            -e DATABASE_URL=postgresql://loklflow:loklflow@localhost:5432/loklflow_db \
+            loklflow-api:ci pnpm seed:prod
+
+      - name: Arrancar la API y comprobar /api/health
+        run: |
+          docker run -d --name api --network host \
+            -e NODE_ENV=production \
+            -e DATABASE_URL=postgresql://loklflow:loklflow@localhost:5432/loklflow_db \
+            -e JWT_SECRET="$(openssl rand -base64 48)" \
+            -e JWT_REFRESH_SECRET="$(openssl rand -base64 48)" \
+            loklflow-api:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3001/api/health > /dev/null; then
+              echo "API arriba"; break
+            fi
+            if [ "$i" = "30" ]; then
+              echo "La API no respondió en 30 intentos:"; docker logs api; exit 1
+            fi
+            sleep 2
+          done
+          # Una ruta protegida tiene que seguir exigiendo sesión: si esto devolviera 200,
+          # los guards globales no estarían registrados en la imagen.
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/api/orders)
+          test "$code" = "401" || { echo "GET /api/orders devolvió $code, se esperaba 401"; exit 1; }
+          docker rm -f api
+
+      - name: Arrancar el web y comprobar que sirve los assets
+        run: |
+          docker run -d --name web --network host \
+            -e PORT=3000 \
+            -e JWT_SECRET="$(openssl rand -base64 48)" \
+            loklflow-web:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/login > /dev/null; then
+              echo "Web arriba"; break
+            fi
+            if [ "$i" = "30" ]; then
+              echo "El web no respondió en 30 intentos:"; docker logs web; exit 1
+            fi
+            sleep 2
+          done
+          # .next/static se copia en un paso aparte del Dockerfile porque la salida
+          # standalone no lo incluye. Si ese COPY desapareciera, la página cargaría igual
+          # pero sin estilos, y solo esto lo detecta.
+          asset=$(curl -s http://localhost:3000/login | grep -oE '/_next/static/[^"]+\.css' | head -1)
+          test -n "$asset" || { echo "No se encontró ningún CSS en /login"; exit 1; }
+          curl -fsS "http://localhost:3000$asset" > /dev/null \
+            || { echo "El asset $asset no se sirve: falta .next/static en la imagen"; exit 1; }
+          docker rm -f web

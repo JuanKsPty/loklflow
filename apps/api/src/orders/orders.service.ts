@@ -59,6 +59,20 @@ export class OrdersService {
   }
 
   async create(dto: CreateOrderDto, waiterId: string) {
+    // El dispositivo puede traer su propio uuid para poder crear la cuenta sin conexión y
+    // encolar contra ella («añade ítem», «cobra») antes de que el servidor la conozca. Si
+    // ese id ya existe, la petición es un reenvío: se devuelve la orden tal cual, sin
+    // repetir efectos —no se vuelve a ocupar la mesa ni se avisa otra vez a cocina.
+    //
+    // La comprobación es explícita y no una violación de unicidad capturada, porque
+    // `save()` con una clave primaria que ya existe **no falla: hace UPDATE**. Confiar en
+    // la excepción sobrescribiría la orden en silencio, y con los ítems en cascada además
+    // borraría los que se hubieran añadido después.
+    if (dto.id) {
+      const existing = await this.ordersRepo.findOne({ where: { id: dto.id } });
+      if (existing) return this.findOne(existing.id);
+    }
+
     const items: OrderItem[] = [];
     for (const itemDto of dto.items) {
       items.push(await this.buildItem(itemDto));
@@ -66,6 +80,7 @@ export class OrdersService {
 
     const order = this.ordersRepo.create({
       orderNumber: await this.nextOrderNumber(),
+      ...(dto.id ? { id: dto.id } : {}),
       label: dto.label ?? null,
       tableId: dto.tableId ?? null,
       waiterId,
@@ -89,13 +104,13 @@ export class OrdersService {
     try {
       saved = await this.ordersRepo.save(order);
     } catch (err) {
-      if (err instanceof QueryFailedError && /unique|duplicate/i.test(err.message)) {
-        // colisión rara de order_number por concurrencia: reintenta una vez
-        order.orderNumber = await this.nextOrderNumber();
-        saved = await this.ordersRepo.save(order);
-      } else {
-        throw err;
+      // Dos reenvíos simultáneos del mismo id: ambos comprobaron antes de que existiera y
+      // ambos insertan. El que pierde recibe una violación de clave primaria, y la respuesta
+      // correcta es la orden que acaba de crear el otro, no un error.
+      if (dto.id && err instanceof QueryFailedError && /unique|duplicate/i.test(err.message)) {
+        return this.findOne(dto.id);
       }
+      throw err;
     }
     const result = await this.findOne(saved.id);
     this.emit(result, 'created');
@@ -122,6 +137,9 @@ export class OrdersService {
 
   async addItem(orderId: string, dto: AddItemDto) {
     const order = await this.findOne(orderId);
+    // Misma idempotencia que en `create`: si la línea que trae el dispositivo ya está en la
+    // cuenta, la operación es un reenvío y no debe volver a sumarla al total.
+    if (dto.id && order.items.some((i) => i.id === dto.id)) return order;
     this.assertOpen(order);
     const item = await this.buildItem(dto);
     item.orderId = order.id;
@@ -308,6 +326,26 @@ export class OrdersService {
 
   // ---- helpers ----
 
+  /**
+   * Siguiente número de cuenta, de una secuencia de Postgres.
+   *
+   * Antes era `MAX(order_number) + 1`, con un único reintento si la inserción chocaba. No
+   * bastaba: ocho creaciones simultáneas devolvían 500, porque varias leían el mismo máximo,
+   * la primera ganaba y los reintentos de las demás volvían a colisionar entre sí. Con dos
+   * meseros tomando nota a la vez, la orden se perdía.
+   *
+   * `nextval` es atómico y no depende de la transacción, así que nunca entrega el mismo
+   * valor dos veces. La contrapartida es que un número se «gasta» si la inserción luego
+   * falla, y por eso la numeración puede tener huecos: es lo aceptable, porque el problema
+   * que resuelve es que dos cuentas distintas compartieran número.
+   */
+  private async nextOrderNumber(): Promise<number> {
+    const [row]: { nextval: string }[] = await this.ordersRepo.query(
+      `SELECT nextval('orders_order_number_seq')`,
+    );
+    return Number(row.nextval);
+  }
+
   private orderLocation(order: Order): string {
     const place = order.table ? `Mesa ${order.table.number}` : 'Para llevar';
     return order.label ? `${place} · ${order.label}` : place;
@@ -323,13 +361,6 @@ export class OrdersService {
     });
   }
 
-  private async nextOrderNumber(): Promise<number> {
-    const row = await this.ordersRepo
-      .createQueryBuilder('o')
-      .select('MAX(o.orderNumber)', 'max')
-      .getRawOne<{ max: number | null }>();
-    return (row?.max ?? 0) + 1;
-  }
 
   private async buildItem(dto: CreateOrderItemDto): Promise<OrderItem> {
     const product = await this.productsRepo.findOne({ where: { id: dto.productId } });
@@ -353,6 +384,7 @@ export class OrdersService {
 
     const unitPrice = product.price;
     return Object.assign(new OrderItem(), {
+      ...(dto.id ? { id: dto.id } : {}),
       productId: product.id,
       quantity: dto.quantity,
       unitPrice,

@@ -29,6 +29,17 @@ export class PaymentsService {
   }
 
   async addPayment(orderId: string, dto: CreatePaymentDto, userId: string) {
+    // Antes que nada, y antes incluso de mirar si la cuenta está cerrada: un pago reenviado
+    // tiene que devolver el estado actual, no un error. La comprobación va primero porque
+    // el propio pago original puede haber cerrado la cuenta, y entonces el reintento
+    // chocaría con «la cuenta ya está cerrada» — un fallo falso que atascaría la cola.
+    if (dto.clientRequestId) {
+      const already = await this.paymentsRepo.findOne({
+        where: { clientRequestId: dto.clientRequestId },
+      });
+      if (already) return this.summary(already.orderId);
+    }
+
     const order = await this.orders.findOne(orderId);
     if (order.status === 'closed' || order.status === 'cancelled') {
       throw new BadRequestException('La cuenta ya está cerrada o cancelada');
@@ -51,6 +62,7 @@ export class PaymentsService {
         method: dto.method,
         amount: dto.amount,
         reference: dto.reference ?? null,
+        clientRequestId: dto.clientRequestId ?? null,
         processedBy: userId,
         shiftId: shift.id,
       }),
