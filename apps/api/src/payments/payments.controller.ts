@@ -1,3 +1,4 @@
+import { ApiTags } from '@nestjs/swagger';
 import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -8,6 +9,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 
+@ApiTags('payments')
 @Controller('orders/:id')
 export class PaymentsController {
   constructor(

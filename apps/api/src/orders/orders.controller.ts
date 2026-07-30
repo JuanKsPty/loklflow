@@ -1,3 +1,4 @@
+import { ApiTags } from '@nestjs/swagger';
 import {
   Body,
   Controller,
@@ -20,6 +21,7 @@ import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 import type { OrderStatus } from './order-status.constants';
 
+@ApiTags('orders')
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}

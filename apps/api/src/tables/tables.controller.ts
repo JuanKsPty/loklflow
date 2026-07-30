@@ -1,3 +1,4 @@
+import { ApiTags } from '@nestjs/swagger';
 import {
   Body,
   Controller,
@@ -18,6 +19,7 @@ import { BulkCreateTableDto } from './dto/bulk-create-table.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
 
+@ApiTags('tables')
 @Controller('tables')
 export class TablesController {
   constructor(private readonly tablesService: TablesService) {}

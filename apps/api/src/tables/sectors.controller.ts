@@ -1,3 +1,4 @@
+import { ApiTags } from '@nestjs/swagger';
 import {
   Body,
   Controller,
@@ -15,6 +16,7 @@ import { UpdateSectorDto } from './dto/update-sector.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
 
+@ApiTags('tables')
 @Controller('tables/sectors')
 export class SectorsController {
   constructor(private readonly sectorsService: SectorsService) {}

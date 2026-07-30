@@ -1,8 +1,10 @@
+import { ApiTags } from '@nestjs/swagger';
 import { Body, Controller, Get, Put } from '@nestjs/common';
 import { BusinessConfigService } from './business-config.service';
 import { UpdateBusinessConfigDto } from './dto/update-business-config.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 
+@ApiTags('business-config')
 @Controller('business-config')
 export class BusinessConfigController {
   constructor(private readonly service: BusinessConfigService) {}

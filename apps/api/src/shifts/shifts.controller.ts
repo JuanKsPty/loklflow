@@ -1,3 +1,4 @@
+import { ApiTags } from '@nestjs/swagger';
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { ShiftsService } from './shifts.service';
 import { OpenShiftDto } from './dto/open-shift.dto';
@@ -7,6 +8,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 
+@ApiTags('shifts')
 @Controller('shifts')
 export class ShiftsController {
   constructor(private readonly shiftsService: ShiftsService) {}

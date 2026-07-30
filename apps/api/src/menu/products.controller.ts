@@ -1,3 +1,4 @@
+import { ApiTags } from '@nestjs/swagger';
 import {
   Body,
   Controller,
@@ -15,6 +16,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
 
+@ApiTags('menu')
 @Controller('menu/products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}

@@ -1,3 +1,4 @@
+import { ApiTags } from '@nestjs/swagger';
 import {
   Body,
   Controller,
@@ -15,6 +16,7 @@ import { UpdateComboDto } from './dto/update-combo.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
 
+@ApiTags('menu')
 @Controller('menu/combos')
 export class CombosController {
   constructor(private readonly combosService: CombosService) {}

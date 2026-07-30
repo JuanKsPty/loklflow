@@ -1,3 +1,4 @@
+import { ApiTags } from '@nestjs/swagger';
 import { Controller, Get, Param, Patch } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -6,6 +7,7 @@ import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 
 // Endpoints personales: sin @RequirePermissions, accesibles a cualquier usuario autenticado;
 // cada acción se limita a las notificaciones del propio usuario (user.sub).
+@ApiTags('notifications')
 @Controller('notifications')
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
