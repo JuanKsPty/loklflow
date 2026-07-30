@@ -1,73 +1,32 @@
 import 'reflect-metadata';
-import * as dotenv from 'dotenv';
-import { DataSource } from 'typeorm';
+import { DataSource, type DataSourceOptions } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { databaseOptions } from '../../config/database.config';
+import { loadRootEnv } from '../../config/load-root-env';
 import { seedPermissions } from './permissions.seed';
 import { seedRoles } from './roles.seed';
 import { seedMenu } from './menu.seed';
 import { seedTables } from './tables.seed';
 import { User } from '../../users/entities/user.entity';
 import { Role } from '../../roles/entities/role.entity';
-import { Permission } from '../../roles/entities/permission.entity';
-import { RolePermission } from '../../roles/entities/role-permission.entity';
-import { RefreshToken } from '../../auth/entities/refresh-token.entity';
 import { BusinessConfig } from '../../business-config/entities/business-config.entity';
-import { AuditLog } from '../../audit/entities/audit-log.entity';
-import { Category } from '../../menu/entities/category.entity';
-import { Product } from '../../menu/entities/product.entity';
-import { ProductAvailability } from '../../menu/entities/product-availability.entity';
-import { Modifier } from '../../menu/entities/modifier.entity';
-import { ModifierOption } from '../../menu/entities/modifier-option.entity';
-import { Combo } from '../../menu/entities/combo.entity';
-import { ComboItem } from '../../menu/entities/combo-item.entity';
-import { Sector } from '../../tables/entities/sector.entity';
-import { RestaurantTable } from '../../tables/entities/table.entity';
-import { Reservation } from '../../tables/entities/reservation.entity';
-import { Order } from '../../orders/entities/order.entity';
-import { OrderItem } from '../../orders/entities/order-item.entity';
-import { OrderItemModifier } from '../../orders/entities/order-item-modifier.entity';
-import { OrderStatusHistory } from '../../orders/entities/order-status-history.entity';
-import { Notification } from '../../notifications/entities/notification.entity';
-import { Payment } from '../../payments/entities/payment.entity';
-import { Shift } from '../../shifts/entities/shift.entity';
 
-dotenv.config();
+// Antes era `dotenv.config()` sin ruta, que busca en el CWD —apps/api al correr el
+// script—, donde no hay ningún .env. No se notaba porque los valores por defecto de la
+// conexión coinciden con docker-compose, así que el seed acababa siempre en la base de
+// desarrollo aunque se le pidiera otra.
+loadRootEnv();
 
-const dataSource = new DataSource({
-  type: 'postgres',
-  host: process.env.DATABASE_HOST ?? 'localhost',
-  port: parseInt(process.env.DATABASE_PORT ?? '5432', 10),
-  username: process.env.DATABASE_USER ?? 'loklflow',
-  password: process.env.DATABASE_PASSWORD ?? 'loklflow',
-  database: process.env.DATABASE_NAME ?? 'loklflow_db',
-  entities: [
-    User,
-    Role,
-    Permission,
-    RolePermission,
-    RefreshToken,
-    BusinessConfig,
-    AuditLog,
-    Category,
-    Product,
-    ProductAvailability,
-    Modifier,
-    ModifierOption,
-    Combo,
-    ComboItem,
-    Sector,
-    RestaurantTable,
-    Reservation,
-    Order,
-    OrderItem,
-    OrderItemModifier,
-    OrderStatusHistory,
-    Notification,
-    Payment,
-    Shift,
-  ],
-  synchronize: true,
-});
+/**
+ * La conexión sale de `databaseOptions()`, la misma que usan la app y la CLI de TypeORM.
+ *
+ * Antes se declaraba aquí a mano, con tres consecuencias: ignoraba `DATABASE_URL` (así que
+ * no había forma de sembrar un Postgres gestionado ni el de un contenedor), forzaba
+ * `synchronize: true` sin mirar el entorno —creando el esquema al margen de las
+ * migraciones, justo lo que el proyecto prohíbe fuera de desarrollo— y mantenía la lista
+ * de entidades a mano, que ya se había quedado atrás: le faltaba `Discount`.
+ */
+const dataSource = new DataSource(databaseOptions() as DataSourceOptions);
 
 async function seedAdmin(ds: DataSource) {
   const usersRepo = ds.getRepository(User);
@@ -192,25 +151,38 @@ async function seedBusinessConfig(ds: DataSource) {
   }
 }
 
+/**
+ * Siembra sobre un datasource ya conectado. Exportado aparte del script para que el arranque
+ * de los tests de integración pueda sembrar su base sin duplicar la lista de pasos ni
+ * abrir una segunda conexión.
+ */
+export async function runSeeds(ds: DataSource): Promise<void> {
+  await seedPermissions(ds);
+  await seedRoles(ds);
+  await seedAdmin(ds);
+  await seedWaiter(ds);
+  await seedKitchen(ds);
+  await seedCashier(ds);
+  await seedBusinessConfig(ds);
+  await seedMenu(ds);
+  await seedTables(ds);
+}
+
 async function main() {
   await dataSource.initialize();
   console.log('Database connected. Running seeds...\n');
 
-  await seedPermissions(dataSource);
-  await seedRoles(dataSource);
-  await seedAdmin(dataSource);
-  await seedWaiter(dataSource);
-  await seedKitchen(dataSource);
-  await seedCashier(dataSource);
-  await seedBusinessConfig(dataSource);
-  await seedMenu(dataSource);
-  await seedTables(dataSource);
+  await runSeeds(dataSource);
 
   await dataSource.destroy();
   console.log('\nAll seeds completed successfully.');
 }
 
-main().catch((err) => {
-  console.error('Seed failed:', err);
-  process.exit(1);
-});
+// Solo cuando se ejecuta como script (`pnpm seed`). Sin esta guarda, importar `runSeeds`
+// desde los tests dispararía además una conexión y una siembra a la base del .env.
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('Seed failed:', err);
+    process.exit(1);
+  });
+}

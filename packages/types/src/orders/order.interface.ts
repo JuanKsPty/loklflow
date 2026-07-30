@@ -58,6 +58,8 @@ export interface Order {
 }
 
 export interface CreateOrderItemPayload {
+  /** uuid generado en el dispositivo; ver `CreateOrderPayload.id`. */
+  id?: string;
   productId: string;
   quantity: number;
   notes?: string;
@@ -65,6 +67,14 @@ export interface CreateOrderItemPayload {
 }
 
 export interface CreateOrderPayload {
+  /**
+   * uuid generado en el dispositivo, que pasa a ser la clave primaria de la orden.
+   *
+   * Permite abrir una cuenta sin conexión y encolar operaciones contra ella antes de que el
+   * servidor la conozca, sin reescribir identificadores al sincronizar. Y hace la creación
+   * idempotente: reenviar la misma petición devuelve la orden que ya existe.
+   */
+  id?: string;
   tableId?: string;
   label?: string;
   source?: OrderSource;
