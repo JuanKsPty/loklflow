@@ -1,0 +1,45 @@
+# Todo lo que no debe entrar en el contexto de build. Sin este archivo `docker build`
+# sube el monorepo entero —node_modules incluido— antes de ejecutar la primera capa.
+
+# Dependencias: se instalan dentro de la imagen, y las de macOS no sirven en Linux
+# (bcrypt es un módulo nativo).
+node_modules
+**/node_modules
+
+# Salidas de build: la imagen las genera en su propia etapa.
+dist
+**/dist
+.next
+**/.next
+out
+**/out
+build
+**/build
+
+# Cachés
+.turbo
+**/.turbo
+coverage
+**/coverage
+*.tsbuildinfo
+
+# Secretos: las variables se inyectan al arrancar el contenedor, nunca se hornean.
+.env
+.env.local
+.env.*.local
+
+# Control de versiones y metadatos
+.git
+.gitignore
+.github
+
+# Editor y sistema operativo
+.vscode
+.idea
+.DS_Store
+*.swp
+
+# Documentación y planes: no afectan al build y ensucian la caché de capas.
+docs
+*.md
+!README.md

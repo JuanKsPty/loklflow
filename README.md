@@ -8,7 +8,7 @@
 
 ![Status](https://img.shields.io/badge/estado-en%20desarrollo-yellow?style=flat-square)
 ![License](https://img.shields.io/badge/licencia-MIT-blue?style=flat-square)
-![Phase](https://img.shields.io/badge/fase%20actual-3%20%E2%80%94%20Caja%20y%20Reportes-blue?style=flat-square)
+![Phase](https://img.shields.io/badge/fase%20actual-4%20%E2%80%94%20Offline%20y%20Resiliencia-blue?style=flat-square)
 ![Stack](https://img.shields.io/badge/stack-NestJS%20%7C%20Next.js%20%7C%20PostgreSQL-informational?style=flat-square)
 ![Monorepo](https://img.shields.io/badge/monorepo-Turborepo-EF4444?style=flat-square&logo=turborepo)
 
@@ -32,7 +32,8 @@ Diseñado para funcionar **aunque se caiga el WiFi o la luz**, con sincronizaci�
 | **Backend** | NestJS · TypeScript · PostgreSQL · Redis |
 | **Frontend** | Next.js · TypeScript · Tailwind CSS |
 | **Infra** | Docker Compose (PostgreSQL + Redis) |
-| **Calidad** | ESLint 10 (flat config) · TypeScript strict · Jest |
+| **Calidad** | ESLint 10 (flat config) · TypeScript strict · Jest (unitarios + integración) |
+| **CI** | GitHub Actions · imágenes de Docker de las dos apps |
 
 ---
 
@@ -91,16 +92,22 @@ Detalle completo en [docs/ROADMAP.md](./docs/ROADMAP.md).
 
 ```
 Fase 0 ████████████████████ 100%  — Completada
-Fase 1 █████████████████░░░   85%  — Faltan CI/CD y deploy en producción
+Fase 1 ███████████████████░   95%  — CI/CD e imágenes listas; deploy aplazado a propósito
 Fase 2 ███████████████████░   95%  — Casi lista (solo fusión de mesas, diferida)
 Fase 3 ████████████████████ 100%  — Completada
-Fase 4 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
+Fase 4 ███░░░░░░░░░░░░░░░░░   15%  — Idempotencia del servidor lista
 Fase 5 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 Fase 6 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 ```
 
-**Lo siguiente:** CI/CD y deploy (pendientes de Fase 1), o la Fase 4 (offline y
-sincronización). Diferidos dentro de Fase 3: envío del recibo por correo y exportación a
+**Lo siguiente:** el resto de la Fase 4 — Service Worker, IndexedDB y la cola de
+sincronización, más migrar las vistas operativas a datos en cliente (hoy son Server
+Components, así que sin servidor no renderizan).
+
+El deploy está **aplazado a conciencia**, no olvidado: no hay piloto ni demo agendada, y la
+arquitectura pone el servidor dentro del establecimiento, no en la nube. El repo queda listo
+y el pipeline lo verifica construyendo y arrancando las imágenes en cada push, sin alquilar
+infraestructura. Diferidos dentro de Fase 3: envío del recibo por correo y exportación a
 PDF/Excel.
 
 ### Módulos implementados
@@ -122,6 +129,8 @@ PDF/Excel.
 | **Panel de métricas** | `/admin` con ventas cobradas, ticket promedio, cuentas abiertas, tiempo medio de preparación, top de productos y reparto por método de pago; se actualiza en vivo al cerrar una cuenta |
 | **Reportes** | Exportación de ventas a CSV por rango de fechas (con BOM y CRLF para Excel) |
 | **Auditoría** | 18 acciones críticas con actor, IP y valor anterior; consulta paginada y filtrable en `/admin/audit`. Las credenciales se redactan antes de persistir |
+| **Idempotencia** | Preparación del modo sin conexión: el uuid que genera el dispositivo es la clave primaria de la orden y de sus ítems, y los pagos aceptan `clientRequestId`. Reenviar una operación devuelve el estado en lugar de duplicar la cuenta o el cobro. `order_number` sale de una secuencia de Postgres |
+| **CI/CD** | Tres jobs en GitHub Actions: lint, tipos, 127 tests unitarios y build · 55 tests de integración contra un Postgres real, con las migraciones aplicadas desde cero · construcción de las dos imágenes de Docker, que se arrancan para comprobar salud y assets |
 
 > Pendiente diferido de Fase 2: fusión de mesas para órdenes grupales.
 >
@@ -146,8 +155,11 @@ PDF/Excel.
 
 ```
 loklflow/
+├── .github/workflows/ci.yml    # verify · integration · images
 ├── apps/
-│   ├── api/                    # Backend NestJS — 81 endpoints
+│   ├── api/                    # Backend NestJS — 92 operaciones
+│   │   ├── Dockerfile          # contexto de build: la raíz del monorepo
+│   │   ├── test/               # arnés de integración (arranque, sesiones, fixtures)
 │   │   └── src/
 │   │       ├── auth/           # JWT + refresh, login por email y por PIN
 │   │       ├── users/
@@ -164,10 +176,12 @@ loklflow/
 │   │       ├── common/         # guards, decoradores, filtros, pipes
 │   │       └── database/       # migraciones y seeds
 │   └── web/                    # Frontend Next.js
+│       ├── Dockerfile          # salida standalone
 │       └── src/
 │           ├── app/
 │           │   ├── (auth)/     # login y login por PIN
 │           │   ├── (dashboard)/admin/   # panel de administración
+│           │   ├── (print)/    # recibo de 80 mm, sin barra ni cabecera
 │           │   ├── pos/        # vista del cajero
 │           │   ├── waiter/     # vista del mesero (móvil)
 │           │   └── kitchen/    # KDS de cocina
@@ -179,7 +193,8 @@ loklflow/
 │   └── config/                 # ESLint flat config y TSConfig base
 ├── docs/                       # documentación técnica
 ├── turbo.json
-├── docker-compose.yml
+├── docker-compose.yml          # solo postgres y redis; las apps corren en local
+├── .dockerignore
 ├── .env.example
 └── README.md
 ```
@@ -223,8 +238,16 @@ pnpm dev --filter=web
 ```bash
 pnpm lint         # ESLint 10 en las 3 workspaces
 pnpm typecheck    # tsc --noEmit
-pnpm test         # Jest (apps/api)
+pnpm test         # 127 tests unitarios (apps/api y packages/types)
+
+# 55 tests de integración: la app real contra un Postgres real. Usa la base
+# loklflow_test, nunca la de desarrollo, y aplica las migraciones desde cero.
+docker compose up -d postgres
+pnpm --filter=api test:int
 ```
+
+Los mismos tres pasos, más las imágenes de Docker, corren en GitHub Actions en cada push y
+cada PR (`.github/workflows/ci.yml`).
 
 En desarrollo el esquema se sincroniza solo (`synchronize: true` cuando
 `NODE_ENV=development`). Fuera de desarrollo el esquema se aplica **solo** con
