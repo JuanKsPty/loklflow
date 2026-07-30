@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { UsersIcon, ShieldIcon, SettingsIcon, ChevronsUpDownIcon, LogOutIcon, UtensilsCrossedIcon, LayoutGridIcon, ReceiptTextIcon, ScrollTextIcon } from 'lucide-react';
+import { UsersIcon, ShieldIcon, SettingsIcon, ChevronsUpDownIcon, LogOutIcon, UtensilsCrossedIcon, LayoutGridIcon, ReceiptTextIcon, ScrollTextIcon, PercentIcon, LayoutDashboardIcon } from 'lucide-react';
 import { authApi } from '@/lib/api/auth.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -35,11 +35,13 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { title: 'Panel', href: '/admin', icon: LayoutDashboardIcon, permission: 'pos:read' },
   { title: 'Menú', href: '/admin/menu', icon: UtensilsCrossedIcon, permission: 'menu:read' },
   { title: 'Mesas', href: '/admin/tables', icon: LayoutGridIcon, permission: 'tables:read' },
   { title: 'Órdenes', href: '/admin/orders', icon: ReceiptTextIcon, permission: 'orders:read' },
   { title: 'Empleados', href: '/admin/users', icon: UsersIcon, permission: 'users:read' },
   { title: 'Roles', href: '/admin/roles', icon: ShieldIcon, permission: 'roles:read' },
+  { title: 'Aprobaciones', href: '/admin/approvals', icon: PercentIcon, permission: 'pos:approve_discount' },
   { title: 'Auditoría', href: '/admin/audit', icon: ScrollTextIcon, permission: 'audit:read' },
   { title: 'Configuración', href: '/admin/settings', icon: SettingsIcon, permission: 'business_config:read' },
 ];
@@ -95,7 +97,12 @@ export function AppSidebar({ user }: AppSidebarProps) {
           <SidebarGroupLabel>Administración</SidebarGroupLabel>
           <SidebarMenu>
             {items.map((item) => {
-              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              // '/admin' es prefijo de todas las demás rutas del panel, así que solo
+              // se marca activo en coincidencia exacta.
+              const active =
+                item.href === '/admin'
+                  ? pathname === '/admin'
+                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton isActive={active} tooltip={item.title} render={<Link href={item.href} />}>

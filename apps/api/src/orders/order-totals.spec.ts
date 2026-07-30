@@ -1,4 +1,9 @@
-import { computeTotals, itemSubtotal } from './order-totals';
+import {
+  computeTotals,
+  discountAsPercentage,
+  itemSubtotal,
+  percentageAsAmount,
+} from './order-totals';
 
 describe('itemSubtotal', () => {
   it('multiplica precio unitario por cantidad', () => {
@@ -90,9 +95,69 @@ describe('computeTotals', () => {
     expect(computeTotals([item(0.1), item(0.2)]).subtotal).toBe(0.3);
   });
 
-  it('permite total negativo si el descuento excede el subtotal', () => {
-    // No se satura a 0: la validación de importe máximo es responsabilidad de
-    // quien aplica el descuento, no del cálculo.
-    expect(computeTotals([item(10)], 15).total).toBe(-5);
+  it('no deja el total negativo si el descuento excede el subtotal', () => {
+    // Red de seguridad: un cobro negativo descuadraría la caja. La validación con
+    // mensaje al usuario vive en quien aplica el descuento.
+    expect(computeTotals([item(10)], 15).total).toBe(0);
+  });
+
+  it('el clamp no se come una propina que compensa el descuento', () => {
+    // subtotal 10 − descuento 15 + propina 20 = 15, sigue siendo positivo.
+    expect(computeTotals([item(10)], 15, 20).total).toBe(15);
+  });
+});
+
+describe('discountAsPercentage', () => {
+  it('convierte un importe a su porcentaje del subtotal', () => {
+    expect(discountAsPercentage(200, 50)).toBe(25);
+  });
+
+  it('da 100 cuando el descuento es todo el subtotal', () => {
+    expect(discountAsPercentage(80, 80)).toBe(100);
+  });
+
+  it('pasa de 100 cuando el descuento excede el subtotal, para que no cuele por un umbral', () => {
+    expect(discountAsPercentage(50, 75)).toBe(150);
+  });
+
+  it('da 0 sin descuento', () => {
+    expect(discountAsPercentage(100, 0)).toBe(0);
+  });
+
+  it('trata un subtotal de 0 como 100%, nunca como 0', () => {
+    // Con base 0 la división sería infinita; devolver 0 dejaría pasar cualquier
+    // descuento por debajo de cualquier umbral.
+    expect(discountAsPercentage(0, 10)).toBe(100);
+  });
+
+  it('acepta los numeric que TypeORM entrega como string', () => {
+    expect(discountAsPercentage('200.00', '20.00')).toBe(10);
+  });
+
+  it('redondea a 2 decimales', () => {
+    // 10/3 = 3.333…%
+    expect(discountAsPercentage(300, 10)).toBe(3.33);
+  });
+});
+
+describe('percentageAsAmount', () => {
+  it('calcula el importe de un porcentaje', () => {
+    expect(percentageAsAmount(200, 15)).toBe(30);
+  });
+
+  it('redondea a 2 decimales', () => {
+    // 33% de 10.10 = 3.333
+    expect(percentageAsAmount(10.1, 33)).toBe(3.33);
+  });
+
+  it('da 0 con porcentaje 0 o subtotal 0', () => {
+    expect(percentageAsAmount(100, 0)).toBe(0);
+    expect(percentageAsAmount(0, 50)).toBe(0);
+  });
+
+  it('es el inverso de discountAsPercentage', () => {
+    const amount = percentageAsAmount(240, 25);
+    expect(amount).toBe(60);
+    expect(discountAsPercentage(240, amount)).toBe(25);
   });
 });

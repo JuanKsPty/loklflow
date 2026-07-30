@@ -1,9 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { CheckCircle2Icon } from 'lucide-react';
+import { CheckCircle2Icon, ReceiptTextIcon } from 'lucide-react';
 import type { Order, PaymentMethod, PaymentSummary } from '@loklflow/types';
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from '@loklflow/types';
 import { paymentsApi } from '@/lib/api/payments.api';
@@ -13,18 +14,25 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { Field, FieldLabel } from '@/components/ui/field';
+import { DiscountDialog } from '@/components/pos/discount-dialog';
 
 interface Props {
   order: Order;
   /** Se llama cuando la cuenta queda saldada (cerrada). */
   onSettled?: () => void;
+  /**
+   * Umbral de descuento del rol, en porcentaje. Llega por props desde el layout de
+   * servidor: el store de auth del cliente no está hidratado tras un refresh, así que
+   * no hay forma fiable de leer los permisos aquí. Si no se pasa, no se ofrece descuento.
+   */
+  maxDiscountPercentage?: number;
 }
 
 function sumPaid(order: Order): number {
   return Number((order.payments ?? []).reduce((s, p) => s + Number(p.amount), 0).toFixed(2));
 }
 
-export function CheckoutPanel({ order, onSettled }: Props) {
+export function CheckoutPanel({ order, onSettled, maxDiscountPercentage }: Props) {
   const router = useRouter();
 
   const initialPaid = useMemo(() => sumPaid(order), [order]);
@@ -52,6 +60,19 @@ export function CheckoutPanel({ order, onSettled }: Props) {
     setAmount(next.remaining.toFixed(2));
     setReceived('');
     setReference('');
+  }
+
+  /**
+   * Vuelve a traer los importes del servidor. Hace falta tras aplicar un descuento:
+   * useState no se reinicializa cuando cambia el prop `order`, así que sin esto el
+   * resumen seguiría mostrando el total anterior.
+   */
+  async function refreshSummary() {
+    try {
+      syncSummary(await paymentsApi.summary(order.id));
+    } catch {
+      // el router.refresh() del diálogo repinta la página de todos modos
+    }
   }
 
   async function applyTip() {
@@ -112,7 +133,7 @@ export function CheckoutPanel({ order, onSettled }: Props) {
             <span className="tabular-nums">−{formatPrice(order.discountAmount)}</span>
           </div>
         )}
-        <div className="mt-1 flex items-end justify-between gap-2">
+        <div className="mt-1 flex flex-wrap items-end justify-between gap-2">
           <div className="flex items-end gap-2">
             <Field className="w-28">
               <FieldLabel className="text-xs">Propina</FieldLabel>
@@ -129,6 +150,27 @@ export function CheckoutPanel({ order, onSettled }: Props) {
             <Button type="button" variant="outline" size="sm" onClick={applyTip} disabled={busy || settled}>
               Aplicar
             </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            {maxDiscountPercentage !== undefined && (
+              <DiscountDialog
+                order={order}
+                maxDiscountPercentage={maxDiscountPercentage}
+                disabled={busy || settled}
+                onApplied={refreshSummary}
+              />
+            )}
+            {summary.payments.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                nativeButton={false}
+                render={<Link href={`/recibo/${order.id}`} target="_blank" />}
+              >
+                <ReceiptTextIcon />
+                Recibo
+              </Button>
+            )}
           </div>
         </div>
         <div className="mt-3 flex justify-between border-t pt-2 text-base font-semibold">

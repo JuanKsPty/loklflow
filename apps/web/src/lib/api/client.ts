@@ -60,3 +60,44 @@ export const api = {
   put: <T>(path: string, body?: unknown) => apiFetch<T>(path, 'PUT', body),
   delete: <T>(path: string) => apiFetch<T>(path, 'DELETE'),
 };
+
+/**
+ * Descarga un archivo del API y lo guarda en el disco del usuario.
+ *
+ * No pasa por `apiFetch` porque ese siempre termina en `res.json()`. Y no puede ser un
+ * `<a href>` directo: la sesión es una cookie httpOnly y un enlace no atravesaría la
+ * lógica de refresh del 401, así que un token caducado descargaría un error en lugar
+ * del archivo.
+ */
+export async function downloadFile(path: string, filename: string): Promise<void> {
+  const request = (retried = false): Promise<Response> =>
+    fetch(`${BASE_URL}/api${path}`, { credentials: 'include' }).then(async (res) => {
+      if (res.status === 401 && !retried) {
+        const refreshed = await fetch(`${BASE_URL}/api/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        if (refreshed.ok) return request(true);
+        if (typeof window !== 'undefined') window.location.href = '/login';
+        throw new ApiError(401, 'Session expired');
+      }
+      return res;
+    });
+
+  const res = await request();
+  if (!res.ok) {
+    throw new ApiError(res.status, `No se pudo descargar el archivo (${res.status})`);
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+  } finally {
+    // Sin esto el blob se queda en memoria mientras viva la pestaña.
+    URL.revokeObjectURL(url);
+  }
+}

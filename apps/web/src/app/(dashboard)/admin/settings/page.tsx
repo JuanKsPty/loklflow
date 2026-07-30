@@ -1,48 +1,40 @@
+import type { BusinessConfig } from '@loklflow/types';
+import { serverFetch } from '@/lib/api/server-client';
 import { PageHeader } from '@/components/page-header';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { BusinessConfigForm } from '@/components/admin/business-config-form';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const metadata = { title: 'Configuración — LoklFlow' };
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  let config: BusinessConfig | null = null;
+  try {
+    config = await serverFetch<BusinessConfig>('/business-config');
+  } catch {
+    // se muestra el aviso de abajo si la API no responde
+  }
+
   return (
     <div>
-      <PageHeader title="Configuración del negocio" description="Datos generales, moneda y zona horaria." />
+      <PageHeader
+        title="Configuración del negocio"
+        description="Datos del establecimiento, moneda, zona horaria e impuesto del recibo."
+      />
 
-      <Tabs defaultValue="general" className="max-w-2xl">
-        <TabsList>
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="regional">Regional</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="general">
-          <Card>
-            <CardHeader>
-              <CardTitle>Información del negocio</CardTitle>
-              <CardDescription>Nombre, logo y datos de contacto del establecimiento.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Esta sección se conectará al módulo de configuración del negocio en la próxima iteración.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="regional">
-          <Card>
-            <CardHeader>
-              <CardTitle>Moneda y zona horaria</CardTitle>
-              <CardDescription>Define la moneda (MXN) y la zona horaria de operación.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Esta sección se conectará al módulo de configuración del negocio en la próxima iteración.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {config ? (
+        <BusinessConfigForm config={config} />
+      ) : (
+        <Card className="max-w-2xl">
+          <CardHeader>
+            <CardTitle>No se pudo cargar la configuración</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground text-sm">
+              Comprueba que la API esté disponible y vuelve a cargar la página.
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

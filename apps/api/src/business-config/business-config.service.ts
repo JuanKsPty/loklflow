@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BusinessConfig } from './entities/business-config.entity';
@@ -11,17 +11,19 @@ export class BusinessConfigService {
     private readonly repo: Repository<BusinessConfig>,
   ) {}
 
-  async get() {
+  /**
+   * Configuración del negocio. La crea con valores por defecto si falta, en lugar de
+   * lanzar 404: es una fila única de la que dependen vistas como el recibo, y un 404
+   * ahí solo produciría una página rota.
+   */
+  async get(): Promise<BusinessConfig> {
     const config = await this.repo.findOne({ where: {} });
-    if (!config) throw new NotFoundException('Business config not found');
-    return config;
+    if (config) return config;
+    return this.repo.save(this.repo.create({ businessName: 'Mi Negocio' }));
   }
 
   async update(dto: UpdateBusinessConfigDto) {
-    let config = await this.repo.findOne({ where: {} });
-    if (!config) {
-      config = this.repo.create({ businessName: dto.businessName ?? 'Mi Negocio' });
-    }
+    const config = await this.get();
     Object.assign(config, dto);
     return this.repo.save(config);
   }

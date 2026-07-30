@@ -19,6 +19,10 @@ export const AUDIT_ACTIONS = [
   'shift.opened',
   'shift.closed',
   'payment.recorded',
+  // Descuentos
+  'discount.requested',
+  'discount.approved',
+  'discount.rejected',
   // Órdenes
   'order.cancelled',
 ] as const;
@@ -32,6 +36,7 @@ export const AUDIT_ENTITY_TYPES = [
   'shift',
   'order',
   'payment',
+  'discount',
   'session',
 ] as const;
 

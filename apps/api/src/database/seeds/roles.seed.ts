@@ -69,6 +69,9 @@ const SYSTEM_ROLES: {
       'orders:create', 'orders:read',
       'pos:create', 'pos:read',
       'menu:read',
+      // Necesario para imprimir el recibo: lleva el nombre del negocio, la
+      // identificación fiscal y la tasa de impuesto.
+      'business_config:read',
     ],
   },
 ];

@@ -1,8 +1,18 @@
-import { IsOptional, IsString, Length } from 'class-validator';
+import {
+  IsEmail,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Length,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class UpdateBusinessConfigDto {
   @IsOptional()
   @IsString()
+  @MaxLength(150)
   businessName?: string;
 
   @IsOptional()
@@ -15,6 +25,7 @@ export class UpdateBusinessConfigDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(30)
   phone?: string;
 
   @IsOptional()
@@ -25,4 +36,25 @@ export class UpdateBusinessConfigDto {
   @IsString()
   @Length(3, 3)
   currency?: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  taxId?: string;
+
+  /** Porcentaje ya incluido en los precios. 0 significa "no desglosar impuesto". */
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
+  taxRate?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  receiptFooter?: string;
 }

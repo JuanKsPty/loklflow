@@ -47,9 +47,11 @@ import {
 interface Props {
   order: Order;
   products: Product[];
+  /** Umbral de descuento del rol; llega del token desde el server component. */
+  maxDiscountPercentage?: number;
 }
 
-export function MobileOrderDetail({ order, products }: Props) {
+export function MobileOrderDetail({ order, products, maxDiscountPercentage }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const open = order.status !== 'closed' && order.status !== 'cancelled';
@@ -105,7 +107,13 @@ export function MobileOrderDetail({ order, products }: Props) {
         </div>
       )}
 
-      {open && order.total > 0 && <CobrarDialog order={order} onSettled={() => router.refresh()} />}
+      {open && order.total > 0 && (
+        <CobrarDialog
+          order={order}
+          maxDiscountPercentage={maxDiscountPercentage}
+          onSettled={() => router.refresh()}
+        />
+      )}
 
       <div>
         <div className="mb-2 flex items-center justify-between">
@@ -265,7 +273,15 @@ function AddItemDialog({
   );
 }
 
-function CobrarDialog({ order, onSettled }: { order: Order; onSettled: () => void }) {
+function CobrarDialog({
+  order,
+  maxDiscountPercentage,
+  onSettled,
+}: {
+  order: Order;
+  maxDiscountPercentage?: number;
+  onSettled: () => void;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -283,6 +299,7 @@ function CobrarDialog({ order, onSettled }: { order: Order; onSettled: () => voi
         </DialogHeader>
         <CheckoutPanel
           order={order}
+          maxDiscountPercentage={maxDiscountPercentage}
           onSettled={() => {
             setOpen(false);
             onSettled();

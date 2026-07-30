@@ -1,11 +1,14 @@
 import type { RestaurantTable } from '../tables/table.interface';
 import type { Product } from '../menu/product.interface';
+import type { ModifierOption } from '../menu/modifier.interface';
 import type { Payment } from '../payments/payment.interface';
 import type { OrderItemStatus, OrderSource, OrderStatus } from './order-status';
 
 export interface OrderItemModifier {
   id: string;
   modifierOptionId: string;
+  /** La relación es eager en el backend, así que siempre viaja en la respuesta. */
+  modifierOption?: ModifierOption;
   priceAdjustment: number;
 }
 

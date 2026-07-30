@@ -20,6 +20,8 @@ import { RealtimeModule } from './realtime/realtime.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ShiftsModule } from './shifts/shifts.module';
+import { DiscountsModule } from './discounts/discounts.module';
+import { ReportsModule } from './reports/reports.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
@@ -49,6 +51,8 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
     NotificationsModule,
     PaymentsModule,
     ShiftsModule,
+    DiscountsModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [

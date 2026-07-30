@@ -169,8 +169,18 @@ export class AuthService {
     pinOnly = false,
   ) {
     const permissions = await this.rolesService.getPermissionsForRole(roleId);
+    const role = await this.rolesService.findOne(roleId);
 
-    const payload: JwtPayload = { sub: userId, name, email, roleId, roleName, permissions, loginMethod };
+    const payload: JwtPayload = {
+      sub: userId,
+      name,
+      email,
+      roleId,
+      roleName,
+      permissions,
+      loginMethod,
+      maxDiscountPercentage: Number(role.maxDiscountPercentage) || 0,
+    };
 
     const accessExpiresIn = pinOnly
       ? (this.config.get<string>('jwt.pinExpiresIn') ?? '4h')

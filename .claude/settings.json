@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(NODE_ENV=production pnpm migration:generate src/database/migrations/AuditLogIndexes)"
+    ]
+  }
+}

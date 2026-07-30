@@ -234,6 +234,32 @@ export class OrdersService {
     return result;
   }
 
+  /**
+   * Fija el descuento y recalcula el total. Reemplaza al descuento anterior, no acumula.
+   *
+   * Si el nuevo total deja la cuenta saldada con lo ya cobrado, cierra la orden y libera
+   * la mesa: el cierre normal solo ocurre dentro de `addPayment`, así que sin esto una
+   * cuenta saldada por un descuento se quedaría abierta para siempre con la mesa ocupada.
+   */
+  async setDiscount(orderId: string, discountAmount: number, userId: string) {
+    const order = await this.findOne(orderId);
+    this.assertOpen(order);
+    order.discountAmount = Number(discountAmount.toFixed(2));
+    this.applyTotals(order);
+    await this.ordersRepo.save(order);
+
+    const saved = await this.findOne(orderId);
+    const paid = Number(
+      (saved.payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0).toFixed(2),
+    );
+    if (paid > 0 && paid >= Number(saved.total) - 0.001) {
+      return this.closeFromPayment(orderId, userId);
+    }
+
+    this.emit(saved, 'status');
+    return saved;
+  }
+
   /** Cierra la orden tras saldarse el pago (desacoplado del flujo de cocina). */
   async closeFromPayment(orderId: string, userId: string) {
     const order = await this.findOne(orderId);

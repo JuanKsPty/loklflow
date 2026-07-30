@@ -21,6 +21,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   users: 'Empleados',
   roles: 'Roles',
   audit: 'Auditoría',
+  approvals: 'Aprobaciones',
   menu: 'Menú',
   tables: 'Mesas',
   orders: 'Órdenes',

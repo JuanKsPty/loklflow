@@ -44,7 +44,7 @@ export function PosHeader({
       </div>
       <div className="ml-auto flex items-center gap-1">
         <ShiftControl current={shift} />
-        <NotificationBell area="admin" />
+        <NotificationBell area="pos" />
         <ThemeToggle />
         <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Cerrar sesión">
           <LogOutIcon />

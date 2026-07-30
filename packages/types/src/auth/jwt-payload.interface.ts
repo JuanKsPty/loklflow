@@ -8,6 +8,11 @@ export interface JwtPayload {
   email: string | null;
   roleId: string;
   roleName: string;
+  /**
+   * Umbral de descuento del rol, en porcentaje. Solo una pista para la UI: el backend
+   * revalida siempre contra la base de datos.
+   */
+  maxDiscountPercentage?: number;
   permissions: string[];
   loginMethod: 'email' | 'pin';
   iat?: number;

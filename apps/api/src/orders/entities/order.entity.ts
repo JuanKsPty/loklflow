@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -16,6 +17,12 @@ import { OrderStatusHistory } from './order-status-history.entity';
 import { Payment } from '../../payments/entities/payment.entity';
 
 @Entity('orders')
+// Ejes de agregación del dashboard y de los reportes: sin estos índices, cualquier
+// consulta por rango de fechas o por turno hace un recorrido completo de la tabla.
+@Index('idx_orders_created_at', ['createdAt'])
+@Index('idx_orders_shift_id', ['shiftId'])
+@Index('idx_orders_waiter_id', ['waiterId'])
+@Index('idx_orders_status', ['status'])
 export class Order {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

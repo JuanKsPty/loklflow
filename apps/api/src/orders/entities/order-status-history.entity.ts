@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -9,6 +10,10 @@ import {
 import { Order } from './order.entity';
 
 @Entity('order_status_history')
+// La tabla no tenía ningún índice y es la base de las métricas de tiempo de preparación.
+@Index('idx_osh_order_id', ['orderId'])
+@Index('idx_osh_changed_at', ['changedAt'])
+@Index('idx_osh_to_status', ['toStatus'])
 export class OrderStatusHistory {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

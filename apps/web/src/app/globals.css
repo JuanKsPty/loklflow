@@ -156,3 +156,36 @@
     @apply font-sans;
     }
 }
+
+/* ─── Impresión ────────────────────────────────────────────────────────────────
+   Recibo de 80 mm, el ancho estándar de las impresoras térmicas de punto de venta.
+   Se fuerza el tema claro: los tokens en oklch del tema oscuro saldrían con fondo
+   negro y gastarían tinta o, con "imprimir fondos" desactivado, texto blanco
+   sobre blanco. */
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 4mm;
+  }
+
+  html,
+  body {
+    width: 80mm;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .receipt,
+  .receipt * {
+    background: transparent !important;
+    color: #000 !important;
+    /* Los bordes discontinuos del recibo deben salir sí o sí. */
+    border-color: #000 !important;
+  }
+
+  /* Sin sombras ni redondeos: en térmica solo añaden ruido. */
+  .receipt * {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+}

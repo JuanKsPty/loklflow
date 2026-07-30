@@ -16,12 +16,28 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-type Area = 'admin' | 'waiter' | 'kitchen';
+type Area = 'admin' | 'pos' | 'waiter' | 'kitchen';
 
 function orderHref(area: Area, id: string): string | null {
   if (area === 'admin') return `/admin/orders/${id}`;
+  // Desde la caja se va a la cuenta, no al detalle de admin: el cajero no tiene
+  // permiso para entrar en el panel.
+  if (area === 'pos') return `/pos/${id}`;
   if (area === 'waiter') return `/waiter/orden/${id}`;
   return null; // cocina no tiene vista de detalle de orden
+}
+
+/** Destino de un aviso según el recurso al que apunta. */
+function notificationHref(
+  area: Area,
+  resourceType: string | null,
+  resourceId: string | null,
+): string | null {
+  if (!resourceId) return null;
+  // Un descuento pendiente se resuelve en la bandeja, que solo existe en el panel.
+  if (resourceType === 'discount') return '/admin/approvals';
+  if (resourceType === 'order') return orderHref(area, resourceId);
+  return null;
 }
 
 export function NotificationBell({ area }: { area: Area }) {
@@ -80,7 +96,7 @@ export function NotificationBell({ area }: { area: Area }) {
     } catch {
       // silencioso
     }
-    const href = n.resourceType === 'order' && n.resourceId ? orderHref(area, n.resourceId) : null;
+    const href = notificationHref(area, n.resourceType, n.resourceId);
     setOpen(false);
     void refreshCount();
     if (href) {

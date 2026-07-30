@@ -93,14 +93,15 @@ Detalle completo en [docs/ROADMAP.md](./docs/ROADMAP.md).
 Fase 0 ████████████████████ 100%  — Completada
 Fase 1 █████████████████░░░   85%  — Faltan CI/CD y deploy en producción
 Fase 2 ███████████████████░   95%  — Casi lista (solo fusión de mesas, diferida)
-Fase 3 ████████████░░░░░░░░   60%  — En progreso (cobro/POS, split, propina y turnos de caja hechos)
+Fase 3 ████████████████████ 100%  — Completada
 Fase 4 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 Fase 5 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 Fase 6 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
 ```
 
-**Lo que falta para cerrar la Fase 3:** descuentos con flujo de aprobación por rol,
-impresión/envío de recibo, dashboard de métricas en tiempo real y reportes exportables.
+**Lo siguiente:** CI/CD y deploy (pendientes de Fase 1), o la Fase 4 (offline y
+sincronización). Diferidos dentro de Fase 3: envío del recibo por correo y exportación a
+PDF/Excel.
 
 ### Módulos implementados
 
@@ -116,8 +117,15 @@ impresión/envío de recibo, dashboard de métricas en tiempo real y reportes ex
 | **Notificaciones** | Avisos persistidos entre roles (campana con no leídas + bandeja): cocina recibe órdenes nuevas, el mesero recibe "orden lista"; push por WebSocket y persistencia en BD |
 | **Caja / POS** | Cobro de cuentas (`/pos` del cajero y desde la cuenta del mesero): múltiples métodos, split en pagos parciales, propina; cierra la cuenta y libera la mesa automáticamente |
 | **Turnos de caja** | Apertura/cierre de turno por cobrador con fondo inicial; cada pago se sella al turno y el cobro exige turno abierto; al cerrar, arqueo automático (ventas por método, efectivo esperado vs. contado y diferencia) |
+| **Descuentos** | Umbral por rol: si el descuento cabe en el límite se aplica al instante, si lo excede queda pendiente y le llega un aviso al gerente, que lo resuelve en `/admin/approvals`. Motivo obligatorio y todo el flujo auditado. Se rechaza si dejaría el total por debajo de lo ya cobrado |
+| **Recibo** | Vista de 80 mm en `/recibo/[id]` con los datos fiscales del negocio, desglose del IVA contenido en el precio y los pagos registrados; impresión directa del navegador, sin librerías |
+| **Panel de métricas** | `/admin` con ventas cobradas, ticket promedio, cuentas abiertas, tiempo medio de preparación, top de productos y reparto por método de pago; se actualiza en vivo al cerrar una cuenta |
+| **Reportes** | Exportación de ventas a CSV por rango de fechas (con BOM y CRLF para Excel) |
+| **Auditoría** | 18 acciones críticas con actor, IP y valor anterior; consulta paginada y filtrable en `/admin/audit`. Las credenciales se redactan antes de persistir |
 
 > Pendiente diferido de Fase 2: fusión de mesas para órdenes grupales.
+>
+> **API documentada** con Swagger en `/api/docs` (92 operaciones). Solo fuera de producción.
 
 ---
 

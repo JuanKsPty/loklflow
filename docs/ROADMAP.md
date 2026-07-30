@@ -67,15 +67,21 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 - [x] Módulo de POS y cobro (cierre de cuenta + liberación de mesa)
 - [x] Múltiples métodos de pago (efectivo, tarjeta, transferencia, billetera)
 - [x] Split de cuenta entre comensales (pagos parciales por método)
-- [ ] Descuentos con flujo de aprobación por rol
+- [x] Descuentos con flujo de aprobación por rol — umbral por rol, solicitud/aprobación
+      con notificación al gerente, bandeja en `/admin/approvals` y auditoría completa
 - [x] Propina digital
-- [ ] Impresión / envío de recibo
+- [x] Impresión de recibo — vista de 80 mm en `/recibo/[id]` con datos fiscales del
+      negocio e IVA desglosado del precio; impresión con `window.print()`
+      _(el envío por correo queda para Fase 6)_
 - [x] Apertura y cierre de turno
 - [x] Resumen automático del turno
-- [ ] Dashboard de métricas en tiempo real
-- [ ] Reportes históricos exportables (PDF / Excel)
+- [x] Dashboard de métricas en tiempo real — ventas, ticket promedio, cuentas abiertas,
+      tiempos de preparación, top de productos y reparto por método de pago
+- [x] Reportes históricos exportables — CSV de ventas por rango
+      _(PDF y Excel diferidos)_
+- [x] Documentación Swagger en `/api/docs` (92 operaciones)
 
-**Entregable:** POS funcional con cierre de turno y dashboard para el dueño.
+**Entregable:** POS funcional con cierre de turno y dashboard para el dueño. ✅
 
 ---
 
@@ -121,7 +127,7 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 - [ ] Diseño responsive para todos los dispositivos
 - [ ] Pruebas unitarias (mínimo 70% de cobertura en servicios)
 - [ ] Pruebas e2e de los flujos principales
-- [ ] Documentación Swagger completa y publicada
+- [x] Documentación Swagger completa y publicada _(hecho en Fase 3)_
 - [ ] README con screenshots y GIFs del sistema
 - [ ] Video demo de 2-3 minutos
 - [ ] Auditoría de seguridad básica (OWASP top 10)

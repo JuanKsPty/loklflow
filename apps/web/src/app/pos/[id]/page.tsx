@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ChevronLeftIcon } from 'lucide-react';
 import { serverFetch } from '@/lib/api/server-client';
+import { getServerUser } from '@/lib/auth/server-user';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CheckoutPanel } from '@/components/pos/checkout-panel';
@@ -22,6 +23,10 @@ export default async function PosCheckoutPage({ params }: Props) {
   } catch {
     notFound();
   }
+
+  // El umbral llega por el token: leerlo aquí, en el servidor, es la única forma fiable
+  // (el store de auth del cliente no se hidrata tras un refresh de página).
+  const user = await getServerUser();
 
   return (
     <div className="flex flex-col gap-4">
@@ -55,7 +60,10 @@ export default async function PosCheckoutPage({ params }: Props) {
         ))}
       </ul>
 
-      <CheckoutPanel order={order} />
+      <CheckoutPanel
+        order={order}
+        maxDiscountPercentage={user?.maxDiscountPercentage ?? 0}
+      />
       <RealtimeRefresher events={['order:changed']} />
     </div>
   );

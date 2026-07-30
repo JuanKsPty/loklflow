@@ -8,4 +8,7 @@ export * from './notifications';
 export * from './payments';
 export * from './shifts';
 export * from './audit';
+export * from './discounts';
+export * from './business-config';
+export * from './reports';
 

@@ -26,7 +26,7 @@ pnpm test --filter=api
 Turborepo monorepo with two apps and two shared packages:
 
 ```
-apps/api     → NestJS 11 backend, runs on :3001, global prefix /api
+apps/api     → NestJS 11 backend, runs on :3001, global prefix /api (Swagger en /api/docs)
 apps/web     → Next.js 16 + React 19 + Tailwind v4, runs on :3000
 packages/types   → shared TypeScript types (consumed by api and web)
 packages/config  → shared ESLint flat config and TSConfig base
