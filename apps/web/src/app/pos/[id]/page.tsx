@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ChevronLeftIcon } from 'lucide-react';
 import { isNotFound, serverFetch } from '@/lib/api/server-client';
+import { reportApiFailure } from '@/lib/observability/api-failure';
 import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { getServerUser } from '@/lib/auth/server-user';
 import { Button } from '@/components/ui/button';
@@ -19,12 +20,14 @@ interface Props {
 export default async function PosCheckoutPage({ params }: Props) {
   const { id } = await params;
   let order: Order | null = null;
+  let failure: 'offline' | 'error' | null = null;
   try {
     order = await serverFetch<Order>(`/orders/${id}`);
   } catch (err) {
     // Solo un 404 significa que la cuenta no existe; lo demás es que no pudimos preguntar, y
     // decirle al cajero que una cuenta real «no existe» le hace buscar donde no hay nada.
     if (isNotFound(err)) notFound();
+    failure = reportApiFailure('pos/cuenta', err);
   }
 
   if (!order) {
@@ -34,7 +37,7 @@ export default async function PosCheckoutPage({ params }: Props) {
           <ChevronLeftIcon />
           Cuentas
         </Button>
-        <ApiDownNotice what="la cuenta" />
+        <ApiDownNotice what="la cuenta" reason={failure ?? 'error'} />
       </div>
     );
   }

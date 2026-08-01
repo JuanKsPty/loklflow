@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ChevronLeftIcon, PlusIcon } from 'lucide-react';
 import { isNotFound, serverFetch } from '@/lib/api/server-client';
+import { reportApiFailure } from '@/lib/observability/api-failure';
 import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { formatPrice } from '@/lib/format';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ export default async function WaiterTablePage({ params }: Props) {
 
   let table: RestaurantTable | null = null;
   let orders: Order[] = [];
+  let failure: 'offline' | 'error' | null = null;
   try {
     [table, orders] = await Promise.all([
       serverFetch<RestaurantTable>(`/tables/${id}`),
@@ -37,6 +39,7 @@ export default async function WaiterTablePage({ params }: Props) {
     // preguntar, y decirle al mesero que su mesa «no existe» es peor que decirle que hay un
     // problema de conexión.
     if (isNotFound(err)) notFound();
+    failure = reportApiFailure('waiter/mesa', err);
   }
 
   if (!table) {
@@ -46,7 +49,7 @@ export default async function WaiterTablePage({ params }: Props) {
           <ChevronLeftIcon />
           Volver al salón
         </Button>
-        <ApiDownNotice what="la mesa" />
+        <ApiDownNotice what="la mesa" reason={failure ?? 'error'} />
       </div>
     );
   }

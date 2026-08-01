@@ -1,4 +1,4 @@
-import { CloudOffIcon } from 'lucide-react';
+import { CloudOffIcon, ServerCrashIcon } from 'lucide-react';
 import {
   Empty,
   EmptyDescription,
@@ -10,6 +10,14 @@ import {
 interface Props {
   /** Qué se estaba intentando cargar, para que el aviso diga algo concreto. */
   what?: string;
+  /**
+   * `offline` si no se pudo hablar con la API, `error` si contestó mal.
+   *
+   * Cambia lo que puede hacer el operario: lo primero se arregla mirando la red, lo segundo
+   * no se arregla desde el salón y hay que avisar. Sin la distinción, el aviso mandaba a
+   * revisar el WiFi también cuando el WiFi estaba perfecto.
+   */
+  reason?: 'offline' | 'error';
   className?: string;
 }
 
@@ -25,18 +33,24 @@ interface Props {
  * Un fallo visible es mejor que un vacío creíble: con este aviso el operario sabe que tiene
  * que mirar la red, y no que el restaurante está tranquilo.
  */
-export function ApiDownNotice({ what, className }: Props) {
+export function ApiDownNotice({ what, reason = 'offline', className }: Props) {
+  const failed = what ? `No se pudo cargar ${what}.` : 'No se pudieron cargar los datos.';
+
   return (
     <Empty className={className ?? 'border'}>
       <EmptyHeader>
         <EmptyMedia variant="icon">
-          <CloudOffIcon />
+          {reason === 'offline' ? <CloudOffIcon /> : <ServerCrashIcon />}
         </EmptyMedia>
-        <EmptyTitle>Sin conexión con el servidor</EmptyTitle>
+        <EmptyTitle>
+          {reason === 'offline' ? 'Sin conexión con el servidor' : 'El servidor falló'}
+        </EmptyTitle>
         <EmptyDescription>
-          {what ? `No se pudo cargar ${what}.` : 'No se pudieron cargar los datos.'} Esto no
-          significa que no haya nada: significa que no hemos podido preguntar. Revisa la
-          conexión y vuelve a intentarlo.
+          {failed} Esto no significa que no haya nada: significa que no hemos podido
+          preguntar.{' '}
+          {reason === 'offline'
+            ? 'Revisa la conexión y vuelve a intentarlo.'
+            : 'La conexión funciona; el fallo está en el servidor. Vuelve a intentarlo y, si sigue igual, avisa.'}
         </EmptyDescription>
       </EmptyHeader>
     </Empty>
