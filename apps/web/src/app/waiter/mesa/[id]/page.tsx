@@ -29,7 +29,7 @@ export default async function WaiterTablePage({ params }: Props) {
   try {
     [table, orders] = await Promise.all([
       serverFetch<RestaurantTable>(`/tables/${id}`),
-      serverFetch<Order[]>(`/orders?tableId=${id}`),
+      serverFetch<Order[]>(`/orders?tableId=${id}&open=true`),
     ]);
   } catch {
     notFound();

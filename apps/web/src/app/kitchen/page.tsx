@@ -13,7 +13,7 @@ const COLUMNS: { status: OrderStatus; title: string }[] = [
 export default async function KitchenPage() {
   let orders: Order[] = [];
   try {
-    orders = await serverFetch<Order[]>('/orders');
+    orders = await serverFetch<Order[]>('/orders?open=true');
   } catch {
     // tablero vacío si la API no responde
   }

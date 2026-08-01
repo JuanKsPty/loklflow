@@ -17,7 +17,9 @@ function paidOf(order: Order): number {
 export default async function PosPage() {
   let orders: Order[] = [];
   try {
-    orders = await serverFetch<Order[]>('/orders');
+    // `open=true`: el servidor filtra las cuentas vivas. Antes se pedía el listado completo y
+    // se filtraba aquí, lo que traía todo el histórico del negocio en cada carga.
+    orders = await serverFetch<Order[]>('/orders?open=true');
   } catch {
     // lista vacía si la API no responde
   }

@@ -10,7 +10,6 @@ interface Props {
   searchParams: Promise<{ status?: string }>;
 }
 
-const CLOSED = new Set(['closed', 'cancelled']);
 const FILTERS: { value: OrderStatus | 'active'; label: string }[] = [
   { value: 'active', label: 'Activas' },
   { value: 'pending', label: ORDER_STATUS_LABELS.pending },
@@ -25,9 +24,11 @@ export default async function WaiterOrdersPage({ searchParams }: Props) {
 
   let orders: Order[] = [];
   try {
+    // La pestaña «activas» las filtra el servidor con open=true, en lugar de traerse el
+    // histórico completo y descartar aquí lo cerrado.
     orders =
       current === 'active'
-        ? (await serverFetch<Order[]>('/orders')).filter((o) => !CLOSED.has(o.status))
+        ? await serverFetch<Order[]>('/orders?open=true')
         : await serverFetch<Order[]>(`/orders?status=${current}`);
   } catch {
     // lista vacía si la API no responde
