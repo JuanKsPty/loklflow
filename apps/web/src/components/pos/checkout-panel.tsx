@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -8,6 +8,7 @@ import { CheckCircle2Icon, ReceiptTextIcon } from 'lucide-react';
 import type { Order, PaymentMethod, PaymentSummary } from '@loklflow/types';
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from '@loklflow/types';
 import { paymentsApi } from '@/lib/api/payments.api';
+import { newClientId } from '@/lib/client-id';
 import { formatPrice } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,9 @@ function sumPaid(order: Order): number {
 
 export function CheckoutPanel({ order, onSettled, maxDiscountPercentage }: Props) {
   const router = useRouter();
+
+  /** Cobro en curso: su firma y la clave de idempotencia que le corresponde. */
+  const attempt = useRef<{ signature: string; key: string } | null>(null);
 
   const initialPaid = useMemo(() => sumPaid(order), [order]);
   const [summary, setSummary] = useState<PaymentSummary>({
@@ -96,19 +100,38 @@ export function CheckoutPanel({ order, onSettled, maxDiscountPercentage }: Props
       toast.error('Ingresa un monto válido');
       return;
     }
+
+    // Clave de idempotencia estable mientras el cobro sea el mismo. `setBusy(true)` no
+    // desactiva el botón hasta el siguiente render, así que un doble toque rápido en una
+    // tablet alcanza a disparar dos peticiones: con la misma clave, el servidor devuelve el
+    // pago ya registrado en vez de cobrarlo otra vez.
+    //
+    // Se rehace en cuanto cambia el importe, el método o la referencia, porque entonces es
+    // otro cobro: reutilizar la clave haría que el servidor respondiera con el pago anterior
+    // e ignorara en silencio el importe nuevo.
+    const signature = `${method}|${amountNum.toFixed(2)}|${reference.trim()}`;
+    if (attempt.current?.signature !== signature) {
+      attempt.current = { signature, key: newClientId() };
+    }
+
     setBusy(true);
     try {
       const next = await paymentsApi.addPayment(order.id, {
         method,
         amount: Number(amountNum.toFixed(2)),
         ...(reference.trim() ? { reference: reference.trim() } : {}),
+        clientRequestId: attempt.current.key,
       });
       const wasSettled = next.remaining <= 0.001;
+      // Cobrado: el siguiente pago de esta cuenta es una operación nueva.
+      attempt.current = null;
       syncSummary(next);
       toast.success(wasSettled ? 'Cuenta cobrada' : 'Pago registrado');
       router.refresh();
       if (wasSettled) onSettled?.();
     } catch (err) {
+      // La clave se conserva a propósito: si falló por red, reintentar el mismo cobro no debe
+      // arriesgarse a duplicarlo.
       toast.error(err instanceof Error ? err.message : 'Error al registrar el pago');
     } finally {
       setBusy(false);
