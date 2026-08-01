@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { LockIcon, LockOpenIcon } from 'lucide-react';
+import { CloudOffIcon, LockIcon, LockOpenIcon } from 'lucide-react';
 import type { PaymentMethod, ShiftSummary } from '@loklflow/types';
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from '@loklflow/types';
 import { shiftsApi } from '@/lib/api/shifts.api';
@@ -24,7 +24,23 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 
-export function ShiftControl({ current }: { current: ShiftSummary | null }) {
+/**
+ * El turno tiene **tres** estados, no dos: abierto, cerrado y desconocido.
+ *
+ * `undefined` significa que no se pudo consultar. Antes ese caso llegaba como `null`, que
+ * aquí se traducía a «Abrir turno», así que ante un fallo de red el cajero veía el botón de
+ * abrir sobre un turno que en realidad ya estaba abierto: lo pulsaba y recibía un error
+ * incomprensible. Ahora se dice lo que pasa y no se ofrece una acción que va a fallar.
+ */
+export function ShiftControl({ current }: { current: ShiftSummary | null | undefined }) {
+  if (current === undefined) {
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <CloudOffIcon className="size-3.5 shrink-0" />
+        Turno sin verificar
+      </span>
+    );
+  }
   if (!current) return <OpenShiftButton />;
   return <CloseShiftButton current={current} />;
 }

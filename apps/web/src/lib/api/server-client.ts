@@ -8,6 +8,17 @@ export class ServerApiError extends Error {
   }
 }
 
+/**
+ * Distingue «el recurso no existe» de «no pudimos preguntar».
+ *
+ * Varias páginas llamaban a `notFound()` dentro del catch, así que con la API caída una mesa o
+ * una cuenta que sí existen se mostraban como «página no encontrada»: información falsa sobre
+ * datos reales. Solo un 404 del servidor significa de verdad que no está.
+ */
+export function isNotFound(err: unknown): boolean {
+  return err instanceof ServerApiError && err.status === 404;
+}
+
 export async function serverFetch<T>(path: string): Promise<T> {
   const cookieStore = await cookies();
   const token = cookieStore.get('access_token')?.value;

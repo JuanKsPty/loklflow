@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { LockOpenIcon } from 'lucide-react';
 import { serverFetch } from '@/lib/api/server-client';
+import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { formatPrice } from '@/lib/format';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,19 +17,36 @@ function paidOf(order: Order): number {
 
 export default async function PosPage() {
   let orders: Order[] = [];
+  let apiDown = false;
   try {
     // `open=true`: el servidor filtra las cuentas vivas. Antes se pedía el listado completo y
     // se filtraba aquí, lo que traía todo el histórico del negocio en cada carga.
     orders = await serverFetch<Order[]>('/orders?open=true');
   } catch {
-    // lista vacía si la API no responde
+    // Con la API caída esto pintaba «No hay cuentas por cobrar»: una caja vacía y en calma
+    // mientras las cuentas seguían abiertas. Peor que un fallo visible.
+    apiDown = true;
   }
 
+  // El turno tiene TRES estados, no dos: abierto, cerrado, y «no lo sabemos». Antes un fallo
+  // de red dejaba `shift` en null, que la interfaz traduce a «no tienes turno abierto», así
+  // que el cajero intentaba abrir uno que ya estaba abierto.
   let shift: ShiftSummary | null = null;
+  let shiftUnknown = false;
   try {
     shift = await serverFetch<ShiftSummary | null>('/shifts/current');
   } catch {
-    // sin turno si la API no responde
+    shiftUnknown = true;
+  }
+
+  if (apiDown) {
+    return (
+      <div>
+        <h1 className="mb-4 text-xl font-semibold">Cuentas por cobrar</h1>
+        <ApiDownNotice what="las cuentas" />
+        <RealtimeRefresher events={['order:changed']} />
+      </div>
+    );
   }
 
   const toCharge = orders
@@ -39,7 +57,7 @@ export default async function PosPage() {
     <div>
       <h1 className="mb-4 text-xl font-semibold">Cuentas por cobrar</h1>
 
-      {!shift && (
+      {!shift && !shiftUnknown && (
         <div className="mb-4 flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-3 text-sm text-primary">
           <LockOpenIcon className="size-4 shrink-0" />
           <span>No tienes turno abierto. Abre tu turno (botón arriba) para poder cobrar.</span>

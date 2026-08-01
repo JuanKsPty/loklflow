@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ChevronLeftIcon, PlusIcon } from 'lucide-react';
-import { serverFetch } from '@/lib/api/server-client';
+import { isNotFound, serverFetch } from '@/lib/api/server-client';
+import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { formatPrice } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,15 +25,30 @@ const CLOSED = new Set(['closed', 'cancelled']);
 export default async function WaiterTablePage({ params }: Props) {
   const { id } = await params;
 
-  let table: RestaurantTable;
+  let table: RestaurantTable | null = null;
   let orders: Order[] = [];
   try {
     [table, orders] = await Promise.all([
       serverFetch<RestaurantTable>(`/tables/${id}`),
       serverFetch<Order[]>(`/orders?tableId=${id}&open=true`),
     ]);
-  } catch {
-    notFound();
+  } catch (err) {
+    // Solo un 404 significa que la mesa no está. Cualquier otro fallo es que no pudimos
+    // preguntar, y decirle al mesero que su mesa «no existe» es peor que decirle que hay un
+    // problema de conexión.
+    if (isNotFound(err)) notFound();
+  }
+
+  if (!table) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Button variant="ghost" size="sm" className="-ml-2" nativeButton={false} render={<Link href="/waiter" />}>
+          <ChevronLeftIcon />
+          Volver al salón
+        </Button>
+        <ApiDownNotice what="la mesa" />
+      </div>
+    );
   }
 
   const openAccounts = orders

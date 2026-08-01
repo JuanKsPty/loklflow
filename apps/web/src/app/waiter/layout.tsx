@@ -13,11 +13,14 @@ export default async function WaiterLayout({ children }: { children: React.React
   if (!user) redirect('/login');
   if (!user.permissions?.includes('orders:create')) redirect('/login');
 
-  let shift: ShiftSummary | null = null;
+  // `undefined` = no se pudo consultar, distinto de `null` = no hay turno abierto.
+  // Antes las dos cosas eran `null`, así que un fallo de red hacía que la cabecera
+  // ofreciera «Abrir turno» sobre un turno que ya estaba abierto.
+  let shift: ShiftSummary | null | undefined;
   try {
     shift = await serverFetch<ShiftSummary | null>('/shifts/current');
   } catch {
-    // sin turno si la API no responde
+    shift = undefined;
   }
 
   return (
