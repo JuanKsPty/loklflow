@@ -103,6 +103,14 @@ diff comes out empty.
 `DATABASE_URL` wins over the five loose `DATABASE_*` variables. `DATABASE_SSL=true` is only
 for a managed Postgres.
 
+**Nunca poner `logging: ['error']` (ni ningún nivel de consulta) en `databaseOptions()`.**
+`AbstractLogger.logQueryError` de TypeORM incluye los `parameters` enlazados, así que un insert
+fallido en `users` dejaría el hash bcrypt del PIN en `docker logs`. Los errores de consulta ya
+se registran, **sin parámetros**, desde `HttpExceptionFilter`. Misma trampa con
+`maxQueryExecutionTime`, que hoy no está configurado: `logQuerySlow` también lleva los
+parámetros y su nivel está activo sin condición, así que configurarlo para medir rendimiento
+abriría la fuga por otro lado, al margen de la opción `logging`.
+
 Anything running outside Nest (the TypeORM CLI, the seed, the test bootstrap) loads the root
 `.env` through `loadRootEnv()` in `src/config/load-root-env.ts`. Never hand-count the
 relative path again: it was wrong in the seed and dotenv fails silently, so the connection
