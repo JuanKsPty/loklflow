@@ -7,6 +7,8 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'node:crypto';
+import { durationToMs } from './duration';
 import { Response } from 'express';
 import { UsersService } from '../users/users.service';
 import { RolesService } from '../roles/roles.service';
@@ -81,7 +83,20 @@ export class AuthService {
     return this.issueTokens(user.id, user.name, user.email, user.role.id, user.role.name, 'pin', res, true);
   }
 
-  async refresh(userId: string, refreshToken: string, res: Response) {
+  /**
+   * `loginMethod` viene del payload del propio token de refresco, que lo lleva porque
+   * `issueTokens` firma el mismo payload para los dos tokens.
+   *
+   * Antes estaba fijado a `'email'`, así que el primer refresco de una sesión por PIN la
+   * degradaba: el token pasaba de cuatro horas a quince minutos y la bitácora empezaba a
+   * registrar `loginMethod: 'email'` para alguien que había entrado con PIN.
+   */
+  async refresh(
+    userId: string,
+    refreshToken: string,
+    res: Response,
+    loginMethod: 'email' | 'pin' = 'email',
+  ) {
     const stored = await this.refreshTokenRepo.findOne({
       where: { token: refreshToken, isRevoked: false },
       relations: { user: { role: true } },
@@ -95,7 +110,16 @@ export class AuthService {
     await this.refreshTokenRepo.save(stored);
 
     const user = stored.user;
-    return this.issueTokens(user.id, user.name, user.email, user.role.id, user.role.name, 'email', res);
+    return this.issueTokens(
+      user.id,
+      user.name,
+      user.email,
+      user.role.id,
+      user.role.name,
+      loginMethod,
+      res,
+      loginMethod === 'pin',
+    );
   }
 
   async logout(userId: string, res: Response, ip?: string) {
@@ -200,31 +224,46 @@ export class AuthService {
 
     res.cookie('access_token', accessToken, {
       ...cookieOptions,
-      maxAge: pinOnly ? 4 * 60 * 60 * 1000 : 15 * 60 * 1000,
+      maxAge: durationToMs(accessExpiresIn),
     });
 
-    if (!pinOnly) {
-      const refreshExpiresIn = this.config.get<string>('jwt.refreshExpiresIn')!;
-      const refreshToken = this.jwtService.sign(payload, {
+    // El refresco se emite SIEMPRE, también en las sesiones por PIN. Antes iba dentro de un
+    // `if (!pinOnly)`, así que el token de PIN duraba cuatro horas exactas sin forma de
+    // renovarse: a mitad de turno el operario quedaba fuera y aterrizaba en el formulario de
+    // email, donde no tiene credenciales porque solo tiene PIN. Un turno dura más de cuatro
+    // horas, así que se disparaba en operación normal, no solo en caídas.
+    const refreshExpiresIn = pinOnly
+      ? this.config.get<string>('jwt.pinRefreshExpiresIn')!
+      : this.config.get<string>('jwt.refreshExpiresIn')!;
+    const refreshMs = durationToMs(refreshExpiresIn);
+
+    // `jti` único por emisión. Sin él, dos inicios de sesión del mismo usuario dentro del
+    // mismo segundo producen un JWT byte a byte idéntico —el payload es determinista y el
+    // `iat` va en segundos—, y `refresh_tokens.token` es único: la segunda petición moría con
+    // un 500. Con las sesiones por PIN emitiendo refresco esto pasa a ser alcanzable a diario,
+    // porque el personal entra por PIN todo el tiempo.
+    const refreshToken = this.jwtService.sign(
+      { ...payload, jti: randomUUID() },
+      {
         secret: this.config.get<string>('jwt.refreshSecret'),
         expiresIn: refreshExpiresIn as JwtSignOptions['expiresIn'],
-      });
+      },
+    );
 
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7);
+    // Derivado de la misma duración que la firma. Antes eran siete días escritos a mano en
+    // dos sitios, así que cambiar JWT_REFRESH_EXPIRES_IN dejaba el JWT, la cookie y la fila
+    // de `refresh_tokens` con tres caducidades distintas.
+    const rt = this.refreshTokenRepo.create({
+      token: refreshToken,
+      user: { id: userId },
+      expiresAt: new Date(Date.now() + refreshMs),
+    });
+    await this.refreshTokenRepo.save(rt);
 
-      const rt = this.refreshTokenRepo.create({
-        token: refreshToken,
-        user: { id: userId },
-        expiresAt,
-      });
-      await this.refreshTokenRepo.save(rt);
-
-      res.cookie('refresh_token', refreshToken, {
-        ...cookieOptions,
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
-    }
+    res.cookie('refresh_token', refreshToken, {
+      ...cookieOptions,
+      maxAge: refreshMs,
+    });
 
     return { id: userId, name, email, roleId, roleName, permissions, loginMethod };
   }
