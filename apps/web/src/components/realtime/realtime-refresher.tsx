@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { useSocket } from './socket-provider';
+import { useRealtimeStatus, useSocket } from './socket-provider';
 
 interface OrderEvent {
   type: 'created' | 'item' | 'status';
@@ -23,8 +23,16 @@ export function RealtimeRefresher({
   toastOnNewOrder?: boolean;
 }) {
   const socket = useSocket();
+  const { reconnectedAt } = useRealtimeStatus();
   const router = useRouter();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Al recuperar la conexión hay que volver a pedir los datos: el gateway difunde sin cursor
+  // ni búfer, así que todo lo ocurrido durante el corte no se reenvía nunca. Sin esto la
+  // pantalla se quedaba mostrando el mundo anterior al corte indefinidamente.
+  useEffect(() => {
+    if (reconnectedAt !== null) router.refresh();
+  }, [reconnectedAt, router]);
 
   useEffect(() => {
     if (!socket) return;

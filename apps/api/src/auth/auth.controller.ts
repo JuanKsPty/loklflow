@@ -54,7 +54,9 @@ export class AuthController {
     @CurrentUser() user: JwtPayload & { refreshToken: string },
     @Res({ passthrough: true }) res: Response,
   ) {
-    return this.authService.refresh(user.sub, user.refreshToken, res);
+    // El método de login viaja en el payload del token de refresco: sin propagarlo, una
+    // sesión por PIN se convertiría en una de email al primer refresco.
+    return this.authService.refresh(user.sub, user.refreshToken, res, user.loginMethod);
   }
 
   @Post('logout')

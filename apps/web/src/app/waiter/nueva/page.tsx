@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ChevronLeftIcon } from 'lucide-react';
 import { serverFetch } from '@/lib/api/server-client';
+import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { Button } from '@/components/ui/button';
 import { PosOrderBuilder } from '@/components/waiter/pos-order-builder';
 import type { Category, Modifier, Product } from '@loklflow/types';
@@ -15,6 +16,7 @@ export default async function WaiterNewOrderPage({ searchParams }: Props) {
   let categories: Category[] = [];
   let products: Product[] = [];
   let modifiers: Modifier[] = [];
+  let apiDown = false;
   try {
     [categories, products, modifiers] = await Promise.all([
       serverFetch<Category[]>('/menu/categories'),
@@ -22,7 +24,8 @@ export default async function WaiterNewOrderPage({ searchParams }: Props) {
       serverFetch<Modifier[]>('/menu/modifiers'),
     ]);
   } catch {
-    // catálogos vacíos si la API no responde
+    // Antes esto mostraba «Sin productos.», como si el menú estuviera vacío.
+    apiDown = true;
   }
 
   const backHref = tableId ? `/waiter/mesa/${tableId}` : '/waiter';
@@ -37,12 +40,16 @@ export default async function WaiterNewOrderPage({ searchParams }: Props) {
         <h1 className="text-lg font-semibold">Nueva cuenta</h1>
       </div>
       <div className="min-h-0 flex-1">
-        <PosOrderBuilder
-          tableId={tableId}
-          categories={categories.filter((c) => c.isActive)}
-          products={products.filter((p) => p.isActive)}
-          modifiers={modifiers}
-        />
+        {apiDown ? (
+          <ApiDownNotice what="el menú" />
+        ) : (
+          <PosOrderBuilder
+            tableId={tableId}
+            categories={categories.filter((c) => c.isActive)}
+            products={products.filter((p) => p.isActive)}
+            modifiers={modifiers}
+          />
+        )}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { Shift } from './entities/shift.entity';
 import { OpenShiftDto } from './dto/open-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
@@ -28,14 +28,28 @@ export class ShiftsService {
     if (existing) {
       throw new BadRequestException('Ya tienes un turno de caja abierto');
     }
-    const shift = await this.shiftsRepo.save(
-      this.shiftsRepo.create({
-        openedBy: userId,
-        openingCash: dto.openingCash,
-        notes: dto.notes ?? null,
-        status: 'open',
-      }),
-    );
+
+    // La comprobación de arriba es un read-then-write: entre la consulta y la inserción cabe
+    // otra petición, así que un doble clic abría dos turnos y dejaba el arqueo sin sentido
+    // (los pagos se reparten entre ambos y ninguno cuadra). El índice único parcial
+    // `idx_shifts_one_open_per_user` cierra esa ventana; aquí se traduce su violación al mismo
+    // error de negocio, para que la carrera no salga como un 500.
+    let shift: Shift;
+    try {
+      shift = await this.shiftsRepo.save(
+        this.shiftsRepo.create({
+          openedBy: userId,
+          openingCash: dto.openingCash,
+          notes: dto.notes ?? null,
+          status: 'open',
+        }),
+      );
+    } catch (err) {
+      if (err instanceof QueryFailedError && /unique|duplicate/i.test(err.message)) {
+        throw new BadRequestException('Ya tienes un turno de caja abierto');
+      }
+      throw err;
+    }
     this.realtime.emitShift(userId);
     // Auditado aquí y no con @Audit(): el handler devuelve el summary, no el turno,
     // así que el interceptor no podría sacar el id del turno recién abierto.

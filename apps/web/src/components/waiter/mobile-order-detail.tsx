@@ -69,7 +69,12 @@ export function MobileOrderDetail({ order, products, maxDiscountPercentage }: Pr
     }
   }
 
-  const nextStates = ALLOWED_TRANSITIONS[order.status];
+  // `closed` se excluye a propósito: una cuenta se cierra al cobrarla, no marcándola.
+  // Antes se pintaba un botón por cada transición permitida, así que en una orden entregada
+  // aparecía «Cerrada» y un toque sacaba la cuenta de «Cuentas por cobrar» y liberaba la mesa
+  // sin haber cobrado. El servidor ya lo rechaza; aquí se quita para no ofrecer un botón que
+  // solo puede dar error. Cancelar sí se queda: es una operación legítima del mesero.
+  const nextStates = ALLOWED_TRANSITIONS[order.status].filter((s) => s !== 'closed');
 
   return (
     <div className="flex flex-col gap-5">

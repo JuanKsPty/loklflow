@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { LayoutGridIcon, MapIcon } from 'lucide-react';
 import { serverFetch } from '@/lib/api/server-client';
+import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { cn } from '@/lib/utils';
 import { TableGrid } from '@/components/waiter/table-grid';
 import { WaiterFloorMap } from '@/components/waiter/waiter-floor-map';
@@ -49,13 +50,26 @@ export default async function WaiterFloorPage({ searchParams }: Props) {
 
   let sectors: Sector[] = [];
   let tables: RestaurantTable[] = [];
+  let apiDown = false;
   try {
     [sectors, tables] = await Promise.all([
       serverFetch<Sector[]>('/tables/sectors'),
       serverFetch<RestaurantTable[]>('/tables'),
     ]);
   } catch {
-    // salón vacío si la API no responde
+    // Antes esto mostraba «No hay mesas configuradas todavía», indistinguible de un salón que
+    // de verdad está sin configurar.
+    apiDown = true;
+  }
+
+  if (apiDown) {
+    return (
+      <div>
+        <ViewToggle active={active} />
+        <ApiDownNotice what="el salón" />
+        <RealtimeRefresher events={['table:changed', 'order:changed']} />
+      </div>
+    );
   }
 
   if (active === 'mapa') {

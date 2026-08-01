@@ -9,6 +9,14 @@ import { DecimalTransformer } from '../../common/transformers/decimal.transforme
 import type { ShiftStatus } from '../shift-status.constants';
 
 @Entity('shifts')
+// Un solo turno abierto por usuario, garantizado por la base de datos y no solo por la
+// comprobación previa del servicio, entre cuyas dos consultas cabe otra petición: un doble
+// clic abría dos turnos y dejaba el arqueo sin sentido. Se declara aquí además de en la
+// migración para que `synchronize` en desarrollo no lo vea como una diferencia.
+@Index('idx_shifts_one_open_per_user', ['openedBy'], {
+  unique: true,
+  where: "status = 'open'",
+})
 export class Shift {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { serverFetch } from '@/lib/api/server-client';
+import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { cn } from '@/lib/utils';
 import { OrderCard } from '@/components/waiter/order-card';
 import { RealtimeRefresher } from '@/components/realtime/realtime-refresher';
@@ -10,7 +11,6 @@ interface Props {
   searchParams: Promise<{ status?: string }>;
 }
 
-const CLOSED = new Set(['closed', 'cancelled']);
 const FILTERS: { value: OrderStatus | 'active'; label: string }[] = [
   { value: 'active', label: 'Activas' },
   { value: 'pending', label: ORDER_STATUS_LABELS.pending },
@@ -24,13 +24,17 @@ export default async function WaiterOrdersPage({ searchParams }: Props) {
   const current = status ?? 'active';
 
   let orders: Order[] = [];
+  let apiDown = false;
   try {
+    // La pestaña «activas» las filtra el servidor con open=true, en lugar de traerse el
+    // histórico completo y descartar aquí lo cerrado.
     orders =
       current === 'active'
-        ? (await serverFetch<Order[]>('/orders')).filter((o) => !CLOSED.has(o.status))
+        ? await serverFetch<Order[]>('/orders?open=true')
         : await serverFetch<Order[]>(`/orders?status=${current}`);
   } catch {
-    // lista vacía si la API no responde
+    // Antes esto pintaba «No hay órdenes.», indistinguible de un turno tranquilo.
+    apiDown = true;
   }
 
   return (
@@ -58,7 +62,9 @@ export default async function WaiterOrdersPage({ searchParams }: Props) {
         })}
       </div>
 
-      {orders.length === 0 ? (
+      {apiDown ? (
+        <ApiDownNotice what="las órdenes" />
+      ) : orders.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">No hay órdenes.</p>
       ) : (
         <div className="flex flex-col gap-3">

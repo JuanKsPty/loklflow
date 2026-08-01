@@ -15,11 +15,11 @@ import { AddItemDto } from './dto/add-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { UpdateItemStatusDto } from './dto/update-item-status.dto';
+import { QueryOrdersDto } from './dto/query-orders.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
-import type { OrderStatus } from './order-status.constants';
 
 @ApiTags('orders')
 @Controller('orders')
@@ -28,8 +28,8 @@ export class OrdersController {
 
   @Get()
   @RequirePermissions('orders:read')
-  findAll(@Query('status') status?: OrderStatus, @Query('tableId') tableId?: string) {
-    return this.ordersService.findAll({ status, tableId });
+  findAll(@Query() query: QueryOrdersDto) {
+    return this.ordersService.findAll(query);
   }
 
   @Get(':id')

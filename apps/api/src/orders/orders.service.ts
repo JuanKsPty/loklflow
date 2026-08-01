@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Not, QueryFailedError, Repository } from 'typeorm';
+import { FindOptionsWhere, In, MoreThan, Not, QueryFailedError, Repository } from 'typeorm';
 import { Product } from '../menu/entities/product.entity';
 import { ModifierOption } from '../menu/entities/modifier-option.entity';
 import { Order } from './entities/order.entity';
@@ -14,6 +14,11 @@ import { AddItemDto } from './dto/add-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { UpdateItemStatusDto } from './dto/update-item-status.dto';
+import {
+  ORDERS_DEFAULT_TAKE,
+  ORDERS_MAX_TAKE,
+  QueryOrdersDto,
+} from './dto/query-orders.dto';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TablesService } from '../tables/tables.service';
@@ -28,6 +33,9 @@ const ORDER_RELATIONS = {
 
 const OPEN_STATUSES: OrderStatus[] = ['pending', 'preparing', 'ready', 'delivered'];
 
+/** Igual que en PaymentsService y DiscountsService: tolerancia de centavos al comparar importes. */
+const MONEY_EPSILON = 0.001;
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -41,14 +49,29 @@ export class OrdersService {
     private readonly audit: AuditService,
   ) {}
 
-  findAll(filters?: { status?: OrderStatus; tableId?: string }) {
+  /**
+   * Listado de órdenes, siempre acotado.
+   *
+   * Antes no tenía ni `take` ni filtro de apertura, así que devolvía todas las órdenes de la
+   * historia del negocio con sus relaciones en eager. El tope por defecto es deliberado: una
+   * respuesta acotada de más se nota y se corrige, una sin acotar se degrada en silencio a
+   * medida que crece el histórico.
+   */
+  findAll(filters?: QueryOrdersDto) {
+    const where: FindOptionsWhere<Order> = {
+      ...(filters?.status ? { status: filters.status } : {}),
+      ...(filters?.tableId ? { tableId: filters.tableId } : {}),
+      // `open` y `status` son compatibles: si llegan los dos, manda el estado concreto.
+      ...(filters?.open && !filters.status ? { status: In(OPEN_STATUSES) } : {}),
+      ...(filters?.since ? { updatedAt: MoreThan(new Date(filters.since)) } : {}),
+    };
+
     return this.ordersRepo.find({
-      where: {
-        ...(filters?.status ? { status: filters.status } : {}),
-        ...(filters?.tableId ? { tableId: filters.tableId } : {}),
-      },
+      where,
       relations: ORDER_RELATIONS,
       order: { createdAt: 'DESC' },
+      take: Math.min(filters?.take ?? ORDERS_DEFAULT_TAKE, ORDERS_MAX_TAKE),
+      skip: filters?.skip ?? 0,
     });
   }
 
@@ -191,6 +214,27 @@ export class OrdersService {
         `Transición no permitida: ${order.status} → ${dto.status}`,
       );
     }
+    // Una cuenta no se puede cerrar con saldo pendiente.
+    //
+    // La regla vive aquí, en el servidor, y no en la interfaz: la vista del mesero pintaba un
+    // botón por cada transición permitida, así que en una orden entregada aparecía «Cerrada»
+    // y bastaba un toque para que la cuenta saliera de «Cuentas por cobrar» y la mesa se
+    // liberara sin haber cobrado. Dinero perdido sin traza. Con la comprobación en el
+    // servicio ninguna ruta futura —ni una operación reenviada desde una cola sin conexión—
+    // puede saltársela.
+    //
+    // El cierre legítimo no pasa por aquí: lo hace `closeFromPayment` cuando el último pago
+    // salda la cuenta.
+    if (dto.status === 'closed') {
+      const paid = this.paidOf(order);
+      const total = Number(order.total);
+      if (paid < total - MONEY_EPSILON) {
+        throw new BadRequestException(
+          `La cuenta tiene ${(total - paid).toFixed(2)} sin cobrar. ` +
+            `Cóbrala para cerrarla, o cancélala si no se va a cobrar.`,
+        );
+      }
+    }
     const history = Object.assign(new OrderStatusHistory(), {
       orderId: order.id,
       fromStatus: order.status,
@@ -267,10 +311,8 @@ export class OrdersService {
     await this.ordersRepo.save(order);
 
     const saved = await this.findOne(orderId);
-    const paid = Number(
-      (saved.payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0).toFixed(2),
-    );
-    if (paid > 0 && paid >= Number(saved.total) - 0.001) {
+    const paid = this.paidOf(saved);
+    if (paid > 0 && paid >= Number(saved.total) - MONEY_EPSILON) {
       return this.closeFromPayment(orderId, userId);
     }
 
@@ -344,6 +386,13 @@ export class OrdersService {
       `SELECT nextval('orders_order_number_seq')`,
     );
     return Number(row.nextval);
+  }
+
+  /** Suma de los pagos registrados en la cuenta, redondeada a centavos. */
+  private paidOf(order: Order): number {
+    return Number(
+      (order.payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0).toFixed(2),
+    );
   }
 
   private orderLocation(order: Order): string {

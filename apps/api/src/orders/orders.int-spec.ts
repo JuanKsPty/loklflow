@@ -208,5 +208,111 @@ describe('Órdenes de punta a punta', () => {
 
       expect(res.status).toBe(400);
     });
+
+    it('no deja cerrar una cuenta con saldo pendiente', async () => {
+      // El agujero que cierra este caso: la vista del mesero pintaba un botón por cada
+      // transición permitida, así que en una orden entregada aparecía «Cerrada». Un toque
+      // sacaba la cuenta de «Cuentas por cobrar» y liberaba la mesa sin haber cobrado nada.
+      const created = await createOrder({
+        tableId: table.id,
+        items: [{ productId: product.id, quantity: 2 }],
+      });
+      const id = created.body.id;
+      for (const status of ['preparing', 'ready', 'delivered']) {
+        await request(app.getHttpServer())
+          .patch(`/api/orders/${id}/status`)
+          .set('Cookie', cookie)
+          .send({ status })
+          .expect(200);
+      }
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/orders/${id}/status`)
+        .set('Cookie', cookie)
+        .send({ status: 'closed' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/sin cobrar/i);
+
+      // Y la cuenta sigue viva y la mesa ocupada, no a medio cerrar.
+      const after = await request(app.getHttpServer())
+        .get(`/api/orders/${id}`)
+        .set('Cookie', cookie)
+        .expect(200);
+      expect(after.body.status).toBe('delivered');
+      expect(await tableStatus(app, table.id)).toBe('occupied');
+    });
+
+    it('sí deja cancelar una cuenta sin cobrar', async () => {
+      // Cancelar sigue siendo legítimo: el cliente se fue, la orden estaba mal tomada.
+      const created = await createOrder({ items: [{ productId: product.id, quantity: 1 }] });
+
+      await request(app.getHttpServer())
+        .patch(`/api/orders/${created.body.id}/status`)
+        .set('Cookie', cookie)
+        .send({ status: 'cancelled' })
+        .expect(200);
+    });
+  });
+
+  describe('listado', () => {
+    /** Crea `n` órdenes y cierra la primera vía cancelación, para tener una no abierta. */
+    async function seedOrders(n: number) {
+      const ids: string[] = [];
+      for (let i = 0; i < n; i++) {
+        const res = await createOrder({ items: [{ productId: product.id, quantity: 1 }] });
+        ids.push(res.body.id);
+      }
+      return ids;
+    }
+
+    const list = (query = '') =>
+      request(app.getHttpServer()).get(`/api/orders${query}`).set('Cookie', cookie);
+
+    it('open=true deja fuera las cerradas y las canceladas', async () => {
+      const [first] = await seedOrders(3);
+      await request(app.getHttpServer())
+        .patch(`/api/orders/${first}/status`)
+        .set('Cookie', cookie)
+        .send({ status: 'cancelled' })
+        .expect(200);
+
+      const res = await list('?open=true').expect(200);
+
+      expect(res.body).toHaveLength(2);
+      expect(res.body.map((o: { id: string }) => o.id)).not.toContain(first);
+    });
+
+    it('take acota el tamaño de la respuesta', async () => {
+      await seedOrders(4);
+
+      const res = await list('?take=2').expect(200);
+
+      expect(res.body).toHaveLength(2);
+    });
+
+    it('rechaza un take por encima del tope en lugar de servirlo', async () => {
+      // Un tope que se pueda saltar por la query string no es un tope: sin esto, cachear el
+      // listado en el dispositivo volvería a significar traerse el histórico entero.
+      await list('?take=5000').expect(400);
+    });
+
+    it('skip pagina sin repetir filas', async () => {
+      await seedOrders(3);
+
+      const page1 = await list('?take=2').expect(200);
+      const page2 = await list('?take=2&skip=2').expect(200);
+
+      expect(page1.body).toHaveLength(2);
+      expect(page2.body).toHaveLength(1);
+      const ids = [...page1.body, ...page2.body].map((o: { id: string }) => o.id);
+      expect(new Set(ids).size).toBe(3);
+    });
+
+    it('rechaza un filtro que no existe, en vez de ignorarlo', async () => {
+      // `forbidNonWhitelisted` del ValidationPipe: un filtro mal escrito tiene que fallar,
+      // no devolver silenciosamente el listado sin filtrar.
+      await list('?estado=pending').expect(400);
+    });
   });
 });

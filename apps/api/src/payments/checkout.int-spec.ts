@@ -351,4 +351,36 @@ describe('Cobro de una cuenta', () => {
       }
     });
   });
+
+  describe('un solo turno abierto por cajero', () => {
+    const openShift = () =>
+      http().post('/api/shifts/open').set('Cookie', cashier).send({ openingCash: 100 });
+
+    it('la segunda apertura seguida se rechaza', async () => {
+      await openShift().expect(201);
+
+      const res = await openShift();
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/turno/i);
+    });
+
+    it('dos aperturas simultáneas dejan un solo turno abierto', async () => {
+      // La comprobación del servicio es un read-then-write: consulta si hay turno y, si no,
+      // lo crea. Entre las dos consultas cabe otra petición, así que un doble clic abría dos
+      // turnos — y con dos turnos abiertos el arqueo pierde el sentido, porque los pagos se
+      // reparten entre ambos y ninguno cuadra. Lo cierra un índice único parcial.
+      const results = await Promise.all([openShift(), openShift(), openShift()]);
+
+      const created = results.filter((r) => r.status === 201);
+      expect(created).toHaveLength(1);
+      // Las demás fallan, pero ninguna con un 500: el índice se traduce a un error de negocio.
+      for (const r of results.filter((r) => r.status !== 201)) {
+        expect(r.status).toBe(400);
+      }
+
+      const current = await http().get('/api/shifts/current').set('Cookie', cashier).expect(200);
+      expect(current.body.shift.id).toBe(created[0].body.shift?.id ?? created[0].body.id);
+    });
+  });
 });

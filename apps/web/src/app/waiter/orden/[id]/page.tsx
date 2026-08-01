@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ChevronLeftIcon } from 'lucide-react';
-import { serverFetch } from '@/lib/api/server-client';
+import { isNotFound, serverFetch } from '@/lib/api/server-client';
+import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { getServerUser } from '@/lib/auth/server-user';
 import { Button } from '@/components/ui/button';
 import { MobileOrderDetail } from '@/components/waiter/mobile-order-detail';
@@ -35,7 +36,17 @@ export default async function WaiterOrderPage({ params }: Props) {
         <RealtimeRefresher events={['order:changed']} />
       </div>
     );
-  } catch {
-    notFound();
+  } catch (err) {
+    // Solo un 404 significa que la cuenta no existe; lo demás es que no pudimos preguntar.
+    if (isNotFound(err)) notFound();
+    return (
+      <div className="flex flex-col gap-4">
+        <Button variant="ghost" size="sm" className="-ml-2" nativeButton={false} render={<Link href="/waiter/ordenes" />}>
+          <ChevronLeftIcon />
+          Volver
+        </Button>
+        <ApiDownNotice what="la cuenta" />
+      </div>
+    );
   }
 }

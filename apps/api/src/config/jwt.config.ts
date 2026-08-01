@@ -27,4 +27,13 @@ export default registerAs('jwt', () => ({
   refreshSecret: requireSecret('JWT_REFRESH_SECRET'),
   refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
   pinExpiresIn: '4h',
+  /**
+   * Ventana de refresco para las sesiones por PIN, más corta que la de email a propósito:
+   * un PIN son cuatro dígitos, así que no conviene que abra una sesión renovable durante
+   * una semana. Doce horas cubren un turno con margen.
+   *
+   * Antes las sesiones por PIN no recibían ningún token de refresco, así que a las cuatro
+   * horas exactas el mesero o el cajero quedaban fuera a mitad de servicio.
+   */
+  pinRefreshExpiresIn: process.env.JWT_PIN_REFRESH_EXPIRES_IN ?? '12h',
 }));

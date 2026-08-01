@@ -18,7 +18,7 @@ export function WaiterHeader({
 }: {
   name: string;
   roleName: string;
-  shift: ShiftSummary | null;
+  shift: ShiftSummary | null | undefined;
 }) {
   const router = useRouter();
   const clearUser = useAuthStore((s) => s.clearUser);
