@@ -8,10 +8,29 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
+import { LogThrottle } from '../common/logging/log-throttle';
 
 const CORS_ORIGINS = process.env.CORS_ORIGINS?.split(',') ?? [
   'http://localhost:3000',
 ];
+
+/**
+ * Traduce el fallo de `jwt.verify` a algo accionable.
+ *
+ * Se mira `name` y no `instanceof TokenExpiredError` a propósito: `jsonwebtoken` no es una
+ * dependencia directa de este paquete —llega a través de `@nestjs/jwt`— y con pnpm importarla
+ * desde aquí depende de un enlace que puede no existir.
+ *
+ * La diferencia importa: un token caducado es el día a día de una tablet que lleva horas
+ * encendida; un token inválido, con el mismo secreto, señala otra cosa (otro despliegue, otro
+ * secreto, alguien probando).
+ */
+function reasonFor(err: unknown): string {
+  const name = err instanceof Error ? err.name : '';
+  if (name === 'TokenExpiredError') return 'token caducado';
+  if (name === 'JsonWebTokenError') return 'token inválido';
+  return 'no se pudo verificar el token';
+}
 
 export interface OrderEvent {
   type: 'created' | 'item' | 'status';
@@ -39,6 +58,13 @@ export interface ShiftEvent {
 export class RealtimeGateway implements OnGatewayConnection {
   private readonly logger = new Logger(RealtimeGateway.name);
 
+  /**
+   * El socket rechazado se reconecta solo, cada pocos segundos y para siempre. Sin freno,
+   * una tablet olvidada encendida con el token caducado escribe decenas de miles de líneas
+   * idénticas por noche y entierra cualquier otra cosa.
+   */
+  private readonly rejections = new LogThrottle();
+
   @WebSocketServer() server!: Server;
 
   constructor(
@@ -48,7 +74,7 @@ export class RealtimeGateway implements OnGatewayConnection {
 
   handleConnection(socket: Socket) {
     const token = this.tokenFromHandshake(socket);
-    if (!token) return socket.disconnect();
+    if (!token) return this.reject(socket, 'sin token');
 
     try {
       const payload = this.jwt.verify<JwtPayload>(token, {
@@ -61,9 +87,30 @@ export class RealtimeGateway implements OnGatewayConnection {
       // Salas personales para notificaciones dirigidas.
       if (payload.sub) void socket.join(`user:${payload.sub}`);
       if (payload.roleName) void socket.join(`role:${payload.roleName}`);
-    } catch {
-      socket.disconnect();
+    } catch (err) {
+      this.reject(socket, reasonFor(err));
     }
+  }
+
+  /**
+   * Cierra la conexión dejando constancia de **por qué**.
+   *
+   * Antes este camino era mudo —el `logger` estaba declarado y no se usaba en ninguna línea—,
+   * así que un token caducado y un secreto mal configurado se veían igual desde fuera: la
+   * pantalla simplemente no se actualiza y no hay nada que mirar.
+   */
+  private reject(socket: Socket, reason: string): void {
+    const origin = socket.handshake.address || 'origen desconocido';
+    const { log, suppressed } = this.rejections.check(`${origin}|${reason}`);
+    if (log) {
+      this.logger.warn({
+        event: 'ws:rejected',
+        reason,
+        origin,
+        ...(suppressed ? { suppressed } : {}),
+      });
+    }
+    socket.disconnect();
   }
 
   emitOrder(payload: OrderEvent) {
