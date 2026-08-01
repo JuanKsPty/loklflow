@@ -38,8 +38,20 @@ export const databaseOptions = (): TypeOrmModuleOptions & {
     migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
     // Nunca fuera de desarrollo: en producción el esquema se aplica con migraciones.
     synchronize: process.env.NODE_ENV === 'development',
+    // **Nunca `['error']` aquí.** `AbstractLogger.logQueryError` de TypeORM incluye los
+    // `parameters` enlazados de la consulta, así que un insert fallido en `users` dejaría el
+    // hash bcrypt del PIN en `docker logs`. Los errores de consulta ya se registran, sin
+    // parámetros, desde el filtro de excepciones. Misma trampa con `maxQueryExecutionTime`:
+    // `logQuerySlow` también los lleva y su nivel está activo sin condición, así que
+    // configurarlo para medir rendimiento abriría la fuga por otro lado.
     logging: process.env.NODE_ENV === 'development',
     ssl: sslOptions(),
+    extra: {
+      // Sin esto, con la base inalcanzable, pedir una conexión al pool se queda esperando
+      // hasta que se rinde el sistema operativo: las peticiones se acumulan y el proceso
+      // parece vivo mientras no atiende nada.
+      connectionTimeoutMillis: 5_000,
+    },
   };
 
   if (process.env.DATABASE_URL) {
