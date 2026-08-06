@@ -20,7 +20,8 @@
     "typeorm:prod": "node ./node_modules/typeorm/cli.js -d dist/database/data-source.js",
     "migration:run:prod": "pnpm typeorm:prod migration:run",
     "migration:revert:prod": "pnpm typeorm:prod migration:revert",
-    "seed:prod": "node dist/database/seeds/seed.js"
+    "seed:prod": "node dist/database/seeds/seed.js",
+    "seed:deploy": "node dist/database/seeds/seed-prod.js"
   },
   "dependencies": {
     "@loklflow/config": "workspace:^",
