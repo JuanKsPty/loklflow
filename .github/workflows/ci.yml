@@ -168,6 +168,69 @@ jobs:
           # los guards globales no estarían registrados en la imagen.
           code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/api/orders)
           test "$code" = "401" || { echo "GET /api/orders devolvió $code, se esperaba 401"; exit 1; }
+
+      # ─── Que la observabilidad exista de verdad, no solo en el código ────────────
+      # Todo lo de abajo se comprueba sobre la imagen en marcha, porque son cosas que el
+      # build no puede ver: el formato del log depende de NODE_ENV, la cabecera depende de un
+      # middleware registrado, y /api/ready depende de que haya una base al otro lado.
+      - name: El id de petición viaja en la cabecera y en el cuerpo del error
+        run: |
+          id=$(curl -s -o /dev/null -D - http://localhost:3001/api/health \
+               | tr -d '\r' | awk 'tolower($1)=="x-request-id:"{print $2}')
+          test -n "$id" || { echo "Ninguna respuesta trajo x-request-id"; exit 1; }
+          echo "x-request-id: $id"
+          # El mismo id tiene que ir en el cuerpo del error, que es lo que ve el operario en
+          # pantalla y lo único que permite localizar la traza en el servidor.
+          body=$(curl -s http://localhost:3001/api/orders)
+          echo "$body" | jq -e '.requestId | strings' > /dev/null \
+            || { echo "El 401 no llevó requestId en el cuerpo: $body"; exit 1; }
+          # Y un id de fuera con forma válida se respeta, para poder seguir una llamada.
+          echoed=$(curl -s -o /dev/null -D - -H 'x-request-id: ci-trace-0001' \
+                   http://localhost:3001/api/health | tr -d '\r' \
+                   | awk 'tolower($1)=="x-request-id:"{print $2}')
+          test "$echoed" = "ci-trace-0001" \
+            || { echo "No se respetó el id entrante: $echoed"; exit 1; }
+
+      - name: Cada línea de log es un JSON parseable
+        run: |
+          # Con NODE_ENV=production el logger escribe JSON compacto, una línea por registro.
+          # Si alguien devuelve el formato con colores, o escribe por su cuenta en stdout
+          # saltándose el logger, la salida deja de poder agregarse y esto lo detecta.
+          docker logs api > /tmp/api.log 2>&1
+          test -s /tmp/api.log || { echo "La API no escribió ni una línea de log"; exit 1; }
+          bad=0
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            printf '%s' "$line" | jq -e 'type == "object" and has("level")' > /dev/null 2>&1 \
+              || { echo "No es JSON: $line"; bad=1; }
+          done < /tmp/api.log
+          test "$bad" = "0" || exit 1
+          echo "$(wc -l < /tmp/api.log) líneas, todas JSON"
+
+      - name: Con Postgres parado, /api/ready falla y /api/health no
+        run: |
+          # Se para el contenedor del servicio: es el último paso del job, así que no rompe
+          # nada posterior. La distinción es el motivo de que /api/ready exista aparte —el
+          # HEALTHCHECK de la imagen mira /api/health y no debe reiniciar un proceso sano
+          # por un parpadeo de la base.
+          docker stop "$(docker ps -q --filter ancestor=postgres:16-alpine)"
+          # La comprobación se cachea unos segundos para que un endpoint público no dispare
+          # un SELECT por petición; hay que esperar a que caduque.
+          sleep 8
+
+          ready=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/api/ready)
+          test "$ready" = "503" || { echo "/api/ready devolvió $ready con la base parada"; exit 1; }
+
+          health=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/api/health)
+          test "$health" = "200" || { echo "/api/health devolvió $health y debía seguir vivo"; exit 1; }
+
+          # Y el 5xx tiene que haber dejado traza, con su id: sin esto el endpoint avisaría
+          # de que algo va mal sin dejar nada que investigar.
+          docker logs api 2>&1 | tail -50 > /tmp/api-fail.log
+          grep -q '"level":"error"' /tmp/api-fail.log \
+            || { echo "El 503 no dejó ninguna línea de error:"; cat /tmp/api-fail.log; exit 1; }
+          grep -q '"requestId"' /tmp/api-fail.log \
+            || { echo "La traza del 503 no lleva requestId:"; cat /tmp/api-fail.log; exit 1; }
           docker rm -f api
 
       - name: Arrancar el web y comprobar que sirve los assets

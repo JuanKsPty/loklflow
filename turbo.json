@@ -20,6 +20,9 @@
     "JWT_REFRESH_EXPIRES_IN",
     "JWT_PIN_REFRESH_EXPIRES_IN",
     "CORS_ORIGINS",
+    "LOG_LEVEL",
+    "LOG_FORMAT",
+    "LOG_HTTP",
     "NEXT_PUBLIC_API_URL"
   ],
   "globalDependencies": [".env"],

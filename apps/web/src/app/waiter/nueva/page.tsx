@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ChevronLeftIcon } from 'lucide-react';
 import { serverFetch } from '@/lib/api/server-client';
+import { reportApiFailure } from '@/lib/observability/api-failure';
 import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { Button } from '@/components/ui/button';
 import { PosOrderBuilder } from '@/components/waiter/pos-order-builder';
@@ -16,16 +17,16 @@ export default async function WaiterNewOrderPage({ searchParams }: Props) {
   let categories: Category[] = [];
   let products: Product[] = [];
   let modifiers: Modifier[] = [];
-  let apiDown = false;
+  let failure: 'offline' | 'error' | null = null;
   try {
     [categories, products, modifiers] = await Promise.all([
       serverFetch<Category[]>('/menu/categories'),
       serverFetch<Product[]>('/menu/products'),
       serverFetch<Modifier[]>('/menu/modifiers'),
     ]);
-  } catch {
+  } catch (err) {
     // Antes esto mostraba «Sin productos.», como si el menú estuviera vacío.
-    apiDown = true;
+    failure = reportApiFailure('waiter/nueva', err);
   }
 
   const backHref = tableId ? `/waiter/mesa/${tableId}` : '/waiter';
@@ -40,8 +41,8 @@ export default async function WaiterNewOrderPage({ searchParams }: Props) {
         <h1 className="text-lg font-semibold">Nueva cuenta</h1>
       </div>
       <div className="min-h-0 flex-1">
-        {apiDown ? (
-          <ApiDownNotice what="el menú" />
+        {failure ? (
+          <ApiDownNotice what="el menú" reason={failure} />
         ) : (
           <PosOrderBuilder
             tableId={tableId}

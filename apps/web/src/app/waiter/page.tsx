@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { LayoutGridIcon, MapIcon } from 'lucide-react';
 import { serverFetch } from '@/lib/api/server-client';
+import { reportApiFailure } from '@/lib/observability/api-failure';
 import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { cn } from '@/lib/utils';
 import { TableGrid } from '@/components/waiter/table-grid';
@@ -50,23 +51,23 @@ export default async function WaiterFloorPage({ searchParams }: Props) {
 
   let sectors: Sector[] = [];
   let tables: RestaurantTable[] = [];
-  let apiDown = false;
+  let failure: 'offline' | 'error' | null = null;
   try {
     [sectors, tables] = await Promise.all([
       serverFetch<Sector[]>('/tables/sectors'),
       serverFetch<RestaurantTable[]>('/tables'),
     ]);
-  } catch {
+  } catch (err) {
     // Antes esto mostraba «No hay mesas configuradas todavía», indistinguible de un salón que
     // de verdad está sin configurar.
-    apiDown = true;
+    failure = reportApiFailure('waiter', err);
   }
 
-  if (apiDown) {
+  if (failure) {
     return (
       <div>
         <ViewToggle active={active} />
-        <ApiDownNotice what="el salón" />
+        <ApiDownNotice what="el salón" reason={failure} />
         <RealtimeRefresher events={['table:changed', 'order:changed']} />
       </div>
     );

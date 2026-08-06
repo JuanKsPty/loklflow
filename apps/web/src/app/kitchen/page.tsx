@@ -1,4 +1,5 @@
 import { serverFetch } from '@/lib/api/server-client';
+import { reportApiFailure } from '@/lib/observability/api-failure';
 import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { KdsColumn } from '@/components/kitchen/kds-column';
 import { RealtimeRefresher } from '@/components/realtime/realtime-refresher';
@@ -13,19 +14,19 @@ const COLUMNS: { status: OrderStatus; title: string }[] = [
 
 export default async function KitchenPage() {
   let orders: Order[] = [];
-  let apiDown = false;
+  let failure: 'offline' | 'error' | null = null;
   try {
     orders = await serverFetch<Order[]>('/orders?open=true');
-  } catch {
+  } catch (err) {
     // Antes esto pintaba el tablero con «Sin órdenes» en las tres columnas, y el cocinero
     // concluía que no había nada que cocinar mientras las comandas se acumulaban.
-    apiDown = true;
+    failure = reportApiFailure('kitchen', err);
   }
 
-  if (apiDown) {
+  if (failure) {
     return (
       <div className="flex h-full flex-col">
-        <ApiDownNotice what="las órdenes" className="my-auto border" />
+        <ApiDownNotice what="las órdenes" reason={failure} className="my-auto border" />
         <RealtimeRefresher events={['order:changed']} />
       </div>
     );

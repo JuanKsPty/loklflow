@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -25,6 +25,8 @@ import { ReportsModule } from './reports/reports.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
+import { RequestContextMiddleware } from './common/logging/request-context.middleware';
+import { ShutdownLogger } from './common/logging/shutdown.logger';
 
 @Module({
   imports: [
@@ -57,6 +59,7 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
   controllers: [AppController],
   providers: [
     AppService,
+    ShutdownLogger,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     // APP_INTERCEPTOR y no useGlobalInterceptors en main.ts, porque así el
@@ -64,4 +67,14 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
     { provide: APP_INTERCEPTOR, useClass: AuditLogInterceptor },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  /**
+   * El middleware del id de petición se registra aquí, en el módulo, y no con `app.use()`
+   * en `main.ts`. Motivo concreto: `createTestApp()` replica a mano los globales de
+   * `main.ts` y no lo ejecuta, así que puesto allí tendría **cero cobertura** en los tests
+   * de integración y solo se descubriría roto en producción.
+   */
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(RequestContextMiddleware).forRoutes('*splat');
+  }
+}

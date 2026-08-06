@@ -18,9 +18,9 @@
 
 ## ¿Qué es LoklFlow?
 
-LoklFlow es una plataforma web **offline-first** de gestión operativa para establecimientos de alimentos y bebidas. Centraliza en un solo sistema todo lo que necesita un negocio para operar: órdenes, menú, inventario, caja, roles de personal y reportes.
+LoklFlow es una plataforma web de gestión operativa para establecimientos de alimentos y bebidas, con **servidor local e idempotente por diseño**. Centraliza en un solo sistema todo lo que necesita un negocio para operar: órdenes, menú, inventario, caja, roles de personal y reportes.
 
-Diseñado para funcionar **aunque se caiga el WiFi o la luz**, con sincronización automática al recuperar la conexión.
+El servidor corre dentro del establecimiento y no en la nube, así que **una caída del enlace a internet no interrumpe la operación**. Aguantar que se caiga la propia red interna es otra cosa, y está a medias a propósito: el contrato del servidor está construido y probado —el uuid que genera el dispositivo es la clave primaria de la orden, los pagos aceptan `clientRequestId`, `order_number` sale de una secuencia—, pero **el runtime sin conexión del cliente todavía no existe**. Eso es la fase 4 y está al 15 %.
 
 ---
 
@@ -61,7 +61,9 @@ Diseñado para funcionar **aunque se caiga el WiFi o la luz**, con sincronizaci�
     (caja)  (móvil)        (pantalla)    (QR)
 ```
 
-El sistema opera **completamente sin internet**. Si se cae la conexión, el personal sigue trabajando normalmente. Los datos se sincronizan automáticamente al recuperar la conexión.
+El sistema opera **sin depender de internet**: servidor, base de datos y clientes viven en la misma red interna, y la nube sólo hace falta para el tablero remoto y el respaldo.
+
+Lo que **todavía no** hace, y conviene decirlo aquí y no en la letra chica: si se cae la red interna o el servidor, los clientes no siguen trabajando. Las 42 pantallas son Server Components que piden datos sin caché, así que hoy no renderizan sin servidor, y no hay Service Worker ni base de datos en el cliente ni cola de sincronización. Lo que sí está hecho es la mitad del servidor, que es la que no se puede añadir después: reenviar una operación devuelve el estado en lugar de duplicar el cobro, y eso está afirmado por pruebas de integración contra un PostgreSQL real.
 
 ---
 

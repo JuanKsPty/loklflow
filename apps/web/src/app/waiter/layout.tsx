@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import type { ShiftSummary } from '@loklflow/types';
 import { getServerUser } from '@/lib/auth/server-user';
 import { serverFetch } from '@/lib/api/server-client';
+import { reportApiFailure } from '@/lib/observability/api-failure';
 import { SocketProvider } from '@/components/realtime/socket-provider';
 import { WaiterHeader } from '@/components/waiter/waiter-header';
 import { WaiterNav } from '@/components/waiter/waiter-nav';
@@ -19,7 +20,8 @@ export default async function WaiterLayout({ children }: { children: React.React
   let shift: ShiftSummary | null | undefined;
   try {
     shift = await serverFetch<ShiftSummary | null>('/shifts/current');
-  } catch {
+  } catch (err) {
+    reportApiFailure('waiter:layout', err);
     shift = undefined;
   }
 

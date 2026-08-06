@@ -7,6 +7,15 @@ export class ApiError extends Error {
     public readonly status: number,
     message: string,
     public readonly data?: unknown,
+    /**
+     * El id que el servidor asignó a esta petición, leído de la cabecera `x-request-id`.
+     *
+     * Es lo que convierte «me salió un error» en algo investigable: con él se localiza en el
+     * log del servidor la línea exacta, con su pila. Llega hasta aquí porque `main.ts` lo
+     * declara en `exposedHeaders` de CORS; sin eso el navegador no deja leerlo y la cabecera
+     * sería código muerto.
+     */
+    public readonly requestId?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -41,6 +50,10 @@ async function request(input: string, init?: RequestInit): Promise<Response> {
   } catch {
     throw new OfflineError();
   }
+}
+
+function requestIdOf(res: Response): string | undefined {
+  return res.headers.get('x-request-id') ?? undefined;
 }
 
 /** Redirige al login, salvo que el problema sea que no hay red. */
@@ -88,7 +101,7 @@ async function apiFetch<T>(
       data && typeof data === 'object' && 'message' in data
         ? String((data as { message: unknown }).message)
         : res.statusText;
-    throw new ApiError(res.status, message, data);
+    throw new ApiError(res.status, message, data, requestIdOf(res));
   }
 
   if (res.status === 204) return undefined as T;
@@ -127,7 +140,12 @@ export async function downloadFile(path: string, filename: string): Promise<void
 
   const res = await attempt();
   if (!res.ok) {
-    throw new ApiError(res.status, `No se pudo descargar el archivo (${res.status})`);
+    throw new ApiError(
+      res.status,
+      `No se pudo descargar el archivo (${res.status})`,
+      undefined,
+      requestIdOf(res),
+    );
   }
 
   const blob = await res.blob();

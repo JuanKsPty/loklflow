@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import type { ShiftSummary } from '@loklflow/types';
 import { getServerUser } from '@/lib/auth/server-user';
 import { serverFetch } from '@/lib/api/server-client';
+import { reportApiFailure } from '@/lib/observability/api-failure';
 import { SocketProvider } from '@/components/realtime/socket-provider';
 import { PosHeader } from '@/components/pos/pos-header';
 
@@ -18,7 +19,8 @@ export default async function PosLayout({ children }: { children: React.ReactNod
   let shift: ShiftSummary | null | undefined;
   try {
     shift = await serverFetch<ShiftSummary | null>('/shifts/current');
-  } catch {
+  } catch (err) {
+    reportApiFailure('pos:layout', err);
     shift = undefined;
   }
 

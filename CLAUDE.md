@@ -103,6 +103,14 @@ diff comes out empty.
 `DATABASE_URL` wins over the five loose `DATABASE_*` variables. `DATABASE_SSL=true` is only
 for a managed Postgres.
 
+**Nunca poner `logging: ['error']` (ni ningún nivel de consulta) en `databaseOptions()`.**
+`AbstractLogger.logQueryError` de TypeORM incluye los `parameters` enlazados, así que un insert
+fallido en `users` dejaría el hash bcrypt del PIN en `docker logs`. Los errores de consulta ya
+se registran, **sin parámetros**, desde `HttpExceptionFilter`. Misma trampa con
+`maxQueryExecutionTime`, que hoy no está configurado: `logQuerySlow` también lleva los
+parámetros y su nivel está activo sin condición, así que configurarlo para medir rendimiento
+abriría la fuga por otro lado, al margen de la opción `logging`.
+
 Anything running outside Nest (the TypeORM CLI, the seed, the test bootstrap) loads the root
 `.env` through `loadRootEnv()` in `src/config/load-root-env.ts`. Never hand-count the
 relative path again: it was wrong in the seed and dotenv fails silently, so the connection
@@ -147,6 +155,64 @@ are short; the legitimate close happens in `closeFromPayment`, which bypasses `u
 The rule lives in the service, not the UI, so no future client — or a replayed offline
 operation — can skip it.
 
+### Registro y observabilidad
+
+El logger es un `ConsoleLogger` **extendido** (`common/logging/app-logger.ts`) que solo añade
+el `requestId`. Nunca extender `Logger`: `Logger.overrideLogger` lanza si recibe un
+`instanceof Logger` con otro constructor. Y `ConsoleLoggerOptions` ya trae `json`, así que
+escribir un logger propio sería trabajo tirado — con `json: true` los valores por defecto
+(`colors: false`, `compact: true`) hacen que la salida pase por `JSON.stringify`: **una línea,
+un JSON**, que es lo que el CI comprueba sobre la imagen. `LOG_FORMAT` fuerza el formato,
+`LOG_LEVEL` es un **mínimo** (no un nivel único) y `LOG_HTTP` decide qué peticiones dejan línea
+de acceso — por defecto solo las que fallan, porque `RealtimeRefresher` recarga a todos los
+clientes ante cada evento y una acción humana son 12–18 peticiones.
+
+El logger se pasa en las **opciones de `NestFactory.create`**, no con `app.useLogger()`: así
+está puesto antes de construir el contenedor y un fallo de arranque sale con el mismo formato.
+
+**El id de petición nace en un middleware registrado desde `AppModule.configure()`**, no con
+`app.use()` en `main.ts`. Dos motivos, los dos verificados: los guards son `APP_GUARD` y
+resuelven antes que cualquier interceptor, así que un id generado ahí faltaría justo en los 401
+y 403; y `createTestApp()` replica los globales a mano sin ejecutar `main.ts`, así que puesto
+allí tendría **cero cobertura** en los tests de integración. Un `x-request-id` entrante solo se
+acepta si encaja en `/^[A-Za-z0-9_.:-]{8,64}$/` — el valor acaba en cada línea de log y sin
+comprobarlo se pueden fabricar registros falsos con saltos de línea. Va también en
+`exposedHeaders` de CORS y lo lee `client.ts`; sin eso la cabecera sería código muerto.
+
+**`HttpExceptionFilter` registra la excepción, y eso es nuevo.** Al ser `@Catch()` global
+desplaza al `BaseExceptionFilter` de Nest, que registraba con `logger.error(exception)` todo lo
+que no fuera intrínseco: el filtro formateaba la respuesta y **tiraba el objeto**, así que
+registrarlo había *quitado* el logging que Nest daba gratis. Se separa por severidad —5xx
+`error` con pila, 401/403/404 `log`, el resto de 4xx `warn`— y no es estética: `TestingLogger`
+silencia `log`, `warn`, `debug` y `verbose` pero **reenvía `error()`**, así que registrar los
+4xx como error llenaría de trazas los tests de integración que los provocan a propósito.
+La excepción se describe campo a campo (nunca volcando el objeto) porque `QueryFailedError`
+lleva los `parameters` enlazados: un insert fallido en `users` pondría el hash bcrypt del PIN
+en `docker logs`. Por lo mismo se omite `detail`, donde Postgres escribe los valores de la fila.
+
+Ojo con un detalle de `ConsoleLogger`: pasar `undefined` como segundo argumento de `error()`
+**no** equivale a omitirlo — lo imprime como un mensaje más y sale una línea con «undefined».
+
+**`GET /api/ready` es un endpoint aparte, no un cambio en `/api/health`.** `health` no toca la
+base a propósito: es lo que mira el `HEALTHCHECK` de la imagen y un proceso sano no debe
+reiniciarse por un parpadeo de Postgres; además `guards.int-spec.ts` compara su cuerpo con
+`toEqual({ status: 'ok' })`. `ready` sí consulta, con caché de 5 s y una sola comprobación en
+vuelo (es `@Public()`: sin eso, cualquiera desde internet dispara un `SELECT 1` por petición),
+y el motivo concreto del fallo se queda en el log — el mensaje del driver dice host y puerto.
+La promesa que pierde la carrera con el temporizador lleva su propio `.catch()`: sin él, con la
+base caída, el rechazo tardío llega como `unhandledRejection`.
+
+`installProcessHandlers()` cubre lo que ocurre fuera de una petición. `uncaughtException` sale
+del proceso, pero con 150 ms de margen: `process.stdout.write` es asíncrono cuando la salida es
+una tubería —lo que hay en un contenedor— y salir de golpe se come la línea que explica la
+caída. `unhandledRejection` **no** sale: esto es una caja registradora y una promesa suelta no
+puede dejar al cajero sin sistema a media venta.
+
+El gateway de realtime ya no es mudo, y sus rechazos van **deduplicados por origen**
+(`LogThrottle`): el cliente de Socket.io reintenta cada pocos segundos para siempre, así que
+una tablet olvidada con el token caducado escribiría decenas de miles de líneas idénticas por
+noche. El tope de claves del throttle no es decoración — la clave lleva la IP.
+
 ## Frontend (apps/web)
 
 - Next.js App Router — all routes under `src/app/`.
@@ -159,6 +225,35 @@ operation — can skip it.
   own fallback secret.
 - Route protection is declared in `src/proxy.ts` (`PROTECTED_PREFIXES`). Adding a new
   authenticated route section means adding it there too, not only relying on a layout redirect.
+- Tests con **vitest** (`vitest.config.mts`, specs `src/**/*.spec.ts`, entorno node). El arnés
+  entró por un solo archivo: `lib/observability/report.ts`, que decide qué sale hacia un log.
+  Playwright y `fake-indexeddb` llegan con el núcleo offline.
+
+### Errores y reporte
+
+`error.tsx`, `global-error.tsx` y `not-found.tsx` existen porque sin ellos Next pinta lo suyo,
+y lo suyo miente sobre el producto: un throw renderiza el `DefaultGlobalError` interno, que
+**emite su propio `<html>` y reemplaza el RootLayout entero** (adiós fuentes, tema, `Toaster`),
+y `notFound()` pinta un fallback con `<style>` en línea `body{color:#000;background:#fff}` que
+**pisa el tema** y está en inglés en una app con `lang="es"`. `global-error.tsx` lleva sus
+estilos en línea a propósito: una causa posible de llegar ahí es que la hoja no haya cargado.
+
+`src/instrumentation.ts` (`onRequestError`) es el único gancho de reporte del lado servidor.
+**Nunca recibe `notFound()` ni `redirect()`** —Next los descarta como errores de enrutado—, lo
+cual es una suerte para los `redirect('/login')` de los layouts, y es la razón de que los
+`catch` de las pantallas operativas tengan que llamar a `reportApiFailure()` por su cuenta: se
+quedan el error y devuelven el aviso sin relanzar nada, así que ahí nunca aparecerían.
+
+`lib/observability/report.ts` es la **única costura** hacia un log, y elige los campos uno a
+uno: un `ApiError` lleva la respuesta del servidor en `data` y las librerías HTTP adjuntan la
+petición entera con la cabecera `Authorization` dentro. Recorta mensaje y pila, y tacha lo que
+tenga forma de JWT. Es lo único de `apps/web` con lógica de seguridad y por eso tiene spec.
+
+`serverFetch` distingue **`ServerOfflineError`** (el `fetch` rechazó: no hay red) de
+`ServerApiError` (el servidor contestó mal), y `ApiDownNotice` lo dice con palabras distintas
+porque llevan a acciones distintas. `ServerApiError` fija su `name` —heredaba `'Error'`— y
+guarda el `x-request-id` de la respuesta, que es lo que enlaza la línea del log de Next con la
+de la API.
 
 ## Infrastructure
 
@@ -216,6 +311,14 @@ starting at once don't race on the same `ALTER TABLE`.
 service) and `images` (builds both images, applies migrations and the seed from the image,
 then boots them and checks `/api/health`, a 401 on a protected route and that static assets
 are served).
+
+El job `images` comprueba además la observabilidad **sobre la imagen en marcha**, que es la
+única forma: el formato del log depende de `NODE_ENV`, la cabecera depende de un middleware
+registrado y `/api/ready` depende de que haya una base al otro lado. Exige que el
+`x-request-id` viaje en la cabecera y en el cuerpo del error, que un id entrante válido se
+respete, que **cada línea de `docker logs` sea un JSON con `level`**, y —parando el contenedor
+de Postgres, que es el último paso del job— que `/api/ready` dé 503 mientras `/api/health`
+sigue en 200 y que ese 5xx haya dejado una traza con su `requestId`.
 
 JWT secrets are generated per run with `openssl rand -base64 48`. Building needs no secrets;
 booting does.

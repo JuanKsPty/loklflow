@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { serverFetch } from '@/lib/api/server-client';
+import { reportApiFailure } from '@/lib/observability/api-failure';
 import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { cn } from '@/lib/utils';
 import { OrderCard } from '@/components/waiter/order-card';
@@ -24,7 +25,7 @@ export default async function WaiterOrdersPage({ searchParams }: Props) {
   const current = status ?? 'active';
 
   let orders: Order[] = [];
-  let apiDown = false;
+  let failure: 'offline' | 'error' | null = null;
   try {
     // La pestaña «activas» las filtra el servidor con open=true, en lugar de traerse el
     // histórico completo y descartar aquí lo cerrado.
@@ -32,9 +33,9 @@ export default async function WaiterOrdersPage({ searchParams }: Props) {
       current === 'active'
         ? await serverFetch<Order[]>('/orders?open=true')
         : await serverFetch<Order[]>(`/orders?status=${current}`);
-  } catch {
+  } catch (err) {
     // Antes esto pintaba «No hay órdenes.», indistinguible de un turno tranquilo.
-    apiDown = true;
+    failure = reportApiFailure('waiter/ordenes', err);
   }
 
   return (
@@ -62,8 +63,8 @@ export default async function WaiterOrdersPage({ searchParams }: Props) {
         })}
       </div>
 
-      {apiDown ? (
-        <ApiDownNotice what="las órdenes" />
+      {failure ? (
+        <ApiDownNotice what="las órdenes" reason={failure} />
       ) : orders.length === 0 ? (
         <p className="py-12 text-center text-sm text-muted-foreground">No hay órdenes.</p>
       ) : (

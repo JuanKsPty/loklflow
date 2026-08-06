@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ChevronLeftIcon } from 'lucide-react';
 import { isNotFound, serverFetch } from '@/lib/api/server-client';
+import { reportApiFailure } from '@/lib/observability/api-failure';
 import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { getServerUser } from '@/lib/auth/server-user';
 import { Button } from '@/components/ui/button';
@@ -39,13 +40,14 @@ export default async function WaiterOrderPage({ params }: Props) {
   } catch (err) {
     // Solo un 404 significa que la cuenta no existe; lo demás es que no pudimos preguntar.
     if (isNotFound(err)) notFound();
+    const reason = reportApiFailure('waiter/orden', err);
     return (
       <div className="flex flex-col gap-4">
         <Button variant="ghost" size="sm" className="-ml-2" nativeButton={false} render={<Link href="/waiter/ordenes" />}>
           <ChevronLeftIcon />
           Volver
         </Button>
-        <ApiDownNotice what="la cuenta" />
+        <ApiDownNotice what="la cuenta" reason={reason} />
       </div>
     );
   }

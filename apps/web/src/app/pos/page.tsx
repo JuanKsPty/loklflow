@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { LockOpenIcon } from 'lucide-react';
 import { serverFetch } from '@/lib/api/server-client';
+import { reportApiFailure } from '@/lib/observability/api-failure';
 import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { formatPrice } from '@/lib/format';
 import { Badge } from '@/components/ui/badge';
@@ -17,15 +18,15 @@ function paidOf(order: Order): number {
 
 export default async function PosPage() {
   let orders: Order[] = [];
-  let apiDown = false;
+  let failure: 'offline' | 'error' | null = null;
   try {
     // `open=true`: el servidor filtra las cuentas vivas. Antes se pedía el listado completo y
     // se filtraba aquí, lo que traía todo el histórico del negocio en cada carga.
     orders = await serverFetch<Order[]>('/orders?open=true');
-  } catch {
+  } catch (err) {
     // Con la API caída esto pintaba «No hay cuentas por cobrar»: una caja vacía y en calma
     // mientras las cuentas seguían abiertas. Peor que un fallo visible.
-    apiDown = true;
+    failure = reportApiFailure('pos', err);
   }
 
   // El turno tiene TRES estados, no dos: abierto, cerrado, y «no lo sabemos». Antes un fallo
@@ -35,15 +36,16 @@ export default async function PosPage() {
   let shiftUnknown = false;
   try {
     shift = await serverFetch<ShiftSummary | null>('/shifts/current');
-  } catch {
+  } catch (err) {
+    reportApiFailure('pos:shift', err);
     shiftUnknown = true;
   }
 
-  if (apiDown) {
+  if (failure) {
     return (
       <div>
         <h1 className="mb-4 text-xl font-semibold">Cuentas por cobrar</h1>
-        <ApiDownNotice what="las cuentas" />
+        <ApiDownNotice what="las cuentas" reason={failure} />
         <RealtimeRefresher events={['order:changed']} />
       </div>
     );

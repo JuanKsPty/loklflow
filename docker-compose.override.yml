@@ -1,0 +1,7 @@
+# Override LOCAL y temporal: corebank ya ocupa el 5432 en esta máquina, así
+# que la postgres de loklflow se publica en 5433. `!override` reemplaza la
+# lista en vez de añadirse a ella, que es lo que hace compose por defecto.
+services:
+  postgres:
+    ports: !override
+      - '5433:5432'
