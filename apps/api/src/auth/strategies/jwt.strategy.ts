@@ -20,6 +20,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
   validate(payload: JwtPayload) {
     if (!payload.sub) throw new UnauthorizedException();
+    /**
+     * Un pase de invitado —el que se emite al pedir desde el QR— nunca es una sesión.
+     *
+     * Es redundante y está a propósito: el pase se firma con un secreto **derivado** de este, así
+     * que no verificaría aquí ni aunque alguien lo pusiera en la cookie `access_token`; y además
+     * no lleva `sub`, que la línea de arriba ya exige. Se comprueba igualmente porque cuesta una
+     * línea y evita que una refactorización futura que unifique secretos abra un agujero sin que
+     * nada falle de forma visible.
+     */
+    if ('typ' in payload) throw new UnauthorizedException();
     return payload;
   }
 }

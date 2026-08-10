@@ -84,7 +84,16 @@ export class OrdersService {
     return order;
   }
 
-  async create(dto: CreateOrderDto, waiterId: string) {
+  /**
+   * `waiterId` admite `null`: un pedido que llega por el QR del cliente no lo tomó nadie del
+   * personal. `DATA_MODEL.md` lo dice desde el principio («null si la orden viene del cliente por
+   * QR») y hasta ahora esto escribía el id de quien firmara la petición.
+   *
+   * Ensanchar el parámetro es compatible con todo lo que ya llamaba: el controlador sigue pasando
+   * `user.sub`. Y las dos columnas donde acaba —`orders.waiter_id` y
+   * `order_status_history.changed_by`— ya eran nullable en el esquema inicial.
+   */
+  async create(dto: CreateOrderDto, waiterId: string | null) {
     // El dispositivo puede traer su propio uuid para poder crear la cuenta sin conexión y
     // encolar contra ella («añade ítem», «cobra») antes de que el servidor la conozca. Si
     // ese id ya existe, la petición es un reenvío: se devuelve la orden tal cual, sin

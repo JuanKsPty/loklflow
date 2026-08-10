@@ -8,5 +8,8 @@ import { BusinessConfig } from './entities/business-config.entity';
   imports: [TypeOrmModule.forFeature([BusinessConfig])],
   controllers: [BusinessConfigController],
   providers: [BusinessConfigService],
+  // Lo consume el módulo público, que necesita el nombre, el logo y la moneda del negocio para
+  // la cabecera del menú del cliente.
+  exports: [BusinessConfigService],
 })
 export class BusinessConfigModule {}
