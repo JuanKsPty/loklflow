@@ -125,6 +125,25 @@ export class TablesService {
     return result;
   }
 
+  /**
+   * Genera un token de QR nuevo para la mesa, invalidando el anterior.
+   *
+   * Es lo que hace útil el QR del cliente: sin rotación, un token filtrado —una foto de la hoja
+   * subida a redes, una mesa que se cambia de sitio— vale para siempre y no hay forma de
+   * revocarlo. Al rotar, el token viejo deja de resolver y el pedido desde esa hoja da 404.
+   *
+   * Se cambia el valor y no se «desactiva» nada: `qr_code` es único y no nullable, así que el
+   * token anterior desaparece del sistema en la misma escritura.
+   */
+  async rotateQrCode(id: string) {
+    const table = await this.findOne(id);
+    table.qrCode = randomUUID();
+    await this.tablesRepo.save(table);
+    const result = await this.findOne(id);
+    this.realtime.emitTable({ type: 'update', tableId: result.id, status: result.status });
+    return result;
+  }
+
   async remove(id: string) {
     const table = await this.findOne(id);
     await this.tablesRepo.remove(table);

@@ -35,6 +35,11 @@ export const tablesApi = {
     api.patch<RestaurantTable>(`/tables/${id}/status`, { status }),
   saveLayout: (payload: SaveLayoutPayload) =>
     api.patch<RestaurantTable[]>('/tables/layout', payload),
+  /**
+   * Genera un token de QR nuevo e invalida el anterior. Es lo que permite revocar un código
+   * filtrado: sin esto, una foto de la hoja en redes sociales vale para siempre.
+   */
+  rotateQr: (id: string) => api.post<RestaurantTable>(`/tables/${id}/qr/rotate`),
   remove: (id: string) => api.delete<void>(`/tables/${id}`),
 };
 

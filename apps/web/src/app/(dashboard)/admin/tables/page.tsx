@@ -10,12 +10,13 @@ import { BulkTablesDialog } from '@/components/admin/tables/bulk-tables-dialog';
 import { TableList } from '@/components/admin/tables/table-table';
 import { SectorTable } from '@/components/admin/tables/sector-table';
 import { ReservationTable } from '@/components/admin/tables/reservation-table';
+import { QrSheet } from '@/components/admin/tables/qr-sheet';
 import { RealtimeRefresher } from '@/components/realtime/realtime-refresher';
 import type { Reservation, RestaurantTable, Sector } from '@loklflow/types';
 
 export const metadata = { title: 'Mesas — LoklFlow' };
 
-const TABS = ['map', 'tables', 'sectors', 'reservations'] as const;
+const TABS = ['map', 'tables', 'sectors', 'reservations', 'qr'] as const;
 type Tab = (typeof TABS)[number];
 
 interface Props {
@@ -83,6 +84,7 @@ export default async function TablesPage({ searchParams }: Props) {
             <ReservationTable reservations={reservations} />
           </>
         }
+        qr={<QrSheet tables={tables} />}
       />
       <RealtimeRefresher events={['table:changed', 'order:changed']} />
     </div>

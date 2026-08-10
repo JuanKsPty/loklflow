@@ -27,6 +27,10 @@ export const AUDIT_ACTION_BADGE: Record<AuditAction, string> = {
   'role.created': 'border-primary/30 bg-primary/10 text-primary',
   'role.updated': 'border-primary/30 bg-primary/10 text-primary',
 
+  // Invalida material impreso: las hojas de QR que estén en las mesas dejan de servir en el
+  // instante en que esto ocurre, así que no es rutina.
+  'table.qr_rotated': 'border-amber-500/30 bg-amber-500/10 text-amber-600',
+
   // Rutina
   'auth.login': 'border-border bg-muted text-muted-foreground',
   'auth.logout': 'border-border bg-muted text-muted-foreground',

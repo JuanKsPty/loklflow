@@ -25,6 +25,8 @@ export const AUDIT_ACTIONS = [
   'discount.rejected',
   // Órdenes
   'order.cancelled',
+  // Mesas
+  'table.qr_rotated',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -37,6 +39,7 @@ export const AUDIT_ENTITY_TYPES = [
   'order',
   'payment',
   'discount',
+  'table',
   'session',
 ] as const;
 
