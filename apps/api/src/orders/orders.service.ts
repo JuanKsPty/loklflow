@@ -24,6 +24,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { TablesService } from '../tables/tables.service';
 import { AuditService } from '../audit/audit.service';
 import { StockService } from '../inventory/stock.service';
+import { saneOccurredAt } from '../common/occurred-at';
 
 const ORDER_RELATIONS = {
   table: true,
@@ -103,6 +104,11 @@ export class OrdersService {
       items.push(await this.buildItem(itemDto));
     }
 
+    // La hora que reporta el dispositivo, si es creíble. `saneOccurredAt` descarta relojes
+    // imposibles en vez de rechazar la petición: una comanda perdida porque una tablet tiene
+    // mal la fecha es mucho peor que un sello unos minutos corrido.
+    const occurredAt = saneOccurredAt(dto.occurredAt);
+
     const order = this.ordersRepo.create({
       orderNumber: await this.nextOrderNumber(),
       ...(dto.id ? { id: dto.id } : {}),
@@ -114,12 +120,14 @@ export class OrdersService {
       notes: dto.notes ?? null,
       discountAmount: 0,
       tipAmount: 0,
+      occurredAt,
       items,
       statusHistory: [
         Object.assign(new OrderStatusHistory(), {
           fromStatus: null,
           toStatus: 'pending',
           changedBy: waiterId,
+          occurredAt,
         }),
       ],
     });
@@ -243,6 +251,10 @@ export class OrdersService {
       toStatus: dto.status,
       changedBy: userId,
       notes: dto.notes ?? null,
+      // Aquí es donde `occurredAt` gana su sueldo: con la cocina sin red, `changed_at` diría
+      // cuándo volvió el WiFi y el reporte de tiempos de preparación sumaría el corte entero
+      // al tiempo de cocina de todas las órdenes afectadas.
+      occurredAt: saneOccurredAt(dto.occurredAt),
     });
     order.status = dto.status;
     order.statusHistory = [...(order.statusHistory ?? []), history];

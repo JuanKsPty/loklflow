@@ -78,7 +78,12 @@ export async function resetOperationalData(ds: DataSource): Promise<void> {
   );
   // Las mesas quedan como las dejó la última orden; devolverlas a 'available' es parte del
   // estado conocido, porque varias comprobaciones miran si una mesa se liberó.
-  await ds.query(`UPDATE "tables" SET status = 'available'`);
+  //
+  // `status_changed_at` se retrasa a propósito en vez de ponerse en `now()`: es lo que
+  // `updateStatus` compara contra el `occurredAt` de una operación encolada, y dejarlo en el
+  // instante del reset haría que cualquier prueba con una hora «de hace un momento» quedara
+  // por detrás del reset y se descartara — un fallo que dependería de milisegundos.
+  await ds.query(`UPDATE "tables" SET status = 'available', status_changed_at = now() - interval '1 day'`);
 }
 
 /** Todas las tablas del esquema público menos el registro de migraciones. */

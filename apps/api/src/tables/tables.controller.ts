@@ -18,6 +18,7 @@ import { UpdateLayoutDto } from './dto/update-layout.dto';
 import { BulkCreateTableDto } from './dto/bulk-create-table.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
+import { saneOccurredAt } from '../common/occurred-at';
 
 @ApiTags('tables')
 @Controller('tables')
@@ -58,7 +59,7 @@ export class TablesController {
   @Patch(':id/status')
   @RequirePermissions('tables:update')
   updateStatus(@Param('id', ParseUuidPipe) id: string, @Body() dto: UpdateTableStatusDto) {
-    return this.tablesService.updateStatus(id, dto.status);
+    return this.tablesService.updateStatus(id, dto.status, saneOccurredAt(dto.occurredAt));
   }
 
   @Patch(':id')

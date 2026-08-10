@@ -110,6 +110,20 @@ export class Order {
   @OneToMany(() => Payment, (p) => p.order)
   payments!: Payment[];
 
+  /**
+   * Hora a la que se abrió la cuenta en el salón, cuando el dispositivo la reporta.
+   *
+   * Es una columna **aparte** de `created_at`, no un reemplazo: un `@CreateDateColumn`
+   * peleando con un valor asignado a mano es comportamiento indocumentado, y el rastro debe
+   * conservar los dos hechos —cuándo pasó y cuándo nos enteramos—, que es justo la diferencia
+   * que interesa cuando se investiga un corte de red.
+   *
+   * `null` en todo lo creado en línea, que es la inmensa mayoría: quien la lea debe hacerlo
+   * como `occurredAt ?? createdAt`.
+   */
+  @Column({ name: 'occurred_at', type: 'timestamptz', nullable: true })
+  occurredAt!: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 
