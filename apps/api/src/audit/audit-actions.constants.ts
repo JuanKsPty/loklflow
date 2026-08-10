@@ -4,6 +4,7 @@ export const AUDIT_ACTIONS = [
   // Autenticación
   'auth.login',
   'auth.login_failed',
+  'auth.login_locked',
   'auth.logout',
   // Empleados
   'user.created',

@@ -1,6 +1,7 @@
 export type AuditAction =
   | 'auth.login'
   | 'auth.login_failed'
+  | 'auth.login_locked'
   | 'auth.logout'
   | 'user.created'
   | 'user.updated'
@@ -21,6 +22,7 @@ export type AuditAction =
 export const AUDIT_ACTIONS: AuditAction[] = [
   'auth.login',
   'auth.login_failed',
+  'auth.login_locked',
   'auth.logout',
   'user.created',
   'user.updated',
@@ -42,6 +44,7 @@ export const AUDIT_ACTIONS: AuditAction[] = [
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   'auth.login': 'Inicio de sesión',
   'auth.login_failed': 'Intento fallido',
+  'auth.login_locked': 'Acceso bloqueado por intentos',
   'auth.logout': 'Cierre de sesión',
   'user.created': 'Empleado creado',
   'user.updated': 'Empleado editado',

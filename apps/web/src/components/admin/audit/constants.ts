@@ -11,6 +11,9 @@ export const AUDIT_ACTION_BADGE: Record<AuditAction, string> = {
   'role.deleted': 'border-destructive/30 bg-destructive/10 text-destructive',
   'order.cancelled': 'border-destructive/30 bg-destructive/10 text-destructive',
   'auth.login_failed': 'border-destructive/30 bg-destructive/10 text-destructive',
+  // Alguien estuvo probando lo suficiente como para que el sistema lo parara. Es lo primero que
+  // el dueño quiere ver en la bitácora.
+  'auth.login_locked': 'border-destructive/30 bg-destructive/10 text-destructive',
 
   // Cambios de privilegios: el mayor impacto en seguridad
   'user.role_changed': 'border-amber-500/30 bg-amber-500/10 text-amber-600',

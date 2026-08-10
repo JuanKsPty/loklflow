@@ -11,12 +11,21 @@ import { randomUUID } from 'node:crypto';
 import { durationToMs } from './duration';
 import { Response } from 'express';
 import { UsersService } from '../users/users.service';
+import { LoginAttemptsService } from './login-attempts.service';
 import { RolesService } from '../roles/roles.service';
 import { AuditService } from '../audit/audit.service';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 import { LoginDto } from './dto/login.dto';
 import { PinLoginDto } from './dto/pin-login.dto';
+
+/**
+ * Cuántos tokens de refresco vivos se conservan por usuario.
+ *
+ * Cinco cubre el caso legítimo —la tablet del salón, la de caja y el teléfono, con margen— y acota
+ * cuántas sesiones reactivables deja atrás alguien que entra y sale todo el día.
+ */
+const MAX_LIVE_REFRESH_TOKENS = 5;
 
 @Injectable()
 export class AuthService {
@@ -28,9 +37,13 @@ export class AuthService {
     private readonly config: ConfigService,
     @InjectRepository(RefreshToken)
     private readonly refreshTokenRepo: Repository<RefreshToken>,
+    private readonly attempts: LoginAttemptsService,
   ) {}
 
   async login(dto: LoginDto, res: Response, ip?: string) {
+    const attemptKey = `email:${dto.email.toLowerCase()}`;
+    await this.assertNotLocked(attemptKey, { email: dto.email }, ip);
+
     // Los login se auditan aquí y no con @Audit() porque el handler es @Public()
     // (no hay request.user que atribuir) y los fallos salen como excepción, que un
     // interceptor no llega a ver.
@@ -55,14 +68,19 @@ export class AuthService {
         'credenciales inválidas',
         ip,
       );
+      await this.registerFailure(attemptKey, { email: dto.email, userId: user.id }, ip);
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    this.attempts.registerSuccess(attemptKey);
     await this.auditLoginSuccess(user.id, user.name, 'email', ip);
     return this.issueTokens(user.id, user.name, user.email, user.role.id, user.role.name, 'email', res);
   }
 
   async pinLogin(dto: PinLoginDto, res: Response, ip?: string) {
+    const attemptKey = `pin:${dto.userId}`;
+    await this.assertNotLocked(attemptKey, { userId: dto.userId }, ip);
+
     const user = await this.usersService.findByIdWithCredentials(dto.userId);
     if (!user || !user.isActive) {
       await this.auditLoginFailure({ userId: dto.userId }, 'usuario inexistente o inactivo', ip);
@@ -76,9 +94,11 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.pin, user.pin);
     if (!valid) {
       await this.auditLoginFailure({ userId: dto.userId }, 'PIN incorrecto', ip);
+      await this.registerFailure(attemptKey, { userId: dto.userId }, ip);
       throw new UnauthorizedException('Invalid PIN');
     }
 
+    this.attempts.registerSuccess(attemptKey);
     await this.auditLoginSuccess(user.id, user.name, 'pin', ip);
     return this.issueTokens(user.id, user.name, user.email, user.role.id, user.role.name, 'pin', res, true);
   }
@@ -215,12 +235,7 @@ export class AuthService {
       expiresIn: accessExpiresIn as JwtSignOptions['expiresIn'],
     });
 
-    const cookieOptions = {
-      httpOnly: true,
-      secure: this.config.get<string>('app.nodeEnv') === 'production',
-      sameSite: 'strict' as const,
-      path: '/',
-    };
+    const cookieOptions = this.cookieOptions();
 
     res.cookie('access_token', accessToken, {
       ...cookieOptions,
@@ -259,6 +274,8 @@ export class AuthService {
       expiresAt: new Date(Date.now() + refreshMs),
     });
     await this.refreshTokenRepo.save(rt);
+    // **Después** de guardar el nuevo y excluyéndolo, o el login se invalidaría a sí mismo.
+    await this.pruneRefreshTokens(userId, rt.id);
 
     res.cookie('refresh_token', refreshToken, {
       ...cookieOptions,
@@ -268,8 +285,104 @@ export class AuthService {
     return { id: userId, name, email, roleId, roleName, permissions, loginMethod };
   }
 
+  /**
+   * Los atributos con los que se ponen **y se borran** las cookies de sesión.
+   *
+   * Extraído a un método porque el `clearCookie` los omitía: llevaba solo `path`. Varios
+   * navegadores cotejan el conjunto de atributos al invalidar una cookie, así que
+   * `httpOnly`/`secure`/`sameSite` distintos pueden hacer que **la cookie sobreviva al cierre de
+   * sesión**. Funcionaba en la práctica por casualidad; con un método compartido no depende de
+   * que dos sitios se mantengan iguales.
+   */
+  /**
+   * Rechaza si la clave está bloqueada, **con el mismo error que unas credenciales incorrectas**.
+   *
+   * Ni 423 ni 429 ni un mensaje distinto: cualquiera de las tres cosas sería un oráculo gratis
+   * —«esta cuenta existe y alguien la está atacando»— y además le diría a quien prueba cuándo
+   * volver. Desde fuera, una cuenta bloqueada y un PIN mal se ven exactamente igual.
+   *
+   * El coste asumido es que un empleado que se equivoca cinco veces ve «PIN incorrecto» durante un
+   * minuto aunque acierte. Es un minuto, y la alternativa es contarle a un atacante cómo va.
+   */
+  private async assertNotLocked(
+    key: string,
+    subject: { email?: string; userId?: string },
+    ip?: string,
+  ): Promise<void> {
+    if (!this.attempts.isLocked(key)) return;
+    await this.auditLoginFailure(subject, 'bloqueado por intentos fallidos', ip);
+    // **El mismo mensaje exacto que daría la credencial incorrecta de esa vía**, no uno genérico:
+    // `pinLogin` responde «Invalid PIN» y `login` «Invalid credentials», así que un mensaje único
+    // para los dos delataría el bloqueo en la ruta del PIN — que es justo la que se ataca.
+    throw new UnauthorizedException(subject.email ? 'Invalid credentials' : 'Invalid PIN');
+  }
+
+  /** Anota el fallo y deja constancia en la bitácora cuando el bloqueo se activa. */
+  private async registerFailure(
+    key: string,
+    subject: { email?: string; userId?: string },
+    ip?: string,
+  ): Promise<void> {
+    if (!this.attempts.registerFailure(key)) return;
+    // Se audita **el bloqueo**, no cada fallo: los fallos ya se registran uno a uno, y lo que el
+    // dueño quiere ver en `/admin/audit` es «alguien estuvo probando con la cuenta de Ana».
+    await this.audit.createLog({
+      userId: subject.userId,
+      action: 'auth.login_locked',
+      entityType: 'session',
+      entityId: subject.userId,
+      newValue: { ...(subject.email ? { email: subject.email } : {}) },
+      ipAddress: ip,
+    });
+  }
+
+  private cookieOptions() {
+    return {
+      httpOnly: true,
+      secure: this.config.get<string>('app.nodeEnv') === 'production',
+      sameSite: 'strict' as const,
+      path: '/',
+    };
+  }
+
   private clearCookies(res: Response) {
-    res.clearCookie('access_token', { path: '/' });
-    res.clearCookie('refresh_token', { path: '/' });
+    res.clearCookie('access_token', this.cookieOptions());
+    res.clearCookie('refresh_token', this.cookieOptions());
+  }
+
+  /**
+   * Deja como mucho `MAX_LIVE_REFRESH_TOKENS` vivos por usuario y borra lo caducado.
+   *
+   * `refresh_tokens` crecía sin tope: cada inicio de sesión inserta una fila y solo el `logout` las
+   * revoca en bloque, así que un bucle de login —o simplemente meses de operación normal con una
+   * tablet que entra por PIN varias veces al día— llena la tabla de credenciales vivas que nadie
+   * va a usar. Cada una es una sesión que un robo de base de datos podría reactivar.
+   *
+   * Cinco cubre de sobra el caso legítimo: el mismo empleado en la tablet del salón, la de caja y
+   * su teléfono, con margen. Es best-effort: si la poda falla, el login **no** puede fallar con
+   * ella.
+   */
+  private async pruneRefreshTokens(userId: string, keepId: string): Promise<void> {
+    try {
+      // Lo caducado y lo revocado no vale para nada: fuera de la tabla, no solo marcado.
+      await this.refreshTokenRepo
+        .createQueryBuilder()
+        .delete()
+        .where('user_id = :userId', { userId })
+        .andWhere('(is_revoked = true OR expires_at < now())')
+        .execute();
+
+      const live = await this.refreshTokenRepo.find({
+        where: { user: { id: userId }, isRevoked: false },
+        order: { createdAt: 'DESC' },
+      });
+
+      const stale = live.filter((t) => t.id !== keepId).slice(MAX_LIVE_REFRESH_TOKENS - 1);
+      if (stale.length > 0) {
+        await this.refreshTokenRepo.remove(stale);
+      }
+    } catch {
+      // Un fallo limpiando no puede impedir que alguien entre a trabajar.
+    }
   }
 }
