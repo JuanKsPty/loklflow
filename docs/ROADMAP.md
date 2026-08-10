@@ -100,33 +100,51 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
       `clientRequestId`. Reenviar una operación devuelve el estado en lugar de duplicarla
 - [x] `order_number` por secuencia de Postgres, en lugar de un `MAX+1` que con dos meseros
       simultáneos devolvía 500 y perdía la orden
-- [ ] Service Worker registrado y funcional
-- [ ] Persistencia de operaciones en IndexedDB
-- [ ] Cola de sincronización ordenada por timestamp
-- [ ] Migrar las vistas operativas (`/waiter`, `/kitchen`, `/pos`) a datos en cliente: hoy las
-      42 páginas son Server Components con `serverFetch` y `cache: 'no-store'`, así que sin
-      servidor no renderizan
-- [ ] Detección automática de pérdida de conexión
-- [ ] Activación del modo offline sin intervención del usuario
-- [ ] Resolución de conflictos en sincronización
-- [ ] Indicador de estado online/offline en todas las vistas
-- [ ] Pruebas de sincronización (corte y reconexión simulados)
-- [ ] Documentación del proceso de sync
+- [x] Service Worker registrado y funcional — `public/sw.js`, escrito a mano. Filtra por
+      **path** y no por origen, porque en producción la API vive detrás del mismo dominio y el
+      filtro por origen no filtraría nada. Sin `skipWaiting`: cambiar los chunks bajo una tablet
+      en pleno servicio parece una caída
+- [x] Persistencia de operaciones en IndexedDB — sobre Dexie, con el orden asignado por la base
+      (`++seq`): calcularlo en el cliente deja una carrera entre pestañas que puede mandar
+      «añadir ítem» antes que «crear la comanda»
+- [x] Cola de sincronización ordenada por timestamp — por `seq`, que es estrictamente mejor:
+      `Date.now()` tiene resolución de milisegundo y un mesero que toca rápido encola varias
+      operaciones dentro del mismo
+- [x] Migrar las vistas operativas (`/waiter`, `/kitchen`, `/pos`) a datos en cliente — las ocho
+      rutas pasan a cascarón de servidor + vista de cliente sobre la copia local, con el catálogo
+      guardado (sin él se podría cambiar lo que ya existe pero no tomar una comanda nueva)
+- [x] Detección automática de pérdida de conexión — tres detectores: el resultado de las
+      peticiones reales, la sonda a `/api/health` (no a `/ready`, que consulta la base) y el
+      `false` de `navigator.onLine`, que es lo único fiable que dice
+- [x] Activación del modo offline sin intervención del usuario — no hay interruptor: la cola se
+      llena cuando el `fetch` rechaza y se vacía cuando vuelve el camino, con 15 s de peor caso
+- [x] Resolución de conflictos en sincronización — el diseño los evita en lugar de resolverlos
+      (nada diferible lleva un valor que dos dispositivos puedan editar). El único alcanzable es
+      el estado de mesa, que desempata por hora del hecho contra `tables.status_changed_at`
+- [x] Indicador de estado online/offline en todas las vistas — en las tres cabeceras operativas,
+      **siempre visible**: uno que solo aparece con problemas enseña a no mirar ese rincón. Con
+      bandeja de fallos y marca por cuenta
+- [x] Pruebas de sincronización (corte y reconexión simulados) — 6 pruebas de Playwright sobre el
+      build de producción, incluida una recarga estando sin red (la persistencia tiene que
+      sobrevivir al cierre de la pestaña, no solo al render)
+- [x] Documentación del proceso de sync — `docs/OFFLINE.md`, con los límites conocidos escritos
+      como decisiones
 
-**Entregable:** Sistema que opera sin internet y sincroniza sin pérdida de datos.
+**Entregable:** Sistema que opera sin internet y sincroniza sin pérdida de datos. ✅
 
 ---
 
 ## Fase 5 — Inventario y Menú QR
 > El negocio controla su stock y los clientes ordenan solos.
 
-- [ ] Catálogo de ingredientes con stock y unidades
-- [ ] Gestión de proveedores (`suppliers`)
-- [ ] Recetas vinculadas a productos del menú
-- [ ] Descuento automático de inventario al cerrar órdenes
-- [ ] Alertas de stock mínimo
-- [ ] Registro de entradas de mercancía (con proveedor y costo)
-- [ ] Registro de merma
+- [x] Catálogo de ingredientes con stock y unidades
+- [x] Gestión de proveedores (`suppliers`)
+- [x] Recetas vinculadas a productos del menú
+- [x] Descuento automático de inventario al cerrar órdenes — por los **dos** caminos de cierre
+      (`updateStatus` y `closeFromPayment`), idempotente por índice parcial único
+- [x] Alertas de stock mínimo — solo al cruzar el umbral, no en cada movimiento
+- [x] Registro de entradas de mercancía (con proveedor y costo) — actualiza el costo promedio
+- [x] Registro de merma
 - [ ] Código QR único por mesa
 - [ ] Vista pública del menú (sin autenticación)
 - [ ] Flujo de orden completa desde QR del cliente (`source: customer_qr`)
