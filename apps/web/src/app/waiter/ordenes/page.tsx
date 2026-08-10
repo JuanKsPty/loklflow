@@ -1,10 +1,8 @@
 import Link from 'next/link';
 import { serverFetch } from '@/lib/api/server-client';
 import { reportApiFailure } from '@/lib/observability/api-failure';
-import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { cn } from '@/lib/utils';
-import { OrderCard } from '@/components/waiter/order-card';
-import { RealtimeRefresher } from '@/components/realtime/realtime-refresher';
+import { OrdersView } from '@/components/waiter/orders-view';
 import { ORDER_STATUS_LABELS } from '@/components/admin/orders/constants';
 import type { Order, OrderStatus } from '@loklflow/types';
 
@@ -24,8 +22,7 @@ export default async function WaiterOrdersPage({ searchParams }: Props) {
   const { status } = await searchParams;
   const current = status ?? 'active';
 
-  let orders: Order[] = [];
-  let failure: 'offline' | 'error' | null = null;
+  let orders: Order[] | null = null;
   try {
     // La pestaña «activas» las filtra el servidor con open=true, en lugar de traerse el
     // histórico completo y descartar aquí lo cerrado.
@@ -34,8 +31,9 @@ export default async function WaiterOrdersPage({ searchParams }: Props) {
         ? await serverFetch<Order[]>('/orders?open=true')
         : await serverFetch<Order[]>(`/orders?status=${current}`);
   } catch (err) {
-    // Antes esto pintaba «No hay órdenes.», indistinguible de un turno tranquilo.
-    failure = reportApiFailure('waiter/ordenes', err);
+    // Se registra igual, pero ya no decide la pantalla: con `null` la vista arranca con las
+    // órdenes que el dispositivo tenía guardadas.
+    reportApiFailure('waiter/ordenes', err);
   }
 
   return (
@@ -63,19 +61,7 @@ export default async function WaiterOrdersPage({ searchParams }: Props) {
         })}
       </div>
 
-      {failure ? (
-        <ApiDownNotice what="las órdenes" reason={failure} />
-      ) : orders.length === 0 ? (
-        <p className="py-12 text-center text-sm text-muted-foreground">No hay órdenes.</p>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {orders.map((order) => (
-            <OrderCard key={order.id} order={order} />
-          ))}
-        </div>
-      )}
-
-      <RealtimeRefresher events={['order:changed']} toastOnNewOrder />
+      <OrdersView filter={current} initialOrders={orders} />
     </div>
   );
 }

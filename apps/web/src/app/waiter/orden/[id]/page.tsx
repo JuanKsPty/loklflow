@@ -3,52 +3,63 @@ import { notFound } from 'next/navigation';
 import { ChevronLeftIcon } from 'lucide-react';
 import { isNotFound, serverFetch } from '@/lib/api/server-client';
 import { reportApiFailure } from '@/lib/observability/api-failure';
-import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { getServerUser } from '@/lib/auth/server-user';
 import { Button } from '@/components/ui/button';
-import { MobileOrderDetail } from '@/components/waiter/mobile-order-detail';
-import { RealtimeRefresher } from '@/components/realtime/realtime-refresher';
+import { OrderDetailView } from '@/components/waiter/order-detail-view';
 import type { Order, Product } from '@loklflow/types';
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
+/**
+ * Cascarón de servidor: pide, y deja que la vista decida qué enseñar.
+ *
+ * El `notFound()` se conserva para el 404 —esa cuenta de verdad no existe—, pero cualquier otro
+ * fallo ya no pinta un cartel: se pasa `null` y la vista arranca con la cuenta que el
+ * dispositivo tenía guardada, que es lo que el mesero necesita durante un corte.
+ */
 export default async function WaiterOrderPage({ params }: Props) {
   const { id } = await params;
+
+  let order: Order | null = null;
+  let products: Product[] | null = null;
+  let maxDiscountPercentage = 0;
+
   try {
-    const [order, products, user] = await Promise.all([
+    const [fetchedOrder, fetchedProducts, user] = await Promise.all([
       serverFetch<Order>(`/orders/${id}`),
       serverFetch<Product[]>('/menu/products'),
       getServerUser(),
     ]);
-    const backHref = order.tableId ? `/waiter/mesa/${order.tableId}` : '/waiter/ordenes';
-    return (
-      <div>
-        <Button variant="ghost" size="sm" className="mb-2 -ml-2" nativeButton={false} render={<Link href={backHref} />}>
-          <ChevronLeftIcon />
-          Volver
-        </Button>
-        <MobileOrderDetail
-          order={order}
-          products={products.filter((p) => p.isActive)}
-          maxDiscountPercentage={user?.maxDiscountPercentage ?? 0}
-        />
-        <RealtimeRefresher events={['order:changed']} />
-      </div>
-    );
+    order = fetchedOrder;
+    products = fetchedProducts;
+    maxDiscountPercentage = user?.maxDiscountPercentage ?? 0;
   } catch (err) {
-    // Solo un 404 significa que la cuenta no existe; lo demás es que no pudimos preguntar.
     if (isNotFound(err)) notFound();
-    const reason = reportApiFailure('waiter/orden', err);
-    return (
-      <div className="flex flex-col gap-4">
-        <Button variant="ghost" size="sm" className="-ml-2" nativeButton={false} render={<Link href="/waiter/ordenes" />}>
-          <ChevronLeftIcon />
-          Volver
-        </Button>
-        <ApiDownNotice what="la cuenta" reason={reason} />
-      </div>
-    );
+    reportApiFailure('waiter/orden', err);
   }
+
+  const backHref = order?.tableId ? `/waiter/mesa/${order.tableId}` : '/waiter/ordenes';
+
+  return (
+    <div>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="mb-2 -ml-2"
+        nativeButton={false}
+        render={<Link href={backHref} />}
+      >
+        <ChevronLeftIcon />
+        Volver
+      </Button>
+      <OrderDetailView
+        orderId={id}
+        initialOrder={order}
+        initialProducts={products}
+        maxDiscountPercentage={maxDiscountPercentage}
+      />
+    </div>
+  );
 }

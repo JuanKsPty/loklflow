@@ -2,9 +2,8 @@ import Link from 'next/link';
 import { ChevronLeftIcon } from 'lucide-react';
 import { serverFetch } from '@/lib/api/server-client';
 import { reportApiFailure } from '@/lib/observability/api-failure';
-import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { Button } from '@/components/ui/button';
-import { PosOrderBuilder } from '@/components/waiter/pos-order-builder';
+import { NewOrderView } from '@/components/waiter/new-order-view';
 import type { Category, Modifier, Product } from '@loklflow/types';
 
 interface Props {
@@ -14,10 +13,9 @@ interface Props {
 export default async function WaiterNewOrderPage({ searchParams }: Props) {
   const { tableId } = await searchParams;
 
-  let categories: Category[] = [];
-  let products: Product[] = [];
-  let modifiers: Modifier[] = [];
-  let failure: 'offline' | 'error' | null = null;
+  let categories: Category[] | null = null;
+  let products: Product[] | null = null;
+  let modifiers: Modifier[] | null = null;
   try {
     [categories, products, modifiers] = await Promise.all([
       serverFetch<Category[]>('/menu/categories'),
@@ -25,8 +23,9 @@ export default async function WaiterNewOrderPage({ searchParams }: Props) {
       serverFetch<Modifier[]>('/menu/modifiers'),
     ]);
   } catch (err) {
-    // Antes esto mostraba «Sin productos.», como si el menú estuviera vacío.
-    failure = reportApiFailure('waiter/nueva', err);
+    // Se registra igual, pero ya no decide la pantalla: la vista tira del catálogo guardado en
+    // el dispositivo, que es lo que permite tomar una comanda durante un corte.
+    reportApiFailure('waiter/nueva', err);
   }
 
   const backHref = tableId ? `/waiter/mesa/${tableId}` : '/waiter';
@@ -41,16 +40,12 @@ export default async function WaiterNewOrderPage({ searchParams }: Props) {
         <h1 className="text-lg font-semibold">Nueva cuenta</h1>
       </div>
       <div className="min-h-0 flex-1">
-        {failure ? (
-          <ApiDownNotice what="el menú" reason={failure} />
-        ) : (
-          <PosOrderBuilder
-            tableId={tableId}
-            categories={categories.filter((c) => c.isActive)}
-            products={products.filter((p) => p.isActive)}
-            modifiers={modifiers}
-          />
-        )}
+        <NewOrderView
+          tableId={tableId}
+          initialCategories={categories}
+          initialProducts={products}
+          initialModifiers={modifiers}
+        />
       </div>
     </div>
   );

@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { MinusIcon, PlusIcon, Trash2Icon, SendIcon } from 'lucide-react';
 import type { Category, Modifier, Product } from '@loklflow/types';
-import { ordersApi } from '@/lib/api/orders.api';
+import { createOrder } from '@/lib/api/orders.offline';
+import { createOrderLocally } from '@/lib/offline/optimistic';
 import { formatPrice } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -121,7 +122,10 @@ export function PosOrderBuilder({ tableId, categories, products, modifiers }: Pr
     }
     setSubmitting(true);
     try {
-      const order = await ordersApi.create({
+      // `createOrder` devuelve el id que acuñó **antes** de intentar el envío. Es lo que
+      // permite navegar a la comanda sin conexión: el servidor no ha contestado y aun así la
+      // cuenta ya tiene identidad, la misma con la que se enviará al reconectar.
+      const { id, result } = await createOrder({
         ...(tableId ? { tableId } : {}),
         ...(label.trim() ? { label: label.trim() } : {}),
         items: cart.map((l) => ({
@@ -130,9 +134,32 @@ export function PosOrderBuilder({ tableId, categories, products, modifiers }: Pr
           ...(l.modifierOptionIds.length ? { modifierOptionIds: l.modifierOptionIds } : {}),
         })),
       });
-      toast.success(`Cuenta #${order.orderNumber} enviada`);
-      router.push(`/waiter/orden/${order.id}`);
-      router.refresh();
+
+      if (result.outcome === 'rejected') {
+        toast.error(result.reason);
+        return;
+      }
+
+      if (result.outcome === 'queued') {
+        // El precio y el nombre de cada línea solo los tiene esta pantalla. Se escriben en la
+        // copia local con los mismos ids que van en la operación, así que al sincronizar la
+        // respuesta del servidor los sobrescribe sin duplicar nada.
+        const body = result.operation.body as { items: { id: string }[] };
+        await createOrderLocally(id, {
+          tableId,
+          label: label.trim() || null,
+          items: cart.map((l, i) => ({
+            id: body.items[i].id,
+            product: products.find((p) => p.id === l.productId)!,
+            quantity: l.quantity,
+          })),
+        });
+        toast.success('Cuenta abierta · se enviará al volver la conexión');
+      } else {
+        toast.success('Cuenta enviada');
+      }
+
+      router.push(`/waiter/orden/${id}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al enviar la cuenta');
     } finally {
