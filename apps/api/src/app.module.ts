@@ -22,6 +22,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { ShiftsModule } from './shifts/shifts.module';
 import { DiscountsModule } from './discounts/discounts.module';
 import { ReportsModule } from './reports/reports.module';
+import { InventoryModule } from './inventory/inventory.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
@@ -55,6 +56,7 @@ import { ShutdownLogger } from './common/logging/shutdown.logger';
     ShiftsModule,
     DiscountsModule,
     ReportsModule,
+    InventoryModule,
   ],
   controllers: [AppController],
   providers: [

@@ -10,6 +10,7 @@ import { RealtimeModule } from '../realtime/realtime.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { TablesModule } from '../tables/tables.module';
 import { AuditModule } from '../audit/audit.module';
+import { InventoryModule } from '../inventory/inventory.module';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 
@@ -27,6 +28,7 @@ import { OrdersService } from './orders.service';
     NotificationsModule,
     TablesModule,
     AuditModule,
+    InventoryModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],
