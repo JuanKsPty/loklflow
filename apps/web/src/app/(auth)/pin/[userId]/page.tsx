@@ -6,7 +6,8 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 interface OperationalUser {
   id: string;
   name: string;
-  role: { id: string; name: string };
+  /** Solo el nombre del rol: el id es un identificador interno que esta pantalla no usa. */
+  role: { name: string };
 }
 
 interface Props {
@@ -18,11 +19,10 @@ export default async function PinEntryPage({ params }: Props) {
   let user: OperationalUser | null = null;
 
   try {
-    const res = await fetch(`${BASE_URL}/api/users/operational`, { cache: 'no-store' });
-    if (res.ok) {
-      const users = await res.json() as OperationalUser[];
-      user = users.find((u) => u.id === userId) ?? null;
-    }
+    // Se pide **este** usuario, no la plantilla entera para hacer `.find()`: eso eran dos volcados
+    // anónimos del personal por cada carga del teclado, para pintar un nombre.
+    const res = await fetch(`${BASE_URL}/api/users/operational/${userId}`, { cache: 'no-store' });
+    if (res.ok) user = (await res.json()) as OperationalUser;
   } catch {
     // fall through to notFound
   }

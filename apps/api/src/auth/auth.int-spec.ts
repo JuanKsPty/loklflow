@@ -41,7 +41,7 @@ describe('Sesión', () => {
   const http = () => request(app.getHttpServer());
 
   const pinLogin = () =>
-    http().post('/api/auth/pin').send({ userId: waiterId, pin: '1234' });
+    http().post('/api/auth/pin').send({ userId: waiterId, pin: '2846' });
 
   it('el login por PIN entrega también token de refresco', async () => {
     const res = await pinLogin().expect(200);

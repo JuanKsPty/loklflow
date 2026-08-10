@@ -62,7 +62,7 @@ describe('endurecimiento de la sesión', () => {
 
       // El admin no tiene PIN, así que el correcto tampoco existiría; lo que se comprueba es que
       // el bloqueo corta **antes** de llegar a comparar nada.
-      const res = await pin(target.id, '1234');
+      const res = await pin(target.id, '2846');
 
       expect(res.status).toBe(401);
     });
@@ -236,6 +236,43 @@ describe('endurecimiento de la sesión', () => {
       const sinTv = cookieFor(['orders:read'], { sub: target.id });
 
       await http().get('/api/orders').set('Cookie', sinTv).expect(200);
+    });
+  });
+
+  /**
+   * La lista del PIN pad se queda pública —sin ella habría que teclear un uuid para entrar, y la
+   * plantilla de un restaurante es visible desde la barra— pero devuelve lo mínimo.
+   */
+  describe('lista pública del PIN pad', () => {
+    it('no expone credenciales ni identificadores internos', async () => {
+      const res = await http().get('/api/users/operational').expect(200);
+      const payload = JSON.stringify(res.body);
+
+      expect(payload).not.toContain('password');
+      expect(payload).not.toContain('"pin"');
+      expect(payload).not.toContain('email');
+      // `role.id` no lo usa la pantalla —solo pinta el nombre— y no hay razón para publicarlo.
+      expect(res.body[0].role.id).toBeUndefined();
+      expect(res.body[0].role.name).toEqual(expect.any(String));
+    });
+
+    it('el detalle por id devuelve uno solo', async () => {
+      const lista = await http().get('/api/users/operational').expect(200);
+      const uno = lista.body[0] as { id: string; name: string };
+
+      const res = await http().get(`/api/users/operational/${uno.id}`).expect(200);
+
+      expect(res.body).toMatchObject({ id: uno.id, name: uno.name });
+      expect(JSON.stringify(res.body)).not.toContain('email');
+    });
+
+    it('un id que no es de la plantilla operativa da 404', async () => {
+      // El mismo 404 para «no existe», «está de baja» y «no tiene PIN»: distinguirlos convertiría
+      // esto en un buscador de empleados para quien no ha entrado.
+      const admin = await seededUser(app, 'admin@loklflow.com');
+
+      await http().get(`/api/users/operational/${admin.id}`).expect(404);
+      await http().get('/api/users/operational/00000000-0000-4000-8000-000000000999').expect(404);
     });
   });
 

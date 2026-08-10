@@ -71,12 +71,12 @@ async function seedWaiter(ds: DataSource) {
       usersRepo.create({
         name: 'Mesero Demo',
         email: 'mesero@loklflow.com',
-        pin: await bcrypt.hash('1234', 10),
+        pin: await bcrypt.hash('2846', 10),
         role: waiterRole,
         isActive: true,
       }),
     );
-    console.log('✓ Waiter user seeded — login por PIN: Mesero Demo / PIN: 1234');
+    console.log('✓ Waiter user seeded — login por PIN: Mesero Demo / PIN: 2846');
   } else {
     console.log('✓ Waiter user already exists');
   }
@@ -98,12 +98,12 @@ async function seedKitchen(ds: DataSource) {
       usersRepo.create({
         name: 'Cocina Demo',
         email: 'cocina@loklflow.com',
-        pin: await bcrypt.hash('5678', 10),
+        pin: await bcrypt.hash('9173', 10),
         role: kitchenRole,
         isActive: true,
       }),
     );
-    console.log('✓ Kitchen user seeded — login por PIN: Cocina Demo / PIN: 5678');
+    console.log('✓ Kitchen user seeded — login por PIN: Cocina Demo / PIN: 9173');
   } else {
     console.log('✓ Kitchen user already exists');
   }
@@ -125,12 +125,12 @@ async function seedCashier(ds: DataSource) {
       usersRepo.create({
         name: 'Cajero Demo',
         email: 'cajero@loklflow.com',
-        pin: await bcrypt.hash('4321', 10),
+        pin: await bcrypt.hash('5029', 10),
         role: cashierRole,
         isActive: true,
       }),
     );
-    console.log('✓ Cashier user seeded — login por PIN: Cajero Demo / PIN: 4321');
+    console.log('✓ Cashier user seeded — login por PIN: Cajero Demo / PIN: 5029');
   } else {
     console.log('✓ Cashier user already exists');
   }

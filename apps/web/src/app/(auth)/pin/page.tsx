@@ -9,7 +9,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 interface OperationalUser {
   id: string;
   name: string;
-  role: { id: string; name: string };
+  role: { name: string };
 }
 
 export const metadata = { title: 'Acceso por PIN — LoklFlow' };
