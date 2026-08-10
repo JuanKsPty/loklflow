@@ -52,6 +52,15 @@ const TRANSACTIONAL_TABLES = [
   'notifications',
   'audit_logs',
   'reservations',
+  // Inventario. El seed no lo siembra, así que vaciarlo no destruye catálogo. Van explícitas
+  // aunque `TRUNCATE ... CASCADE` sobre `orders` ya arrastraría `stock_movements` —CASCADE
+  // alcanza a cualquier tabla que referencie, al margen del `ON DELETE` declarado—: depender
+  // de ese efecto lateral dejaría el stock de los ingredientes intacto y las suites se
+  // contaminarían entre sí.
+  'stock_movements',
+  'recipe_ingredients',
+  'ingredients',
+  'suppliers',
 ];
 
 /**

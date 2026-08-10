@@ -23,6 +23,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TablesService } from '../tables/tables.service';
 import { AuditService } from '../audit/audit.service';
+import { StockService } from '../inventory/stock.service';
 
 const ORDER_RELATIONS = {
   table: true,
@@ -47,6 +48,7 @@ export class OrdersService {
     private readonly notifications: NotificationsService,
     private readonly tables: TablesService,
     private readonly audit: AuditService,
+    private readonly stock: StockService,
   ) {}
 
   /**
@@ -261,6 +263,11 @@ export class OrdersService {
     if (result.status === 'closed' || result.status === 'cancelled') {
       await this.maybeFreeTable(result);
     }
+    // Este es el **segundo** camino hasta `closed`, y es fácil pasarlo por alto: la
+    // comprobación de saldo de arriba rechaza cerrar una cuenta con deuda, pero una cuenta ya
+    // saldada sí puede cerrarse desde aquí. Si el descuento de inventario solo colgara de
+    // `closeFromPayment`, esas ventas no descontarían nada.
+    if (result.status === 'closed') await this.consumeStock(result, userId);
     // Solo la cancelación va a la bitácora: el resto del ciclo de vida ya queda en
     // order_status_history. Se registra aquí, después del early-return de arriba, para
     // no anotar un cambio cuando el estado no cambió.
@@ -337,7 +344,24 @@ export class OrdersService {
     const result = await this.findOne(orderId);
     this.emit(result, 'status');
     await this.maybeFreeTable(result);
+    await this.consumeStock(result, userId);
     return result;
+  }
+
+  /**
+   * Descuenta del inventario lo que la cuenta consumió.
+   *
+   * Los ítems cancelados quedan fuera: se anularon antes de prepararse, así que no salieron
+   * de la cocina. El servicio de inventario **nunca lanza** —un fallo suyo no puede impedir
+   * que una cuenta cobrada se cierre, el dinero ya cambió de manos— y es idempotente, así
+   * que llamarlo desde los dos caminos de cierre no descuenta dos veces.
+   */
+  private async consumeStock(order: Order, userId: string) {
+    const items = (order.items ?? [])
+      .filter((item) => item.status !== 'cancelled')
+      .map((item) => ({ productId: item.productId, quantity: item.quantity }));
+    if (items.length === 0) return;
+    await this.stock.consumeForOrder(order.id, items, userId);
   }
 
   /** Libera la mesa si ya no le quedan cuentas abiertas. */

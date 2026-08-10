@@ -11,4 +11,5 @@ export * from './audit';
 export * from './discounts';
 export * from './business-config';
 export * from './reports';
+export * from './inventory';
 

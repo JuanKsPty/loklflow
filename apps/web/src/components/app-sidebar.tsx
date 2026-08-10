@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { UsersIcon, ShieldIcon, SettingsIcon, ChevronsUpDownIcon, LogOutIcon, UtensilsCrossedIcon, LayoutGridIcon, ReceiptTextIcon, ScrollTextIcon, PercentIcon, LayoutDashboardIcon } from 'lucide-react';
+import { UsersIcon, ShieldIcon, SettingsIcon, ChevronsUpDownIcon, LogOutIcon, UtensilsCrossedIcon, LayoutGridIcon, ReceiptTextIcon, ScrollTextIcon, PercentIcon, LayoutDashboardIcon, PackageIcon } from 'lucide-react';
 import { authApi } from '@/lib/api/auth.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -38,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { title: 'Panel', href: '/admin', icon: LayoutDashboardIcon, permission: 'pos:read' },
   { title: 'Menú', href: '/admin/menu', icon: UtensilsCrossedIcon, permission: 'menu:read' },
   { title: 'Mesas', href: '/admin/tables', icon: LayoutGridIcon, permission: 'tables:read' },
+  { title: 'Inventario', href: '/admin/inventario', icon: PackageIcon, permission: 'inventory:read' },
   { title: 'Órdenes', href: '/admin/orders', icon: ReceiptTextIcon, permission: 'orders:read' },
   { title: 'Empleados', href: '/admin/users', icon: UsersIcon, permission: 'users:read' },
   { title: 'Roles', href: '/admin/roles', icon: ShieldIcon, permission: 'roles:read' },
