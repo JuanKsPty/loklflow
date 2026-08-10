@@ -4,7 +4,7 @@ import { serverFetch } from '@/lib/api/server-client';
 import { reportApiFailure } from '@/lib/observability/api-failure';
 import { cn } from '@/lib/utils';
 import { FloorView } from '@/components/waiter/floor-view';
-import type { RestaurantTable, Sector } from '@loklflow/types';
+import type { Order, RestaurantTable, Sector } from '@loklflow/types';
 
 interface Props {
   searchParams: Promise<{ view?: string }>;
@@ -56,10 +56,13 @@ export default async function WaiterFloorPage({ searchParams }: Props) {
 
   let sectors: Sector[] | null = null;
   let tables: RestaurantTable[] | null = null;
+  // Las cuentas abiertas: la fusión necesita saber qué mesas tienen algo que juntar.
+  let orders: Order[] | null = null;
   try {
-    [sectors, tables] = await Promise.all([
+    [sectors, tables, orders] = await Promise.all([
       serverFetch<Sector[]>('/tables/sectors'),
       serverFetch<RestaurantTable[]>('/tables'),
+      serverFetch<Order[]>('/orders?open=true'),
     ]);
   } catch (err) {
     // Se sigue registrando: que la pantalla aguante no significa que el fallo no exista.
@@ -69,7 +72,12 @@ export default async function WaiterFloorPage({ searchParams }: Props) {
   return (
     <div className={active === 'mapa' ? 'flex h-full flex-col' : undefined}>
       <ViewToggle active={active} />
-      <FloorView view={active} initialSectors={sectors} initialTables={tables} />
+      <FloorView
+        view={active}
+        initialSectors={sectors}
+        initialTables={tables}
+        initialOrders={orders}
+      />
     </div>
   );
 }

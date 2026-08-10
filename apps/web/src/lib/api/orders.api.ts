@@ -51,4 +51,12 @@ export const ordersApi = {
     api.patch<Order>(`/orders/${id}/status`, payload),
   updateItemStatus: (id: string, itemId: string, payload: UpdateOrderItemStatusPayload) =>
     api.patch<Order>(`/orders/${id}/items/${itemId}/status`, payload),
+  /**
+   * Vacía varias cuentas en esta. La ruta cuelga de `orders` y no de `tables` porque lo que se
+   * fusiona es una **cuenta**, aunque la funcionalidad se llame «fusión de mesas».
+   */
+  merge: (targetId: string, sourceOrderIds: string[]) =>
+    api.post<Order>(`/orders/${targetId}/merge`, { sourceOrderIds }),
+  /** Devuelve una cuenta fusionada a su estado anterior, con sus líneas. */
+  unmerge: (id: string) => api.post<Order>(`/orders/${id}/unmerge`),
 };

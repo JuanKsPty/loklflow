@@ -11,6 +11,7 @@ import { orderPartition } from '@/lib/api/orders.offline';
 import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { RealtimeInvalidator } from '@/components/realtime/realtime-invalidator';
 import { MobileOrderDetail } from './mobile-order-detail';
+import { MergedBanner } from './merged-banner';
 
 /**
  * Una cuenta, leída del dispositivo.
@@ -62,6 +63,9 @@ export function OrderDetailView({
 
   return (
     <>
+      {/* Antes del detalle: si la cuenta está fusionada, el mesero tiene que enterarse antes de
+          preguntarse dónde están sus ítems. */}
+      <MergedBanner order={order} />
       <MobileOrderDetail
         order={order}
         products={products.filter((p) => p.isActive)}

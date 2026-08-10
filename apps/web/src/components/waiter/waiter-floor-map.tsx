@@ -43,9 +43,16 @@ function buildPositions(tables: RestaurantTable[]): Record<string, Pos> {
 export function WaiterFloorMap({
   sectors,
   tables,
+  selecting = false,
+  selected,
+  onToggle,
 }: {
   sectors: Sector[];
   tables: RestaurantTable[];
+  /** Modo selección para fusionar. Ver la nota en `TableGrid`: el componente sigue siendo tonto. */
+  selecting?: boolean;
+  selected?: Set<string>;
+  onToggle?: (tableId: string) => void;
 }) {
   const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
@@ -166,11 +173,17 @@ export function WaiterFloorMap({
               <button
                 key={t.id}
                 type="button"
-                onClick={() => router.push(`/waiter/mesa/${t.id}`)}
+                // En modo selección el toque no navega: si lo hiciera, elegir la segunda mesa
+                // sacaría al mesero de la pantalla y perdería la primera.
+                onClick={() =>
+                  selecting ? onToggle?.(t.id) : router.push(`/waiter/mesa/${t.id}`)
+                }
+                aria-pressed={selecting ? (selected?.has(t.id) ?? false) : undefined}
                 className={cn(
                   'absolute z-10 flex flex-col items-center justify-center gap-0.5 border-2 text-center transition-shadow hover:shadow-md active:scale-95',
                   shapeClass,
                   TABLE_STATUS_MAP_CLASSES[t.status],
+                  selected?.has(t.id) && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
                 )}
                 style={{ left: toX(p.x), top: toY(p.y), width: size, height: size }}
                 aria-label={`Mesa ${t.number} — ${TABLE_STATUS_LABELS[t.status]}`}
