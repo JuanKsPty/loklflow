@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api/client';
 import { putMany, replaceCollection, type Collection } from '@/lib/offline/cache';
+import { useHydrateWhenEmpty } from '@/lib/offline/use-cache';
 import { pending as pendingOps } from '@/lib/offline/outbox';
 import { useRealtimeStatus, useSocket } from './socket-provider';
 
@@ -31,7 +32,7 @@ export function RealtimeInvalidator({
   events,
   collection,
   path,
-  single = false,
+  rowId,
   toastOnNewOrder = false,
 }: {
   events: string[];
@@ -39,13 +40,15 @@ export function RealtimeInvalidator({
   /** De dónde se vuelve a pedir. Mismo camino que usó el cascarón de servidor. */
   path: string;
   /**
-   * Si `path` devuelve **una** fila en vez de la colección.
+   * Presente cuando `path` devuelve **una** fila en vez de la colección: es su id.
    *
-   * Importa más de lo que parece: con la colección se borra de la copia local lo que ya no
-   * viene, que es lo correcto en un listado —una cuenta cerrada en otro dispositivo tiene que
-   * desaparecer— y desastroso en una ficha, donde borraría todas las demás.
+   * Importa más de lo que parece. Con la semántica de colección se borra de la copia local lo
+   * que ya no viene, que es lo correcto en un listado —una cuenta cerrada en otro dispositivo
+   * tiene que desaparecer— y desastroso en una ficha, donde borraría todas las demás. Y el id
+   * hace falta además para saber si **esta** fila está guardada: en una ficha, que la colección
+   * tenga otras cuentas no significa que tenga la que la pantalla está enseñando.
    */
-  single?: boolean;
+  rowId?: string;
   toastOnNewOrder?: boolean;
 }) {
   const socket = useSocket();
@@ -55,7 +58,7 @@ export function RealtimeInvalidator({
   const reload = useCallback(async () => {
     try {
       const data = await api.get<{ id: string } | { id: string }[]>(path);
-      if (single) {
+      if (rowId) {
         await putMany(collection, [data as { id: string }]);
         return;
       }
@@ -72,13 +75,16 @@ export function RealtimeInvalidator({
       // local, que es justo el comportamiento que se busca. El indicador de la cabecera ya
       // cuenta el estado de la conexión.
     }
-  }, [collection, path, single]);
+  }, [collection, path, rowId]);
 
   // Al recuperar la conexión hay que volver a pedirlo todo: el gateway difunde sin cursor ni
   // búfer, así que lo ocurrido durante el corte no se reenvía nunca.
   useEffect(() => {
     if (reconnectedAt !== null) void reload();
   }, [reconnectedAt, reload]);
+
+  // Primera carga cuando el cascarón de servidor no trajo nada y el navegador sí puede pedir.
+  useHydrateWhenEmpty(collection, path, rowId);
 
   useEffect(() => {
     if (!socket) return;

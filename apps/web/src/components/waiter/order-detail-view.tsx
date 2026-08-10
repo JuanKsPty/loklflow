@@ -4,7 +4,7 @@ import { useCallback, useMemo } from 'react';
 import type { Order, Product } from '@loklflow/types';
 import { api } from '@/lib/api/client';
 import { COLLECTIONS, putMany } from '@/lib/offline/cache';
-import { useCachedCollection, useCachedRow } from '@/lib/offline/use-cache';
+import { useCachedCollection, useCachedRow, useHydrateWhenEmpty } from '@/lib/offline/use-cache';
 import { usePendingFor } from '@/lib/offline/use-outbox';
 import { applyPendingToOrder } from '@/lib/offline/apply-pending';
 import { orderPartition } from '@/lib/api/orders.offline';
@@ -37,6 +37,11 @@ export function OrderDetailView({
 
   const order = useMemo(() => applyPendingToOrder(cached, pending), [cached, pending]);
 
+  // Antes del `return` temprano: si el cascarón no trajo nada y el navegador sí puede pedir,
+  // esta pantalla tiene que intentarlo, o se queda con el aviso de «sin conexión» para siempre.
+  useHydrateWhenEmpty(COLLECTIONS.orders, `/orders/${orderId}`, orderId);
+  useHydrateWhenEmpty(COLLECTIONS.products, '/menu/products');
+
   /**
    * Relee la cuenta del servidor. La usan las acciones que **solo** funcionan en línea —cobrar,
    * fijar propina, pedir descuento—, donde sí hay servidor por definición y el total resultante
@@ -67,7 +72,7 @@ export function OrderDetailView({
         events={['order:changed']}
         collection={COLLECTIONS.orders}
         path={`/orders/${orderId}`}
-        single
+        rowId={orderId}
       />
     </>
   );

@@ -28,43 +28,21 @@ export type MutateResult =
   | { outcome: 'rejected'; reason: string };
 
 /**
- * Aviso de que una petición real llegó al servidor, o no.
- *
- * Es la señal de conectividad **más fiable que existe en la aplicación**, mejor que
- * `navigator.onLine` y que cualquier sonda: no es una opinión sobre el estado de la red, es el
- * resultado de una petición que de verdad hizo el operario. El indicador de conexión se
- * suscribe aquí, así que cambia en el instante en que el mesero toca algo y no llega.
- *
- * Vive en este módulo y no en el proveedor de React para que `mutate` siga siendo probable en
- * Node y no dependa de que haya un árbol montado.
+ * La señal de conectividad se emite desde la capa HTTP (`lib/api/reachability.ts`), para que
+ * **toda** petición la alimente y no solo las diferibles: cobrar no se difiere nunca, así que
+ * un cobro fallido no movía el indicador. Se reexporta aquí porque es donde la buscaría quien
+ * lea el módulo de la cola.
  */
-export type Reachability = 'reached' | 'unreachable';
-
-const listeners = new Set<(state: Reachability) => void>();
-
-export function onReachability(listener: (state: Reachability) => void): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-function announce(state: Reachability): void {
-  for (const listener of listeners) listener(state);
-}
+export { onReachability, type Reachability } from '@/lib/api/reachability';
 
 export async function mutate(input: MutateInput): Promise<MutateResult> {
   try {
     const data = await send(input.method, input.path, input.body);
-    announce('reached');
     return { outcome: 'sent', data };
   } catch (err) {
     // Solo un fallo de red lleva a la cola. Si el servidor contestó —aunque sea un 400— ya
     // decidió, y encolar sería reintentar eternamente algo que ya está resuelto.
-    if (!(err instanceof OfflineError)) {
-      // Un 4xx es una respuesta: significa que el servidor está ahí y contestó que no.
-      announce('reached');
-      throw err;
-    }
-    announce('unreachable');
+    if (!(err instanceof OfflineError)) throw err;
 
     if (!isQueueable({ kind: input.kind, status: statusOf(input.body) })) {
       return {

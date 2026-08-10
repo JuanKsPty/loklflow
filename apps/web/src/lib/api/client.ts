@@ -1,3 +1,5 @@
+import { announceReachability } from './reachability';
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
@@ -46,8 +48,15 @@ export class OfflineError extends Error {
  */
 async function request(input: string, init?: RequestInit): Promise<Response> {
   try {
-    return await fetch(input, init);
+    const response = await fetch(input, init);
+    // Contestó algo, aunque sea un 500: el servidor está ahí. Se anuncia desde aquí para que
+    // **cualquier** petición mueva el indicador de conexión, y no solo las que pasan por la
+    // cola: un cobro no se difiere nunca, así que antes un cobro fallido no movía nada y el
+    // cajero seguía viendo «Al día» mientras no llegaba una sola petición.
+    announceReachability('reached');
+    return response;
   } catch {
+    announceReachability('unreachable');
     throw new OfflineError();
   }
 }

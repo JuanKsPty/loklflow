@@ -9,7 +9,8 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { flush, onReachability } from '@/lib/offline/mutate';
+import { flush } from '@/lib/offline/mutate';
+import { onReachability } from '@/lib/api/reachability';
 import { onBackOnline, probe } from '@/lib/offline/net';
 
 /**

@@ -2,7 +2,7 @@
 
 import type { Category, Modifier, Product } from '@loklflow/types';
 import { COLLECTIONS } from '@/lib/offline/cache';
-import { useCachedCollection } from '@/lib/offline/use-cache';
+import { useCachedCollection, useHydrateWhenEmpty } from '@/lib/offline/use-cache';
 import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { PosOrderBuilder } from './pos-order-builder';
 
@@ -30,6 +30,12 @@ export function NewOrderView({
   const categories = useCachedCollection<Category>(COLLECTIONS.categories, initialCategories);
   const products = useCachedCollection<Product>(COLLECTIONS.products, initialProducts);
   const modifiers = useCachedCollection<Modifier>(COLLECTIONS.modifiers, initialModifiers);
+
+  // El catálogo es lo que decide si se puede tomar una comanda sin red, así que si el cascarón
+  // no lo trajo hay que intentarlo desde el cliente antes de rendirse.
+  useHydrateWhenEmpty(COLLECTIONS.products, '/menu/products');
+  useHydrateWhenEmpty(COLLECTIONS.categories, '/menu/categories');
+  useHydrateWhenEmpty(COLLECTIONS.modifiers, '/menu/modifiers');
 
   // Sin servidor **y** sin catálogo guardado no hay nada que ofrecer. Es el único caso en que
   // esta pantalla no puede hacer su trabajo, y entonces sí hay que decirlo.

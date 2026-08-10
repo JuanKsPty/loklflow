@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { PlusIcon } from 'lucide-react';
 import type { Order, RestaurantTable } from '@loklflow/types';
 import { COLLECTIONS } from '@/lib/offline/cache';
-import { useCachedCollection, useCachedRow } from '@/lib/offline/use-cache';
+import { useCachedCollection, useCachedRow, useHydrateWhenEmpty } from '@/lib/offline/use-cache';
 import { usePendingOperations } from '@/lib/offline/use-outbox';
 import { applyPendingToOrders, applyPendingToTables, byPartition } from '@/lib/offline/apply-pending';
 import { formatPrice } from '@/lib/format';
@@ -49,6 +49,11 @@ export function TableView({
     () => (cachedTable ? applyPendingToTables([cachedTable], pending)[0] : undefined),
     [cachedTable, pending],
   );
+
+  // Antes del `return` temprano: sin esto la mesa se queda en «sin conexión» aunque la red
+  // hubiera vuelto, porque nada más vuelve a pedirla.
+  useHydrateWhenEmpty(COLLECTIONS.tables, '/tables');
+  useHydrateWhenEmpty(COLLECTIONS.orders, '/orders?open=true');
 
   const accounts = useMemo(
     () =>

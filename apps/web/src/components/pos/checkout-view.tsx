@@ -4,7 +4,7 @@ import { useCallback, useMemo } from 'react';
 import type { Order } from '@loklflow/types';
 import { api } from '@/lib/api/client';
 import { COLLECTIONS, putMany } from '@/lib/offline/cache';
-import { useCachedRow } from '@/lib/offline/use-cache';
+import { useCachedRow, useHydrateWhenEmpty } from '@/lib/offline/use-cache';
 import { usePendingFor } from '@/lib/offline/use-outbox';
 import { applyPendingToOrder } from '@/lib/offline/apply-pending';
 import { orderPartition } from '@/lib/api/orders.offline';
@@ -47,6 +47,9 @@ export function CheckoutView({
   const { online } = useConnectivity();
 
   const order = useMemo(() => applyPendingToOrder(cached, pending), [cached, pending]);
+
+  // Antes del `return` temprano, por lo mismo que en la vista del mesero.
+  useHydrateWhenEmpty(COLLECTIONS.orders, `/orders/${orderId}`, orderId);
 
   const reload = useCallback(async () => {
     try {
@@ -126,7 +129,7 @@ export function CheckoutView({
         events={['order:changed']}
         collection={COLLECTIONS.orders}
         path={`/orders/${orderId}`}
-        single
+        rowId={orderId}
       />
     </>
   );
