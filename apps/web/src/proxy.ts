@@ -6,7 +6,24 @@ import { verifyToken } from '@/lib/auth/jwt';
 // de servidor, sin defensa en profundidad, y es la superficie con más rutas de la app.
 const PROTECTED_PREFIXES = ['/admin', '/orders', '/kitchen', '/pos', '/waiter'];
 
-function isProtected(pathname: string) {
+/**
+ * Rutas que **tienen** que quedar abiertas: el menú y el pedido desde el QR del cliente.
+ *
+ * Hoy pasarían igual, porque no empiezan por ningún prefijo protegido, así que esto no arregla
+ * nada — **blinda**. La lista de arriba va a crecer, y el día que alguien añada un prefijo que
+ * empiece por `/m` (`/menu`, `/mesa`…) el cliente que escanea un papel acabaría en el formulario de
+ * acceso del personal, con un campo de email, y nadie relacionaría las dos cosas. La salida
+ * temprana y su spec convierten eso en un test rojo en lugar de en una llamada del dueño.
+ */
+const PUBLIC_PREFIXES = ['/m'];
+
+/** Funciones puras para poder probarlas sin montar Next. */
+export function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+export function isProtected(pathname: string): boolean {
+  if (isPublicPath(pathname)) return false;
   return PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
 }
 

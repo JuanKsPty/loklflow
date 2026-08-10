@@ -76,3 +76,33 @@ export async function serverFetch<T>(path: string): Promise<T> {
   }
   return res.json() as Promise<T>;
 }
+
+/**
+ * Como `serverFetch`, pero **sin mandar la cookie de sesión**.
+ *
+ * Para las rutas de `/api/public`, que las abre un cliente que no tiene sesión. No es una
+ * optimización: si un empleado abre el QR de una mesa en el mismo navegador donde está trabajando,
+ * su cookie viajaría a los endpoints públicos sin ninguna necesidad, y el día que alguien mire
+ * `request.user` dentro del módulo público el comportamiento dependería de quién tenga la pestaña
+ * abierta. Mejor que ahí nunca llegue una credencial.
+ *
+ * Devuelve los mismos errores que `serverFetch` para que `isNotFound`, `isOffline` y
+ * `reportApiFailure` funcionen igual sin ramas nuevas.
+ */
+export async function serverPublicFetch<T>(path: string): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/api/public${path}`, { cache: 'no-store' });
+  } catch (err) {
+    throw new ServerOfflineError(`La API no respondió (public${path})`, { cause: err });
+  }
+
+  if (!res.ok) {
+    throw new ServerApiError(
+      res.status,
+      `API error ${res.status} on public${path}`,
+      res.headers.get('x-request-id') ?? undefined,
+    );
+  }
+  return res.json() as Promise<T>;
+}
