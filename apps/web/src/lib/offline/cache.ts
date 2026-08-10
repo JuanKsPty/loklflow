@@ -69,20 +69,30 @@ export async function putMany<T extends Identifiable>(
  * dispositivo se quedaría para siempre en la copia local del mesero, que seguiría viéndola
  * abierta días después. Se usa solo cuando la respuesta del servidor es la colección completa;
  * para un refresco incremental está `putMany`.
+ *
+ * **`protect` no es un extra: sin él esto borra trabajo.** Una cuenta abierta sin conexión
+ * existe en el dispositivo y **no** en la respuesta del servidor, que todavía no sabe de ella.
+ * Sin proteger las filas con operaciones en cola, el siguiente refresco del listado la borraría
+ * —comanda incluida— y la cola seguiría enviando operaciones contra algo que la pantalla ya no
+ * puede mostrar. Quien llama pasa los ids que tienen algo pendiente.
  */
 export async function replaceCollection<T extends Identifiable>(
   collection: Collection,
   rows: T[],
-  at: number = Date.now(),
+  options: { at?: number; protect?: Iterable<string> } = {},
 ): Promise<void> {
   if (!isSupported()) return;
 
+  const at = options.at ?? Date.now();
   const table = cache();
   const keep = new Set(rows.map((row) => row.id));
-  const stale = await table.where('collection').equals(collection).toArray();
+  for (const id of options.protect ?? []) keep.add(id);
 
+  const existing = await table.where('collection').equals(collection).toArray();
   await table.bulkDelete(
-    stale.filter((row) => !keep.has(row.id)).map((row) => [row.collection, row.id] as [string, string]),
+    existing
+      .filter((row) => !keep.has(row.id))
+      .map((row) => [row.collection, row.id] as [string, string]),
   );
   await table.bulkPut(rows.map((row) => ({ collection, id: row.id, value: row, updatedAt: at })));
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api/client';
 import { putMany, replaceCollection, type Collection } from '@/lib/offline/cache';
+import { pending as pendingOps } from '@/lib/offline/outbox';
 import { useRealtimeStatus, useSocket } from './socket-provider';
 
 interface OrderEvent {
@@ -54,8 +55,18 @@ export function RealtimeInvalidator({
   const reload = useCallback(async () => {
     try {
       const data = await api.get<{ id: string } | { id: string }[]>(path);
-      if (single) await putMany(collection, [data as { id: string }]);
-      else await replaceCollection(collection, data as { id: string }[]);
+      if (single) {
+        await putMany(collection, [data as { id: string }]);
+        return;
+      }
+      // Lo que tiene operaciones en cola sobrevive al reemplazo aunque el servidor no lo
+      // conozca: una cuenta abierta sin conexión no está en su respuesta, y borrarla dejaría
+      // a la cola enviando operaciones contra algo que la pantalla ya no muestra.
+      const queued = await pendingOps();
+      const protect = queued
+        .map((op) => op.partition.split(':')[1])
+        .filter((id): id is string => Boolean(id));
+      await replaceCollection(collection, data as { id: string }[], { protect });
     } catch {
       // Sin red no hay nada que hacer y no hay nada que decir: la vista sigue con su copia
       // local, que es justo el comportamiento que se busca. El indicador de la cabecera ya

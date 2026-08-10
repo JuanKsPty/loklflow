@@ -5,7 +5,7 @@ import type { Order } from '@loklflow/types';
 import { COLLECTIONS } from '@/lib/offline/cache';
 import { useCachedCollection } from '@/lib/offline/use-cache';
 import { usePendingOperations } from '@/lib/offline/use-outbox';
-import { applyPendingToOrders, byPartition } from '@/lib/offline/apply-pending';
+import { applyPendingToOrders, byPartition, pendingIds } from '@/lib/offline/apply-pending';
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { ReceiptTextIcon } from 'lucide-react';
 import { ApiDownNotice } from '@/components/offline/api-down-notice';
@@ -29,8 +29,11 @@ export function OrdersView({
   filter: string;
   initialOrders: Order[] | null;
 }) {
-  const cached = useCachedCollection<Order>(COLLECTIONS.orders, initialOrders);
   const pending = usePendingOperations();
+  // Las cuentas con algo en cola sobreviven al reemplazo: el servidor no conoce las que se
+  // abrieron sin conexión, y borrarlas se llevaría la comanda por delante.
+  const protect = useMemo(() => pendingIds(pending, 'order'), [pending]);
+  const cached = useCachedCollection<Order>(COLLECTIONS.orders, initialOrders, 'replace', protect);
   const groups = useMemo(() => byPartition(pending), [pending]);
 
   const orders = useMemo(() => {

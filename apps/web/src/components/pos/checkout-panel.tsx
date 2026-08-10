@@ -2,7 +2,6 @@
 
 import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { CheckCircle2Icon, ReceiptTextIcon } from 'lucide-react';
 import type { Order, PaymentMethod, PaymentSummary } from '@loklflow/types';
@@ -19,7 +18,15 @@ import { DiscountDialog } from '@/components/pos/discount-dialog';
 
 interface Props {
   order: Order;
-  /** Se llama cuando la cuenta queda saldada (cerrada). */
+  /**
+   * Se llama tras **cualquier** cambio que haya hecho el servidor: un pago, una propina, un
+   * descuento aplicado.
+   *
+   * Reemplaza al `router.refresh()` que había aquí. La pantalla de cobro lee ahora de la copia
+   * local del dispositivo, y un refresco reejecutaría el Server Component para resembrarla con
+   * los mismos datos que acaba de devolver esta petición — un viaje de ida y vuelta al servidor
+   * para no enterarse de nada nuevo. Quien llama relee la cuenta y la escribe en la copia.
+   */
   onSettled?: () => void;
   /**
    * Umbral de descuento del rol, en porcentaje. Llega por props desde el layout de
@@ -34,7 +41,6 @@ function sumPaid(order: Order): number {
 }
 
 export function CheckoutPanel({ order, onSettled, maxDiscountPercentage }: Props) {
-  const router = useRouter();
 
   /** Cobro en curso: su firma y la clave de idempotencia que le corresponde. */
   const attempt = useRef<{ signature: string; key: string } | null>(null);
@@ -75,8 +81,9 @@ export function CheckoutPanel({ order, onSettled, maxDiscountPercentage }: Props
     try {
       syncSummary(await paymentsApi.summary(order.id));
     } catch {
-      // el router.refresh() del diálogo repinta la página de todos modos
+      // Si falla, `onSettled` relee la cuenta completa y la vista se repinta con eso.
     }
+    onSettled?.();
   }
 
   async function applyTip() {
@@ -87,7 +94,7 @@ export function CheckoutPanel({ order, onSettled, maxDiscountPercentage }: Props
       const next = await paymentsApi.summary(order.id);
       syncSummary(next);
       toast.success('Propina actualizada');
-      router.refresh();
+      onSettled?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al actualizar propina');
     } finally {
@@ -127,8 +134,7 @@ export function CheckoutPanel({ order, onSettled, maxDiscountPercentage }: Props
       attempt.current = null;
       syncSummary(next);
       toast.success(wasSettled ? 'Cuenta cobrada' : 'Pago registrado');
-      router.refresh();
-      if (wasSettled) onSettled?.();
+      onSettled?.();
     } catch (err) {
       // La clave se conserva a propósito: si falló por red, reintentar el mismo cobro no debe
       // arriesgarse a duplicarlo.

@@ -5,7 +5,7 @@ import type { RestaurantTable, Sector } from '@loklflow/types';
 import { COLLECTIONS } from '@/lib/offline/cache';
 import { useCachedCollection } from '@/lib/offline/use-cache';
 import { usePendingOperations } from '@/lib/offline/use-outbox';
-import { applyPendingToTables } from '@/lib/offline/apply-pending';
+import { applyPendingToTables, pendingIds } from '@/lib/offline/apply-pending';
 import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { RealtimeInvalidator } from '@/components/realtime/realtime-invalidator';
 import { TableGrid } from './table-grid';
@@ -32,8 +32,14 @@ export function FloorView({
   initialTables: RestaurantTable[] | null;
 }) {
   const sectors = useCachedCollection<Sector>(COLLECTIONS.sectors, initialSectors);
-  const cached = useCachedCollection<RestaurantTable>(COLLECTIONS.tables, initialTables);
   const pending = usePendingOperations();
+  const protect = useMemo(() => pendingIds(pending, 'table'), [pending]);
+  const cached = useCachedCollection<RestaurantTable>(
+    COLLECTIONS.tables,
+    initialTables,
+    'replace',
+    protect,
+  );
 
   // Superpone lo encolado: el mesero que marca una mesa ocupada sin red tiene que verla
   // ocupada, o vuelve a tocarla creyendo que no funcionó.

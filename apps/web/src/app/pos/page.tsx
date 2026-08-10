@@ -1,108 +1,45 @@
-import Link from 'next/link';
-import { LockOpenIcon } from 'lucide-react';
 import { serverFetch } from '@/lib/api/server-client';
 import { reportApiFailure } from '@/lib/observability/api-failure';
-import { ApiDownNotice } from '@/components/offline/api-down-notice';
-import { formatPrice } from '@/lib/format';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { RealtimeRefresher } from '@/components/realtime/realtime-refresher';
-import { ORDER_STATUS_BADGE, ORDER_STATUS_LABELS } from '@/components/admin/orders/constants';
+import { PosAccountsView } from '@/components/pos/pos-accounts-view';
 import type { Order, ShiftSummary } from '@loklflow/types';
 
-const CLOSED = new Set(['closed', 'cancelled']);
-
-function paidOf(order: Order): number {
-  return Number((order.payments ?? []).reduce((s, p) => s + Number(p.amount), 0).toFixed(2));
-}
-
 export default async function PosPage() {
-  let orders: Order[] = [];
-  let failure: 'offline' | 'error' | null = null;
-  try {
+  /**
+   * Las dos peticiones van en paralelo con `allSettled`, no con `all`.
+   *
+   * `all` rechaza con el primer fallo y perdería el resultado de la otra, y aquí las dos
+   * alimentan lógicas distintas: el turno tiene **tres** estados —abierto, cerrado y «no lo
+   * sabemos»— y un fallo de red que se tradujera a «no tienes turno abierto» haría que el
+   * cajero intentara abrir uno que ya está abierto.
+   */
+  const [ordersResult, shiftResult] = await Promise.allSettled([
     // `open=true`: el servidor filtra las cuentas vivas. Antes se pedía el listado completo y
     // se filtraba aquí, lo que traía todo el histórico del negocio en cada carga.
-    orders = await serverFetch<Order[]>('/orders?open=true');
-  } catch (err) {
-    // Con la API caída esto pintaba «No hay cuentas por cobrar»: una caja vacía y en calma
-    // mientras las cuentas seguían abiertas. Peor que un fallo visible.
-    failure = reportApiFailure('pos', err);
-  }
+    serverFetch<Order[]>('/orders?open=true'),
+    serverFetch<ShiftSummary | null>('/shifts/current'),
+  ]);
 
-  // El turno tiene TRES estados, no dos: abierto, cerrado, y «no lo sabemos». Antes un fallo
-  // de red dejaba `shift` en null, que la interfaz traduce a «no tienes turno abierto», así
-  // que el cajero intentaba abrir uno que ya estaba abierto.
+  let orders: Order[] | null = null;
+  if (ordersResult.status === 'fulfilled') orders = ordersResult.value;
+  // Se registra igual, pero ya no decide la pantalla: la vista tira de la copia local.
+  else reportApiFailure('pos', ordersResult.reason);
+
   let shift: ShiftSummary | null = null;
   let shiftUnknown = false;
-  try {
-    shift = await serverFetch<ShiftSummary | null>('/shifts/current');
-  } catch (err) {
-    reportApiFailure('pos:shift', err);
+  if (shiftResult.status === 'fulfilled') shift = shiftResult.value;
+  else {
+    reportApiFailure('pos:shift', shiftResult.reason);
     shiftUnknown = true;
   }
-
-  if (failure) {
-    return (
-      <div>
-        <h1 className="mb-4 text-xl font-semibold">Cuentas por cobrar</h1>
-        <ApiDownNotice what="las cuentas" reason={failure} />
-        <RealtimeRefresher events={['order:changed']} />
-      </div>
-    );
-  }
-
-  const toCharge = orders
-    .filter((o) => !CLOSED.has(o.status) && o.total > 0)
-    .sort((a, b) => a.orderNumber - b.orderNumber);
 
   return (
     <div>
       <h1 className="mb-4 text-xl font-semibold">Cuentas por cobrar</h1>
-
-      {!shift && !shiftUnknown && (
-        <div className="mb-4 flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-3 text-sm text-primary">
-          <LockOpenIcon className="size-4 shrink-0" />
-          <span>No tienes turno abierto. Abre tu turno (botón arriba) para poder cobrar.</span>
-        </div>
-      )}
-
-      {toCharge.length === 0 ? (
-        <p className="py-12 text-center text-sm text-muted-foreground">No hay cuentas por cobrar.</p>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {toCharge.map((order) => {
-            const paid = paidOf(order);
-            const remaining = Number(Math.max(0, order.total - paid).toFixed(2));
-            return (
-              <Link key={order.id} href={`/pos/${order.id}`}>
-                <Card className="transition-colors hover:bg-accent/50">
-                  <CardContent className="flex items-center justify-between gap-3 py-4">
-                    <div className="min-w-0">
-                      <p className="font-medium">{order.label || `Cuenta #${order.orderNumber}`}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {order.table ? `Mesa ${order.table.number}` : 'Para llevar'} · #{order.orderNumber}
-                      </p>
-                      {paid > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          Pagado {formatPrice(paid)} · Restante {formatPrice(remaining)}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <Badge variant="outline" className={ORDER_STATUS_BADGE[order.status]}>
-                        {ORDER_STATUS_LABELS[order.status]}
-                      </Badge>
-                      <span className="text-base font-semibold tabular-nums">{formatPrice(order.total)}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
-        </div>
-      )}
-
-      <RealtimeRefresher events={['order:changed', 'shift:changed']} />
+      <PosAccountsView
+        initialOrders={orders}
+        shiftOpen={shift !== null}
+        shiftUnknown={shiftUnknown}
+      />
     </div>
   );
 }

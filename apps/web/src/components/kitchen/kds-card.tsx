@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import type { Order, OrderStatus } from '@loklflow/types';
-import { ordersApi } from '@/lib/api/orders.api';
+import { updateStatus } from '@/lib/api/orders.offline';
+import { PendingBadge } from '@/components/offline/pending-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
@@ -19,18 +19,27 @@ const ADVANCE: Partial<Record<OrderStatus, { label: string; next: OrderStatus }>
 };
 
 export function KdsCard({ order }: { order: Order }) {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const advance = ADVANCE[order.status];
   // En cocina solo se muestran (y preparan) los ítems de estación cocina.
   const kitchenItems = (order.items ?? []).filter((i) => i.product?.station === 'kitchen');
 
+  /**
+   * Sin `router.refresh()`: el tablero lee de la copia local y superpone la cola, así que el
+   * avance se ve en el momento. Refrescar reejecutaría el Server Component, que sin red falla.
+   *
+   * `preparing` y `ready` son encolables por diseño —describen trabajo ya hecho—, así que la
+   * cocina sigue avanzando comandas durante un corte. `cancelled` **no** lo es: libera la mesa
+   * y anula una comanda que otro dispositivo puede haber empezado, así que sin red se rechaza
+   * con el motivo escrito en `queueable.ts`.
+   */
   async function run(next: OrderStatus, okMsg: string) {
     setBusy(true);
     try {
-      await ordersApi.updateStatus(order.id, { status: next });
-      toast.success(okMsg);
-      router.refresh();
+      const result = await updateStatus(order.id, { status: next });
+      if (result.outcome === 'rejected') toast.error(result.reason);
+      else if (result.outcome === 'queued') toast.success(`${okMsg} · pendiente de enviar`);
+      else toast.success(okMsg);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error');
     } finally {
@@ -51,7 +60,10 @@ export function KdsCard({ order }: { order: Order }) {
               {order.table ? `Mesa ${order.table.number}` : 'Para llevar'}
             </p>
           </div>
-          <ElapsedTime since={order.createdAt} />
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <ElapsedTime since={order.occurredAt ?? order.createdAt} />
+            <PendingBadge partition={`order:${order.id}`} />
+          </div>
         </div>
 
         <ul className="flex flex-col gap-1.5 border-t pt-2 text-sm">

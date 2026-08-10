@@ -158,6 +158,21 @@ export function applyPendingToOrders(
   });
 }
 
+/**
+ * Los ids de las entidades con algo en la cola.
+ *
+ * Lo usan las vistas para que el reemplazo de una colección **no borre** lo que el servidor
+ * todavía no conoce: una cuenta abierta sin conexión no viene en su respuesta.
+ */
+export function pendingIds(ops: QueuedOperation[], prefix: 'order' | 'table'): string[] {
+  const ids = new Set<string>();
+  for (const op of ops) {
+    const id = idOfPartition(op.partition, prefix);
+    if (id) ids.add(id);
+  }
+  return [...ids];
+}
+
 /** Agrupa la cola por partición, que es como la consultan las vistas. */
 export function byPartition(ops: QueuedOperation[]): Map<string, QueuedOperation[]> {
   const groups = new Map<string, QueuedOperation[]>();

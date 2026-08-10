@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { CACHE, OUTBOX, cache, clear, db, isSupported, outbox, resetConnection } from './db';
+import { COLLECTIONS, getCollection, putMany, replaceCollection } from './cache';
 
 /**
  * El almacén local.
@@ -70,6 +71,72 @@ describe('almacenamiento local', () => {
       const orders = await cache().where('collection').equals('orders').toArray();
 
       expect(orders.map((r) => r.id).sort()).toEqual(['o1', 'o2']);
+    });
+  });
+
+  /**
+   * La capa de arriba del mismo almacén: es lo que leen las pantallas operativas cuando no hay
+   * servidor, así que sus reglas de escritura deciden si se pierde trabajo del salón o no.
+   */
+  describe('siembra de colecciones', () => {
+    const row = (id: string, value: unknown = { id }) => ({ id, ...(value as object) });
+
+    it('reemplazar borra lo que el servidor ya no devuelve', async () => {
+      // Una cuenta cerrada en otro dispositivo desaparece de `?open=true`, y si no se borrara
+      // el mesero la seguiría viendo abierta días después.
+      await replaceCollection(COLLECTIONS.orders, [row('a'), row('b')]);
+      await replaceCollection(COLLECTIONS.orders, [row('a')]);
+
+      const ids = (await getCollection<{ id: string }>(COLLECTIONS.orders)).map((o) => o.id);
+      expect(ids).toEqual(['a']);
+    });
+
+    /**
+     * El fallo que borraría una comanda entera: una cuenta abierta sin conexión existe en el
+     * dispositivo y **no** en la respuesta del servidor, que todavía no sabe de ella. Sin
+     * proteger las filas con operaciones en cola, el siguiente refresco del listado la borra y
+     * la cola se queda enviando operaciones contra algo que la pantalla ya no muestra.
+     */
+    it('reemplazar NO borra lo que tiene operaciones en cola', async () => {
+      await putMany(COLLECTIONS.orders, [row('local-sin-enviar')]);
+
+      await replaceCollection(COLLECTIONS.orders, [row('del-servidor')], {
+        protect: ['local-sin-enviar'],
+      });
+
+      const ids = (await getCollection<{ id: string }>(COLLECTIONS.orders)).map((o) => o.id).sort();
+      expect(ids).toEqual(['del-servidor', 'local-sin-enviar']);
+    });
+
+    it('mezclar no borra nada, solo añade y actualiza', async () => {
+      await putMany(COLLECTIONS.orders, [row('a', { id: 'a', total: 100 })]);
+      await putMany(COLLECTIONS.orders, [row('b')]);
+      await putMany(COLLECTIONS.orders, [row('a', { id: 'a', total: 250 })]);
+
+      const rows = await getCollection<{ id: string; total?: number }>(COLLECTIONS.orders);
+      expect(rows).toHaveLength(2);
+      expect(rows.find((r) => r.id === 'a')?.total).toBe(250);
+    });
+
+    /**
+     * El cascarón de servidor puede llegar después de que un evento de socket o una operación
+     * encolada hayan escrito algo más nuevo. Sembrar a ciegas haría retroceder la pantalla.
+     */
+    it('mezclar respeta lo que ya es más nuevo', async () => {
+      const ahora = Date.now();
+      await putMany(COLLECTIONS.orders, [row('a', { id: 'a', total: 999 })], ahora);
+      await putMany(COLLECTIONS.orders, [row('a', { id: 'a', total: 100 })], ahora - 60_000);
+
+      const rows = await getCollection<{ id: string; total?: number }>(COLLECTIONS.orders);
+      expect(rows.find((r) => r.id === 'a')?.total).toBe(999);
+    });
+
+    it('las colecciones no se pisan entre sí', async () => {
+      await replaceCollection(COLLECTIONS.orders, [row('1')]);
+      await replaceCollection(COLLECTIONS.tables, [row('1'), row('2')]);
+
+      expect(await getCollection(COLLECTIONS.orders)).toHaveLength(1);
+      expect(await getCollection(COLLECTIONS.tables)).toHaveLength(2);
     });
   });
 

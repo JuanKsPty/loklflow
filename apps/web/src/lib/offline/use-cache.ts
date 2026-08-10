@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { getCollection, getRow, putMany, replaceCollection, type Collection } from './cache';
 import { isSupported } from './db';
@@ -37,15 +37,28 @@ export function useCachedCollection<T extends Identifiable>(
    * un trozo. Los listados mandan la completa; una ficha suelta, no.
    */
   mode: 'replace' | 'merge' = 'replace',
+  /**
+   * Ids que no se pueden borrar aunque no vengan en `initial`.
+   *
+   * Sin esto, en modo `replace`, una cuenta abierta sin conexión —que existe en el dispositivo
+   * y no en el servidor— desaparecería en el siguiente refresco del listado, con su comanda
+   * dentro, mientras la cola seguiría enviando operaciones contra algo invisible.
+   */
+  protect: Iterable<string> = [],
 ): T[] {
-  const seeded = useRef(false);
-
+  // Sin bandera de «ya sembrado»: `initial` cambia de identidad en cada render del cascarón de
+  // servidor, y una bandera haría que un refresco posterior se ignorara en silencio. Sembrar de
+  // nuevo es inocuo porque `putMany` respeta lo más nuevo y `replaceCollection` protege lo que
+  // tiene operaciones pendientes.
+  const protectKey = [...protect].sort().join(',');
   useEffect(() => {
-    if (!initial || seeded.current || !isSupported()) return;
-    seeded.current = true;
-    const seed = mode === 'replace' ? replaceCollection : putMany;
-    void seed(collection, initial);
-  }, [collection, initial, mode]);
+    if (!initial || !isSupported()) return;
+    if (mode === 'replace') {
+      void replaceCollection(collection, initial, { protect: protectKey ? protectKey.split(',') : [] });
+    } else {
+      void putMany(collection, initial);
+    }
+  }, [collection, initial, mode, protectKey]);
 
   const rows = useLiveQuery(
     () => (isSupported() ? getCollection<T>(collection) : Promise.resolve([])),
@@ -60,11 +73,8 @@ export function useCachedRow<T extends Identifiable>(
   id: string,
   initial: T | null,
 ): T | undefined {
-  const seeded = useRef(false);
-
   useEffect(() => {
-    if (!initial || seeded.current || !isSupported()) return;
-    seeded.current = true;
+    if (!initial || !isSupported()) return;
     void putMany(collection, [initial]);
   }, [collection, initial]);
 
