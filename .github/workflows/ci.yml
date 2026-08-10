@@ -288,4 +288,14 @@ jobs:
           test -n "$asset" || { echo "No se encontró ningún CSS en /login"; exit 1; }
           curl -fsS "http://localhost:3000$asset" > /dev/null \
             || { echo "El asset $asset no se sirve: falta .next/static en la imagen"; exit 1; }
+          # `public/` tampoco viaja dentro de standalone y también se copia aparte. Si ese
+          # COPY faltara, el modo sin conexión se desplegaría roto sin que nada fallara de
+          # forma visible: con red la aplicación funciona exactamente igual, y el fallo solo
+          # aparecería el día del corte, que es justo el día en que no se puede investigar.
+          curl -fsS http://localhost:3000/sw.js > /dev/null \
+            || { echo "/sw.js no se sirve: falta public/ en la imagen"; exit 1; }
+          curl -fsS http://localhost:3000/manifest.webmanifest > /dev/null \
+            || { echo "/manifest.webmanifest no se sirve: falta public/ en la imagen"; exit 1; }
+          curl -fsS http://localhost:3000/icons/icon-192.png > /dev/null \
+            || { echo "Los iconos del manifiesto no se sirven"; exit 1; }
           docker rm -f web

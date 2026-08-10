@@ -36,8 +36,11 @@ export default defineConfig({
     // la prueba de los estilos signifique algo — sin él fallaría siempre, y con `pnpm start`
     // pasaría siempre, que es peor: dejaría de vigilar el `COPY` que de verdad puede
     // desaparecer del Dockerfile.
+    // `public/` corre la misma suerte: tampoco viaja dentro de standalone, y ahí están el
+    // Service Worker y el manifiesto. Sin copiarlo, `/sw.js` daría 404 aquí y las pruebas del
+    // modo sin conexión pasarían por no haber registrado nunca un SW — verdes por vacío.
     command:
-      'cp -R .next/static .next/standalone/apps/web/.next/ && node .next/standalone/apps/web/server.js',
+      'cp -R .next/static .next/standalone/apps/web/.next/ && cp -R public .next/standalone/apps/web/ && node .next/standalone/apps/web/server.js',
     url: BASE_URL,
     env: {
       PORT: String(PORT),

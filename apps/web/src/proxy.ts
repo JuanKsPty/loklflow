@@ -29,5 +29,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api).*)'],
+  // `sw.js`, el manifiesto y los iconos quedan fuera del matcher. Hoy pasarían igual —no
+  // empiezan por ningún prefijo protegido—, así que esto es blindaje, no arreglo: el día que
+  // alguien añada un prefijo nuevo a `PROTECTED_PREFIXES`, el Service Worker no puede acabar
+  // recibiendo un 307 hacia `/login`. Un SW que se sirve como redirección no se registra, y el
+  // modo sin conexión desaparecería sin un solo error en consola.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|icons/|api).*)'],
 };

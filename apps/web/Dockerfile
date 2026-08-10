@@ -52,8 +52,14 @@ ENV PORT=3000
 # servidor queda en apps/web/server.js y no en la raíz.
 COPY --from=build --chown=node:node /app/apps/web/.next/standalone ./
 # .next/static NO viaja dentro de standalone: hay que copiarlo aparte o todos los CSS y JS
-# del cliente responden 404. (No hay carpeta public/ en este proyecto.)
+# del cliente responden 404.
 COPY --from=build --chown=node:node /app/apps/web/.next/static ./apps/web/.next/static
+# `public/` tampoco viaja dentro de standalone, y ahora existe: el Service Worker, el
+# manifiesto y los iconos viven ahí. Sin esta línea `/sw.js` responde 404 en la imagen, con lo
+# que el modo sin conexión se despliega roto **sin que nada falle de forma visible** — la
+# aplicación funciona igual mientras haya red. Por eso el job `images` de CI comprueba que
+# `/sw.js` y `/manifest.webmanifest` devuelven 200.
+COPY --from=build --chown=node:node /app/apps/web/public ./apps/web/public
 
 USER node
 EXPOSE 3000
