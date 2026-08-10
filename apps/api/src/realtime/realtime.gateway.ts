@@ -9,10 +9,18 @@ import {
 import { Server, Socket } from 'socket.io';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 import { LogThrottle } from '../common/logging/log-throttle';
+import { corsOrigins } from '../config/cors';
 
-const CORS_ORIGINS = process.env.CORS_ORIGINS?.split(',') ?? [
-  'http://localhost:3000',
-];
+/**
+ * La misma lista que usa `main.ts`, por la misma función.
+ *
+ * Se evalúa **al cargar el módulo**, porque el decorador `@WebSocketGateway` la necesita antes de
+ * que exista el contenedor: por eso no puede inyectar `ConfigService` y por eso la función tiene
+ * que ser pura. Antes esto era un `process.env.CORS_ORIGINS?.split(',')` copiado de `main.ts`, y
+ * dos copias de la misma regla acaban divergiendo — con el síntoma de que las peticiones HTTP
+ * funcionan y el tiempo real no.
+ */
+const CORS_ORIGINS = corsOrigins();
 
 /**
  * Traduce el fallo de `jwt.verify` a algo accionable.
