@@ -20,6 +20,15 @@ export interface JwtPayload {
   maxDiscountPercentage?: number;
   permissions: string[];
   loginMethod: 'email' | 'pin';
+  /**
+   * Versión de sesión del usuario (`users.token_version`).
+   *
+   * **Opcional a propósito**: los tokens emitidos antes de que esto existiera no lo llevan y se
+   * tratan como versión 0, que es la de todos los usuarios tras la migración. Así el despliegue no
+   * expulsa a nadie —importante en una caja registradora— y la comprobación se vuelve efectiva
+   * sola conforme las sesiones se renuevan.
+   */
+  tv?: number;
   iat?: number;
   exp?: number;
 }

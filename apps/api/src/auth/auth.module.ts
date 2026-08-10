@@ -11,12 +11,14 @@ import { RefreshToken } from './entities/refresh-token.entity';
 import { UsersModule } from '../users/users.module';
 import { RolesModule } from '../roles/roles.module';
 import { AuditModule } from '../audit/audit.module';
+import { TokenVersionModule } from '../token-version/token-version.module';
 
 @Module({
   imports: [
     PassportModule,
     JwtModule.register({}),
     TypeOrmModule.forFeature([RefreshToken]),
+    TokenVersionModule,
     UsersModule,
     RolesModule,
     AuditModule,

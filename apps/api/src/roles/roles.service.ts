@@ -11,6 +11,7 @@ import { RolePermission } from './entities/role-permission.entity';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { AssignPermissionsDto } from './dto/assign-permissions.dto';
+import { TokenVersionCache } from '../token-version/token-version.cache';
 import { AuditService } from '../audit/audit.service';
 import { redactPick } from '../audit/audit-redact';
 import type { AuditAction } from '../audit/audit-actions.constants';
@@ -34,6 +35,7 @@ export class RolesService {
     @InjectRepository(RolePermission)
     private rolePermissionsRepo: Repository<RolePermission>,
     private readonly audit: AuditService,
+    private readonly tokenVersions: TokenVersionCache,
   ) {}
 
   findAll() {
@@ -112,6 +114,11 @@ export class RolesService {
       this.rolePermissionsRepo.create({ role, permission: p }),
     );
     await this.rolePermissionsRepo.save(newRolePerms);
+
+    // Los permisos van dentro del token, así que cambiarlos no surtía efecto hasta que caducara.
+    // Subir la versión de todos los usuarios del rol invalida sus sesiones: el siguiente refresco
+    // les da un token con los permisos nuevos.
+    await this.tokenVersions.bumpByRole(id);
 
     const after = permissions.map((p) => p.key).sort();
     await this.log('role.permissions_changed', id, actor, {

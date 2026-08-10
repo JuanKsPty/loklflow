@@ -12,6 +12,7 @@ import { durationToMs } from './duration';
 import { Response } from 'express';
 import { UsersService } from '../users/users.service';
 import { LoginAttemptsService } from './login-attempts.service';
+import { TokenVersionCache } from '../token-version/token-version.cache';
 import { RolesService } from '../roles/roles.service';
 import { AuditService } from '../audit/audit.service';
 import { RefreshToken } from './entities/refresh-token.entity';
@@ -38,6 +39,7 @@ export class AuthService {
     @InjectRepository(RefreshToken)
     private readonly refreshTokenRepo: Repository<RefreshToken>,
     private readonly attempts: LoginAttemptsService,
+    private readonly tokenVersions: TokenVersionCache,
   ) {}
 
   async login(dto: LoginDto, res: Response, ip?: string) {
@@ -214,9 +216,13 @@ export class AuthService {
   ) {
     const permissions = await this.rolesService.getPermissionsForRole(roleId);
     const role = await this.rolesService.findOne(roleId);
+    // La versión de sesión viaja firmada: es lo que permite invalidar todas las sesiones de un
+    // usuario subiendo un contador, sin consultar la base en cada petición.
+    const tv = (await this.tokenVersions.versionOf(userId)) ?? 0;
 
     const payload: JwtPayload = {
       sub: userId,
+      tv,
       name,
       email,
       roleId,

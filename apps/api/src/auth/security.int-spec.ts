@@ -2,7 +2,8 @@ import type { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
 import { closeTestApp, createTestApp } from '../../test/app';
-import { seededUser, sessionAs } from '../../test/fixtures';
+import { cookieFor } from '../../test/app';
+import { seededRole, seededUser, sessionAs } from '../../test/fixtures';
 
 /**
  * Los agujeros de sesión, convertidos en pruebas.
@@ -24,6 +25,12 @@ describe('endurecimiento de la sesión', () => {
   });
 
   const http = () => request(app.getHttpServer());
+
+  /** Cookie firmada para un usuario concreto, con su versión de sesión **actual**. */
+  async function cookieForUser(userId: string): Promise<string> {
+    const [row] = await ds.query('SELECT token_version FROM users WHERE id = $1', [userId]);
+    return cookieFor(['orders:read'], { sub: userId, tv: Number(row.token_version) });
+  }
   const pin = (userId: string, value: string) =>
     http().post('/api/auth/pin').send({ userId, pin: value });
   /** Login por correo, con su propio cupo de límite de peticiones. Ver la nota más abajo. */
@@ -125,6 +132,113 @@ describe('endurecimiento de la sesión', () => {
     });
   });
 
+  /**
+   * Revocación efectiva de sesiones.
+   *
+   * `JwtStrategy` solo comprobaba que el token tuviera `sub`, y `PermissionsGuard` lee los permisos
+   * **del token**: desactivar a un empleado o cambiarle el rol no tenía ningún efecto hasta que el
+   * token caducara. Con una sesión por PIN eso son cuatro horas de acceso operativo tras el
+   * despido, y su token de refresco vive doce.
+   */
+  describe('revocación de sesiones', () => {
+    it('una sesión válida sigue funcionando', async () => {
+      // Cookie firmada en vez de un login real: el límite de peticiones de `/auth/login` se cuenta
+      // por `(ip, email)`, y en un archivo de tests todo sale de la misma IP. Gastar cupo en lo que
+      // no se está probando haría fallar por 429 a los casos de más abajo.
+      const admin = await seededUser(app, 'admin@loklflow.com');
+
+      await http().get('/api/orders').set('Cookie', await cookieForUser(admin.id)).expect(200);
+    });
+
+    /**
+     * También sobre un usuario creado aquí: dar de baja a un sembrado lo dejaría inactivo —o con la
+     * versión subida— para el resto de la ejecución, y las suites que corran después fallarían con
+     * 401 sin ninguna relación aparente.
+     */
+    it('dar de baja a un empleado invalida su sesión en la petición siguiente', async () => {
+      const admin = await sessionAs(app, 'admin@loklflow.com', [
+        'users:read',
+        'users:create',
+        'users:delete',
+      ]);
+      const rol = await seededRole(app, 'Mesero');
+
+      const usuario = (
+        await http()
+          .post('/api/users')
+          .set('Cookie', admin)
+          .send({ name: 'Despedible', email: `baja-${Date.now()}@loklflow.com`, password: 'Passw0rd!2345', roleId: rol.id })
+          .expect(201)
+      ).body as { id: string };
+
+      const victimCookie = await cookieForUser(usuario.id);
+      await http().get('/api/orders').set('Cookie', victimCookie).expect(200);
+
+      await http().delete(`/api/users/${usuario.id}`).set('Cookie', admin).expect(204);
+
+      // Sin esperar a que caduque nada.
+      await http().get('/api/orders').set('Cookie', victimCookie).expect(401);
+    });
+
+    /**
+     * Sobre un rol y un usuario **creados aquí**, no sobre los sembrados.
+     *
+     * Cambiar los permisos del rol Mesero lo dejaría cambiado para toda la ejecución —el catálogo
+     * sobrevive a `resetOperationalData`—, y además subiría la versión de sesión de los usuarios
+     * sembrados, rompiendo con 401 a cualquier suite posterior que los use. Es contaminación de
+     * estado compartido, y el síntoma sería un fallo en un archivo que no tiene nada que ver.
+     */
+    it('cambiar los permisos de un rol invalida las sesiones de sus usuarios', async () => {
+      const admin = await sessionAs(app, 'admin@loklflow.com', [
+        'roles:read',
+        'roles:create',
+        'roles:update',
+        'users:create',
+      ]);
+
+      const rol = (
+        await http()
+          .post('/api/roles')
+          .set('Cookie', admin)
+          .send({ name: `Prueba revocación ${Date.now()}` })
+          .expect(201)
+      ).body as { id: string };
+
+      const usuario = (
+        await http()
+          .post('/api/users')
+          .set('Cookie', admin)
+          .send({ name: 'Revocable', email: `rev-${Date.now()}@loklflow.com`, password: 'Passw0rd!2345', roleId: rol.id })
+          .expect(201)
+      ).body as { id: string };
+
+      const victimCookie = await cookieForUser(usuario.id);
+      await http().get('/api/orders').set('Cookie', victimCookie).expect(200);
+
+      const permisos = await http().get('/api/roles/permissions').set('Cookie', admin).expect(200);
+      const alguno = (permisos.body as { id: string }[]).slice(0, 3).map((p) => p.id);
+      await http()
+        .put(`/api/roles/${rol.id}/permissions`)
+        .set('Cookie', admin)
+        .send({ permissionIds: alguno })
+        .expect(200);
+
+      await http().get('/api/orders').set('Cookie', victimCookie).expect(401);
+    });
+
+    /**
+     * La barandilla que hace que este despliegue **no eche a nadie**: los tokens emitidos antes de
+     * que la columna existiera no llevan `tv`, y se tratan como versión 0 —la de todos los usuarios
+     * tras la migración.
+     */
+    it('un token anterior a la función sigue valiendo', async () => {
+      const target = await seededUser(app, 'admin@loklflow.com');
+      const sinTv = cookieFor(['orders:read'], { sub: target.id });
+
+      await http().get('/api/orders').set('Cookie', sinTv).expect(200);
+    });
+  });
+
   describe('cierre de sesión', () => {
     /**
      * `clearCookie` llevaba solo `path`. Varios navegadores cotejan el conjunto de atributos al
@@ -132,14 +246,13 @@ describe('endurecimiento de la sesión', () => {
      * **la cookie sobreviva al cierre de sesión**.
      */
     it('borra las cookies con los mismos atributos con que se pusieron', async () => {
-      const login = await byEmail().expect(200);
-      const sessionCookies = (login.headers['set-cookie'] as unknown as string[]).map(
-        (c) => c.split(';')[0],
-      );
+      // Lo que se comprueba son los atributos del `Set-Cookie` que **borra**, y esos no dependen de
+      // cómo se entrara: una cookie firmada evita gastar cupo del límite de peticiones.
+      const admin = await seededUser(app, 'admin@loklflow.com');
 
       const res = await http()
         .post('/api/auth/logout')
-        .set('Cookie', sessionCookies.join('; '))
+        .set('Cookie', await cookieForUser(admin.id))
         .expect(204);
 
       const cleared = res.headers['set-cookie'] as unknown as string[];

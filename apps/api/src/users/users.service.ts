@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity';
 import { RolesService } from '../roles/roles.service';
+import { TokenVersionCache } from '../token-version/token-version.cache';
 import { AuditService } from '../audit/audit.service';
 import type { AuditAction } from '../audit/audit-actions.constants';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
@@ -21,6 +22,7 @@ export class UsersService {
     private usersRepo: Repository<User>,
     private rolesService: RolesService,
     private readonly audit: AuditService,
+    private readonly tokenVersions: TokenVersionCache,
   ) {}
 
   findAll() {
@@ -125,6 +127,17 @@ export class UsersService {
 
     await this.log('user.updated', id, actor, { oldValue: before, newValue: after });
 
+    /**
+     * Los dos cambios que hacen que el token deje de reflejar la realidad **invalidan la sesión**.
+     *
+     * Los permisos y el rol viven dentro del token, así que sin esto un cambio de rol no surtía
+     * efecto hasta que el token caducara; y desactivar a alguien tampoco lo echaba. Es el punto
+     * entero de `token_version`.
+     */
+    if (dto.isActive === false || (dto.roleId && saved.role?.name !== previousRoleName)) {
+      await this.tokenVersions.bump(id);
+    }
+
     // El cambio de rol se registra aparte porque es la acción de mayor impacto en
     // seguridad y hay que poder filtrarla sin leer el diff de cada edición.
     if (dto.roleId && saved.role?.name !== previousRoleName) {
@@ -141,6 +154,9 @@ export class UsersService {
     const user = await this.findOne(id);
     user.isActive = false;
     await this.usersRepo.save(user);
+    // Dar de baja a alguien tiene que echarlo **ahora**, no cuando su token caduque. Con una
+    // sesión por PIN eso eran cuatro horas de acceso operativo tras el despido.
+    await this.tokenVersions.bump(id);
     await this.log('user.deactivated', id, actor, {
       oldValue: { isActive: true },
       newValue: { isActive: false },
