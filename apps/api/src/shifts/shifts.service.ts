@@ -5,7 +5,7 @@ import { Shift } from './entities/shift.entity';
 import { OpenShiftDto } from './dto/open-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
 import { Payment } from '../payments/entities/payment.entity';
-import { PAYMENT_METHODS, type PaymentMethod } from '../payments/payment-method.constants';
+import { arqueo } from './arqueo';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { AuditService } from '../audit/audit.service';
 
@@ -118,40 +118,20 @@ export class ShiftsService {
     if (!shift) throw new NotFoundException('Turno no encontrado');
 
     const payments = await this.paymentsRepo.find({ where: { shiftId } });
-    const byMethod = PAYMENT_METHODS.reduce(
-      (acc, method) => {
-        acc[method] = 0;
-        return acc;
-      },
-      {} as Record<PaymentMethod, number>,
-    );
-    for (const p of payments) {
-      byMethod[p.method] = Number((byMethod[p.method] + Number(p.amount)).toFixed(2));
-    }
 
-    const totalSales = Number(
-      PAYMENT_METHODS.reduce((sum, m) => sum + byMethod[m], 0).toFixed(2),
-    );
-    const cashSales = byMethod.cash;
-    const expectedCash = Number((shift.openingCash + cashSales).toFixed(2));
-    const countedCash = shift.closingCash;
-    const difference =
-      countedCash === null ? null : Number((countedCash - expectedCash).toFixed(2));
-
+    // La aritmética vive en `arqueo.ts`, que se prueba con números y sin base de datos.
     return {
       shift,
-      byMethod,
-      totalSales,
-      cashSales,
-      expectedCash,
-      countedCash,
-      difference,
-      paymentsCount: payments.length,
+      ...arqueo({
+        openingCash: shift.openingCash,
+        closingCash: shift.closingCash,
+        payments,
+      }),
     };
   }
 
   private async totalSalesOf(shiftId: string) {
     const payments = await this.paymentsRepo.find({ where: { shiftId } });
-    return Number(payments.reduce((sum, p) => sum + Number(p.amount), 0).toFixed(2));
+    return arqueo({ openingCash: 0, closingCash: null, payments }).totalSales;
   }
 }

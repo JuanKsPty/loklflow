@@ -116,7 +116,19 @@ jobs:
           echo "JWT_SECRET=$(openssl rand -base64 48)" >> "$GITHUB_ENV"
           echo "JWT_REFRESH_SECRET=$(openssl rand -base64 48)" >> "$GITHUB_ENV"
 
-      - run: pnpm --filter=api test:int
+      # Las dos suites en una pasada, con cobertura y umbral. Sustituye a `test:int`: corre los
+      # mismos int-specs más los unitarios, así que separarlos sería ejecutarlo todo dos veces.
+      # El umbral vive solo aquí; `pnpm test` sigue siendo el rápido y sin base.
+      - run: pnpm --filter=api test:cov:all
+
+      - name: Guardar el informe de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-api
+          path: apps/api/coverage/lcov-report
+          retention-days: 7
+          if-no-files-found: warn
 
   # ─── Que las imágenes se construyan y arranquen de verdad ───────────────────────
   images:

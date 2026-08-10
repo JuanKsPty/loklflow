@@ -384,6 +384,60 @@ describe('Inventario', () => {
         .expect(200);
     });
 
+    it('reactivar un proveedor sí se hace por edición', async () => {
+      // La asimetría es deliberada: volver a poner algo en circulación no es destructivo, y
+      // exigirle un endpoint aparte sería ceremonia sin motivo.
+      const proveedor = (
+        await http()
+          .post('/api/inventory/suppliers')
+          .set('Cookie', admin)
+          .send({ name: `Proveedor ${Math.random()}` })
+          .expect(201)
+      ).body as { id: string };
+
+      await http()
+        .patch(`/api/inventory/suppliers/${proveedor.id}/deactivate`)
+        .set('Cookie', admin)
+        .expect(200);
+
+      const reactivado = await http()
+        .patch(`/api/inventory/suppliers/${proveedor.id}`)
+        .set('Cookie', admin)
+        .send({ isActive: true })
+        .expect(200);
+      expect(reactivado.body.isActive).toBe(true);
+    });
+
+    it('un proveedor que no existe da 404', async () => {
+      await http()
+        .get('/api/inventory/suppliers/00000000-0000-4000-8000-000000000999')
+        .set('Cookie', admin)
+        .expect(404);
+    });
+
+    it('los proveedores se listan y se editan', async () => {
+      const proveedor = (
+        await http()
+          .post('/api/inventory/suppliers')
+          .set('Cookie', admin)
+          .send({ name: `Proveedor ${Math.random()}`, phone: '5550000' })
+          .expect(201)
+      ).body as { id: string };
+
+      const editado = await http()
+        .patch(`/api/inventory/suppliers/${proveedor.id}`)
+        .set('Cookie', admin)
+        .send({ phone: '5551111' })
+        .expect(200);
+      expect(editado.body.phone).toBe('5551111');
+
+      const listado = await http()
+        .get('/api/inventory/suppliers')
+        .set('Cookie', admin)
+        .expect(200);
+      expect((listado.body as { id: string }[]).some((s) => s.id === proveedor.id)).toBe(true);
+    });
+
     it('un ingrediente de baja conserva su historial', async () => {
       // Es el motivo de que sea baja y no borrado: la clave ajena de los movimientos es RESTRICT,
       // y el libro mayor tiene que poder explicar de dónde salió cada unidad.

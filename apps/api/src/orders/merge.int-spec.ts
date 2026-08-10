@@ -132,6 +132,45 @@ describe('fusión de cuentas', () => {
     expect(await tableStatus(app, tables[0].id)).toBe('occupied');
   });
 
+  it('dos cuentas de la misma mesa la dejan ocupada', async () => {
+    // La mesa de origen es la de destino: liberarla dejaría el salón diciendo que está libre con
+    // gente sentada y una cuenta abierta encima.
+    const destino = await openOrder(0);
+    const origen = await openOrder(0);
+
+    await merge(destino.id, [origen.id]).expect(201);
+
+    expect(await tableStatus(app, tables[0].id)).toBe('occupied');
+  });
+
+  it('una cuenta sin mesa se fusiona igual', async () => {
+    // Para llevar: `tableId` es nulo y no hay ninguna mesa que liberar.
+    const destino = await openOrder(0);
+    const paraLlevar = await http()
+      .post('/api/orders')
+      .set('Cookie', waiter)
+      .send({ items: [{ productId: product.id, quantity: 2 }] })
+      .expect(201);
+
+    await merge(destino.id, [paraLlevar.body.id]).expect(201);
+
+    const res = await http().get(`/api/orders/${destino.id}`).set('Cookie', waiter).expect(200);
+    expect(res.body.items).toHaveLength(2);
+  });
+
+  it('varias cuentas de una vez', async () => {
+    const destino = await openOrder(0);
+    const a = await openOrder(1);
+    const b = await openOrder(2);
+
+    await merge(destino.id, [a.id, b.id]).expect(201);
+
+    const res = await http().get(`/api/orders/${destino.id}`).set('Cookie', waiter).expect(200);
+    expect(res.body.items).toHaveLength(3);
+    expect(await tableStatus(app, tables[1].id)).toBe('available');
+    expect(await tableStatus(app, tables[2].id)).toBe('available');
+  });
+
   describe('lo que rechaza', () => {
     it('una cuenta con pagos registrados, diciendo cuál', async () => {
       const destino = await openOrder(0);

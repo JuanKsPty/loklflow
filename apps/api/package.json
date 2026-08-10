@@ -21,7 +21,8 @@
     "migration:run:prod": "pnpm typeorm:prod migration:run",
     "migration:revert:prod": "pnpm typeorm:prod migration:revert",
     "seed:prod": "node dist/database/seeds/seed.js",
-    "seed:deploy": "node dist/database/seeds/seed-prod.js"
+    "seed:deploy": "node dist/database/seeds/seed-prod.js",
+    "test:cov:all": "jest --config jest.coverage.config.ts --runInBand"
   },
   "dependencies": {
     "@loklflow/config": "workspace:^",
