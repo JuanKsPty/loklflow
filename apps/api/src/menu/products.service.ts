@@ -6,6 +6,7 @@ import { Modifier } from './entities/modifier.entity';
 import { ProductAvailability } from './entities/product-availability.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { isAvailableNow } from './availability';
 
 @Injectable()
 export class ProductsService {
@@ -16,10 +17,39 @@ export class ProductsService {
     private modifiersRepo: Repository<Modifier>,
   ) {}
 
-  findAll() {
-    return this.productsRepo.find({
-      relations: { category: true, modifiers: true, availabilities: true },
+  /**
+   * `opts` es opcional y **el comportamiento por defecto no cambia**: sin él devuelve todo,
+   * incluidos los productos inactivos y los fuera de horario, que es lo que `/admin/menu/products`
+   * necesita para poder editarlos.
+   *
+   * Los filtros existen para el menú público, donde ofrecer algo que no se puede servir es un
+   * cliente que pide y se lleva un «no hay».
+   */
+  async findAll(opts?: {
+    /** Solo lo activo. */
+    activeOnly?: boolean;
+    /** Instante contra el que evaluar `product_availabilities`. */
+    availableAt?: Date;
+    /** Zona del negocio. Sin ella se usaría la del servidor, que es de otro sitio. */
+    timeZone?: string;
+  }) {
+    const products = await this.productsRepo.find({
+      // `modifiers.options` anidado y no `modifiers: true`: sin las opciones, un grupo de
+      // modificadores llega vacío y un producto con modificador obligatorio no se puede pedir.
+      // Las pantallas del personal lo tapaban pidiendo los modificadores por separado.
+      relations: { category: true, modifiers: { options: true }, availabilities: true },
       order: { name: 'ASC' },
+    });
+
+    if (!opts) return products;
+
+    const at = opts.availableAt;
+    const timeZone = opts.timeZone ?? 'UTC';
+
+    return products.filter((product) => {
+      if (opts.activeOnly && !product.isActive) return false;
+      if (at && !isAvailableNow(product.availabilities, at, timeZone)) return false;
+      return true;
     });
   }
 

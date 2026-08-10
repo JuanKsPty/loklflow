@@ -50,7 +50,9 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 > Un mesero toma una orden y cocina la ve en tiempo real.
 
 - [x] Módulo de menú (categorías, productos, modificadores, combos)
-- [x] Disponibilidad de productos por horario
+- [x] Disponibilidad de productos por horario — la regla se guardaba y se editaba desde esta
+      fase, pero **nadie la evaluaba**: se aplica de verdad en `menu/availability.ts` (Fase 5),
+      con la zona horaria del negocio y las ventanas que cruzan medianoche
 - [x] Módulo de mesas y sectores (mapa visual)
 - [x] Estados de mesa en tiempo real (`available`, `occupied`, `reserved`, `cleaning`, `maintenance`)
 - [ ] Fusión de mesas para órdenes grupales _(diferida — columna `merged_into_order_id` ya existe)_
