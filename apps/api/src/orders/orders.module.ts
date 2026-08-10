@@ -13,6 +13,7 @@ import { AuditModule } from '../audit/audit.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
+import { OrdersMergeService } from './orders-merge.service';
 
 @Module({
   imports: [
@@ -31,7 +32,7 @@ import { OrdersService } from './orders.service';
     InventoryModule,
   ],
   controllers: [OrdersController],
-  providers: [OrdersService],
+  providers: [OrdersService, OrdersMergeService],
   exports: [OrdersService],
 })
 export class OrdersModule {}

@@ -23,6 +23,9 @@ import { Payment } from '../../payments/entities/payment.entity';
 @Index('idx_orders_shift_id', ['shiftId'])
 @Index('idx_orders_waiter_id', ['waiterId'])
 @Index('idx_orders_status', ['status'])
+// Todas las consultas operativas filtran por esta columna desde que existe la fusión: sin índice,
+// cada listado del salón recorre la tabla entera.
+@Index('idx_orders_merged_into', ['mergedIntoOrderId'])
 export class Order {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -98,8 +101,31 @@ export class Order {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0, transformer: DecimalTransformer })
   total!: number;
 
+  /**
+   * La cuenta en la que esta se fusionó, o `null`.
+   *
+   * Vivió como columna suelta desde el esquema inicial —sin clave ajena, sin índice y sin que
+   * ninguna consulta la leyera— hasta que se implementó la fusión.
+   *
+   * **El `status` de una cuenta fusionada no se toca**, y esa es la decisión no obvia: no se pone
+   * `closed` (sería mentira: no se cobró) ni `cancelled` (ensuciaría la auditoría de cancelaciones
+   * y los reportes). La exclusión de los listados y de los agregados cuelga de esta columna, y con
+   * cero ítems sus totales quedan en 0. Así la fusión es completamente reversible sin haber
+   * falsificado ninguna transición.
+   */
+  @ManyToOne(() => Order, (order) => order.mergedOrders, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'merged_into_order_id' })
+  mergedInto!: Order | null;
+
   @Column({ name: 'merged_into_order_id', type: 'uuid', nullable: true })
   mergedIntoOrderId!: string | null;
+
+  /** Las cuentas que se fusionaron en esta. */
+  @OneToMany(() => Order, (order) => order.mergedInto)
+  mergedOrders!: Order[];
 
   @OneToMany(() => OrderItem, (item) => item.order, { cascade: true })
   items!: OrderItem[];

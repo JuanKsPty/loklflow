@@ -25,6 +25,8 @@ export const AUDIT_ACTIONS = [
   'discount.rejected',
   // Órdenes
   'order.cancelled',
+  'order.merged',
+  'order.unmerged',
   // Mesas
   'table.qr_rotated',
 ] as const;

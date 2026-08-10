@@ -6,6 +6,7 @@ import { OrderItem } from '../orders/entities/order-item.entity';
 import { OrderStatusHistory } from '../orders/entities/order-status-history.entity';
 import { Payment } from '../payments/entities/payment.entity';
 import { PAYMENT_METHODS, type PaymentMethod } from '../payments/payment-method.constants';
+import { NOT_MERGED_SQL } from '../orders/order-merge';
 import { DateRangeDto } from './dto/date-range.dto';
 import { toUtcTimestamp } from './utc-timestamp';
 
@@ -69,6 +70,14 @@ export class ReportsService {
   async salesSummary(range: DateRangeDto): Promise<SalesSummary> {
     const { from, to } = this.resolveRange(range);
 
+    /**
+     * Las consultas sobre pagos **no** filtran las cuentas fusionadas, y no es un olvido.
+     *
+     * Una cuenta fusionada no puede tener pagos: `canMerge` rechaza fusionar una que ya los tenga,
+     * y `PaymentsService` rechaza cobrar una ya fusionada. Así que el filtro no quitaría ninguna
+     * fila y sí sugeriría que aquí hay un riesgo de doble conteo que no existe. Lo que se cuenta
+     * dos veces son los **ítems** y los **totales de orden**, y esos sí van filtrados.
+     */
     const paymentsRow = await this.paymentsRepo
       .createQueryBuilder('p')
       .select('COALESCE(SUM(p.amount), 0)', 'total')
@@ -102,6 +111,7 @@ export class ReportsService {
       .addSelect('COALESCE(SUM(o.tipAmount), 0)', 'tips')
       .where('o.createdAt BETWEEN :from AND :to', { from, to })
       .andWhere('o.status IN (:...statuses)', { statuses: SOLD_STATUSES })
+      .andWhere(NOT_MERGED_SQL)
       .getRawOne<{ count: string; total: string; discounts: string; tips: string }>();
 
     const openRow = await this.ordersRepo
@@ -109,6 +119,7 @@ export class ReportsService {
       .select('COUNT(o.id)', 'count')
       .addSelect('COALESCE(SUM(o.total), 0)', 'total')
       .where('o.status IN (:...statuses)', { statuses: OPEN_STATUSES })
+      .andWhere(NOT_MERGED_SQL)
       .getRawOne<{ count: string; total: string }>();
 
     const ordersClosed = Number(closedRow?.count ?? 0);
@@ -143,6 +154,9 @@ export class ReportsService {
       .addSelect('COALESCE(SUM(i.subtotal), 0)', 'revenue')
       .where('o.createdAt BETWEEN :from AND :to', { from, to })
       .andWhere("i.status != 'cancelled'")
+      // Sin esto, los ítems que se movieron a la cuenta destino se contarían **dos veces**: una
+      // por la cuenta fusionada, que sigue existiendo, y otra por la que ahora los tiene.
+      .andWhere(NOT_MERGED_SQL)
       .groupBy('prod.id')
       .addGroupBy('prod.name')
       .orderBy('SUM(i.quantity)', 'DESC')
@@ -191,6 +205,7 @@ export class ReportsService {
       )
       .where("h.toStatus = 'ready'")
       .andWhere('h.changedAt BETWEEN :from AND :to', { from, to })
+      .andWhere(NOT_MERGED_SQL)
       .getRawOne<{
         totalMinutes: string | null;
         kitchenMinutes: string | null;
@@ -228,7 +243,12 @@ export class ReportsService {
     }));
   }
 
-  /** Filas planas para exportar a CSV: una por pago, con el contexto de su orden. */
+  /**
+   * Filas planas para exportar a CSV: una por pago, con el contexto de su orden.
+   *
+   * Sin filtro de fusionadas por lo mismo que arriba: una fila por pago, y una cuenta fusionada no
+   * tiene ninguno.
+   */
   async salesRows(range: DateRangeDto) {
     const { from, to } = this.resolveRange(range);
 

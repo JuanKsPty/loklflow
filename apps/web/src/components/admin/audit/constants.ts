@@ -31,6 +31,11 @@ export const AUDIT_ACTION_BADGE: Record<AuditAction, string> = {
   // instante en que esto ocurre, así que no es rutina.
   'table.qr_rotated': 'border-amber-500/30 bg-amber-500/10 text-amber-600',
 
+  // Mueve dinero de una cuenta a otra sin cobrar nada: no es destructivo, pero cambia qué se
+  // cobra y dónde, así que tiene que verse.
+  'order.merged': 'border-info/30 bg-info/10 text-info',
+  'order.unmerged': 'border-info/30 bg-info/10 text-info',
+
   // Rutina
   'auth.login': 'border-border bg-muted text-muted-foreground',
   'auth.logout': 'border-border bg-muted text-muted-foreground',

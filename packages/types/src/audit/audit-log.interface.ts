@@ -14,6 +14,8 @@ export type AuditAction =
   | 'shift.closed'
   | 'payment.recorded'
   | 'order.cancelled'
+  | 'order.merged'
+  | 'order.unmerged'
   | 'table.qr_rotated';
 
 export const AUDIT_ACTIONS: AuditAction[] = [
@@ -32,6 +34,8 @@ export const AUDIT_ACTIONS: AuditAction[] = [
   'shift.closed',
   'payment.recorded',
   'order.cancelled',
+  'order.merged',
+  'order.unmerged',
   'table.qr_rotated',
 ];
 
@@ -51,6 +55,8 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   'shift.closed': 'Turno cerrado',
   'payment.recorded': 'Pago registrado',
   'order.cancelled': 'Orden cancelada',
+  'order.merged': 'Cuentas fusionadas',
+  'order.unmerged': 'Fusión deshecha',
   'table.qr_rotated': 'QR de mesa regenerado',
 };
 

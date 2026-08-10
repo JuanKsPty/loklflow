@@ -44,6 +44,14 @@ export class PaymentsService {
     if (order.status === 'closed' || order.status === 'cancelled') {
       throw new BadRequestException('La cuenta ya está cerrada o cancelada');
     }
+    // Una cuenta fusionada no se cobra por sí misma: su trabajo está en la principal y su total es
+    // 0. Sin esta comprobación, un enlace viejo o una pantalla sin refrescar dejarían registrar un
+    // pago contra una cuenta que ningún listado muestra — dinero que no cuadra con nada.
+    if (order.mergedIntoOrderId) {
+      throw new BadRequestException(
+        'Esta cuenta se fusionó en otra. Cobra la cuenta principal.',
+      );
+    }
 
     const shift = await this.shifts.currentForUser(userId);
     if (!shift) {

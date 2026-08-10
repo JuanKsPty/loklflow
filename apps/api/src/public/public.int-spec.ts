@@ -50,7 +50,12 @@ describe('menú público por QR', () => {
       .set('Cookie', admin)
       .expect(200);
     allTables = res.body as typeof allTables;
-    table = allTables[nextTable % allTables.length];
+    // La última mesa queda **reservada** para el caso que agota el cupo a propósito: su bucket
+    // queda inservible durante cinco minutos, y la rotación acabaría volviendo a ella —hay más
+    // casos que mesas— haciendo fallar con 429 un test que no tiene nada que ver. Es justo la
+    // clase de intermitencia que depende del orden de ejecución y acaba en un `it.skip`.
+    const rotables = allTables.slice(0, -1);
+    table = rotables[nextTable % rotables.length];
     nextTable += 1;
     qrCode = table.qrCode;
   });
@@ -222,16 +227,17 @@ describe('menú público por QR', () => {
      * «demasiados intentos» a alguien que no ha intentado nada.
      */
     it('agotar el límite de una mesa no afecta a otra', async () => {
-      const otra = allTables.find((t) => t.id !== table.id)!;
+      // La mesa reservada: su cupo queda quemado durante cinco minutos y ningún otro caso la usa.
+      const quemada = allTables[allTables.length - 1];
 
-      // Se agota el cupo de esta mesa a base de peticiones inválidas, que también cuentan.
+      // Se agota a base de peticiones inválidas, que también cuentan para el límite.
       for (let i = 0; i < 14; i++) {
-        await order({ items: [] });
+        await order({ items: [] }, quemada.qrCode);
       }
-      await order(oneItem()).expect(429);
+      await order(oneItem(), quemada.qrCode).expect(429);
 
-      // La mesa de al lado sigue pudiendo pedir.
-      await order(oneItem(), otra.qrCode).expect(201);
+      // La mesa de al lado sigue pudiendo pedir: es lo que prueba que la clave es por mesa.
+      await order(oneItem()).expect(201);
     });
   });
 
