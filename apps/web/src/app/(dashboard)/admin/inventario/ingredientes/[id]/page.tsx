@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/page-header';
 import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { IngredientForm } from '@/components/admin/inventory/ingredient-form';
 import { MovementTable } from '@/components/admin/inventory/movement-table';
+import { ActiveControl } from '@/components/admin/inventory/active-control';
 import type { Ingredient, StockMovement } from '@loklflow/types';
 
 interface Props {
@@ -41,6 +42,14 @@ export default async function EditIngredientPage({ params }: Props) {
     <div>
       <PageHeader title="Editar ingrediente" description={ingredient.name} />
       <IngredientForm ingredient={ingredient} />
+      <div className="mt-6">
+        <ActiveControl
+          kind="ingredient"
+          id={ingredient.id}
+          isActive={ingredient.isActive}
+          name={ingredient.name}
+        />
+      </div>
       <div className="mt-8">
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Historial</h2>
         <MovementTable movements={movements} />

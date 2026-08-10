@@ -10,6 +10,7 @@ import { IngredientTable } from '@/components/admin/inventory/ingredient-table';
 import { MovementTable } from '@/components/admin/inventory/movement-table';
 import { SupplierTable } from '@/components/admin/inventory/supplier-table';
 import { MovementDialog } from '@/components/admin/inventory/movement-dialog';
+import { LowStockFilter } from '@/components/admin/inventory/low-stock-filter';
 import type { Ingredient, StockMovement, Supplier } from '@loklflow/types';
 
 export const metadata = { title: 'Inventario — LoklFlow' };
@@ -18,22 +19,28 @@ const TABS = ['ingredients', 'movements', 'suppliers'] as const;
 type Tab = (typeof TABS)[number];
 
 interface Props {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; lowStock?: string }>;
 }
 
 export default async function InventoryPage({ searchParams }: Props) {
-  const { tab } = await searchParams;
+  const { tab, lowStock } = await searchParams;
   const active: Tab = TABS.includes(tab as Tab) ? (tab as Tab) : 'ingredients';
+  const onlyLow = lowStock === 'true';
 
   let ingredients: Ingredient[] = [];
   let movements: StockMovement[] = [];
   let suppliers: Supplier[] = [];
+  // Los que están bajo mínimo se piden **al servidor**, que es quien puede comparar dos columnas
+  // (`current_stock <= minimum_stock`), en vez de traerse todo y filtrar aquí. Se pide siempre
+  // porque el contador del chip tiene que estar aunque no se esté filtrando.
+  let low: Ingredient[] = [];
   let failure: 'offline' | 'error' | null = null;
   try {
-    [ingredients, movements, suppliers] = await Promise.all([
+    [ingredients, movements, suppliers, low] = await Promise.all([
       serverFetch<Ingredient[]>('/inventory/ingredients'),
       serverFetch<StockMovement[]>('/inventory/movements'),
       serverFetch<Supplier[]>('/inventory/suppliers'),
+      serverFetch<Ingredient[]>('/inventory/ingredients?lowStock=true'),
     ]);
   } catch (err) {
     failure = reportApiFailure('admin/inventario', err);
@@ -59,7 +66,9 @@ export default async function InventoryPage({ searchParams }: Props) {
         initial={active}
         ingredients={
           <>
-            <div className="mb-3 flex justify-end gap-2">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <LowStockFilter active={onlyLow} lowCount={low.length} />
+              <div className="flex justify-end gap-2">
               <MovementDialog ingredients={ingredients} suppliers={suppliers} />
               <Button
                 variant="outline"
@@ -69,8 +78,9 @@ export default async function InventoryPage({ searchParams }: Props) {
                 <PlusIcon />
                 Nuevo ingrediente
               </Button>
+              </div>
             </div>
-            <IngredientTable ingredients={ingredients} />
+            <IngredientTable ingredients={onlyLow ? low : ingredients} />
           </>
         }
         movements={<MovementTable movements={movements} />}

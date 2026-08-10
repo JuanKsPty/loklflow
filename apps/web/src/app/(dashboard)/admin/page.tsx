@@ -2,12 +2,14 @@ import Link from 'next/link';
 import {
   BanknoteIcon,
   ClockIcon,
+  PackageIcon,
   PercentIcon,
   ReceiptTextIcon,
   TimerIcon,
   UtensilsCrossedIcon,
 } from 'lucide-react';
 import type {
+  Ingredient,
   PrepTimeMetric,
   SalesByDay,
   SalesSummary,
@@ -69,13 +71,19 @@ export default async function DashboardPage({ searchParams }: Props) {
     openOrdersValue: 0,
   };
 
-  const [summary, topProducts, prep, byDay] = await Promise.all([
+  const [summary, topProducts, prep, byDay, lowStock] = await Promise.all([
     serverFetch<SalesSummary>(`/reports/sales-summary${q}`).catch(() => empty),
     serverFetch<TopProduct[]>(`/reports/top-products${q}`).catch(() => [] as TopProduct[]),
     serverFetch<PrepTimeMetric>(`/reports/prep-times${q}`).catch(
       () => ({ averageMinutes: null, averageKitchenMinutes: null, sampleSize: 0 }),
     ),
     serverFetch<SalesByDay[]>(`/reports/sales-by-day${q}`).catch(() => [] as SalesByDay[]),
+    // El aviso de stock mínimo existía como notificación —que se lee una vez y se pierde— y como
+    // filtro que nadie llamaba. Aquí es lo primero que ve el dueño al abrir el panel, que es
+    // cuando de verdad puede hacer algo al respecto: pedir.
+    serverFetch<Ingredient[]>('/inventory/ingredients?lowStock=true').catch(
+      () => [] as Ingredient[],
+    ),
   ]);
 
   const maxQty = Math.max(1, ...topProducts.map((p) => p.quantity));
@@ -104,6 +112,24 @@ export default async function DashboardPage({ searchParams }: Props) {
           </Link>
         ))}
       </div>
+
+      {lowStock.length > 0 && (
+        // Enlaza al filtro, así que el aviso lleva directamente a la lista de lo que hay que
+        // pedir en vez de dejar al dueño buscándolo.
+        <Link
+          href="/admin/inventario?tab=ingredients&lowStock=true"
+          className="mb-3 flex items-center gap-2 rounded-xl border border-warning/30 bg-warning/10 px-3 py-3 text-sm text-warning transition-colors hover:bg-warning/15"
+        >
+          <PackageIcon className="size-4 shrink-0" />
+          <span>
+            <strong>
+              {lowStock.length} {lowStock.length === 1 ? 'ingrediente' : 'ingredientes'}
+            </strong>{' '}
+            bajo el mínimo: {lowStock.slice(0, 3).map((i) => i.name).join(', ')}
+            {lowStock.length > 3 && ` y ${lowStock.length - 3} más`}.
+          </span>
+        </Link>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard

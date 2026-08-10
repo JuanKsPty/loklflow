@@ -147,11 +147,18 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 - [x] Alertas de stock mínimo — solo al cruzar el umbral, no en cada movimiento
 - [x] Registro de entradas de mercancía (con proveedor y costo) — actualiza el costo promedio
 - [x] Registro de merma
-- [ ] Código QR único por mesa
-- [ ] Vista pública del menú (sin autenticación)
-- [ ] Flujo de orden completa desde QR del cliente (`source: customer_qr`)
+- [x] Código QR único por mesa — con rotación (`POST /tables/:id/qr/rotate`), hoja imprimible y
+      descarga por mesa. El QR se genera en el navegador porque la API no puede saber qué dirección
+      alcanza el teléfono de un cliente
+- [x] Vista pública del menú (sin autenticación) — módulo `src/public/` con DTOs propios: exponer
+      las entidades filtraría `station`, `isActive` y el `qrCode` de la mesa. Aplica el horario y
+      llega en una sola respuesta
+- [x] Flujo de orden completa desde QR del cliente (`source: customer_qr`) — con `waiterId` nulo
+      como pedía el modelo de datos, seguimiento por un pase firmado sin identificador en la ruta,
+      y controles de dominio (mesa que recibe pedidos, tope por mesa, cantidades acotadas) que
+      pesan más que el límite de peticiones
 
-**Entregable:** Inventario automatizado y flujo completo de cliente con QR.
+**Entregable:** Inventario automatizado y flujo completo de cliente con QR. ✅
 
 ---
 

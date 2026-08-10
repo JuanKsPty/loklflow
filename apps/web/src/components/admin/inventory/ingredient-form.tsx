@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import type { Ingredient } from '@loklflow/types';
@@ -11,7 +11,6 @@ import { inventoryApi } from '@/lib/api/inventory.api';
 import { ingredientSchema, type IngredientFormValues } from '@/lib/validations/inventory.schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
 import {
   Field,
@@ -32,7 +31,6 @@ export function IngredientForm({ ingredient }: Props) {
   const {
     register,
     handleSubmit,
-    control,
     formState: { errors, isSubmitting },
   } = useForm<IngredientFormValues>({
     resolver: zodResolver(ingredientSchema),
@@ -42,7 +40,6 @@ export function IngredientForm({ ingredient }: Props) {
       initialStock: 0,
       minimumStock: ingredient?.minimumStock ?? 0,
       costPerUnit: ingredient?.costPerUnit ?? 0,
-      isActive: ingredient?.isActive ?? true,
     },
   });
 
@@ -56,7 +53,6 @@ export function IngredientForm({ ingredient }: Props) {
           unit: values.unit,
           minimumStock: values.minimumStock ?? 0,
           costPerUnit: values.costPerUnit ?? 0,
-          isActive: values.isActive,
         });
       } else {
         await inventoryApi.ingredients.create({
@@ -65,7 +61,6 @@ export function IngredientForm({ ingredient }: Props) {
           initialStock: values.initialStock ?? 0,
           minimumStock: values.minimumStock ?? 0,
           costPerUnit: values.costPerUnit ?? 0,
-          isActive: values.isActive,
         });
       }
       toast.success(editing ? 'Ingrediente actualizado' : 'Ingrediente creado');
@@ -157,15 +152,6 @@ export function IngredientForm({ ingredient }: Props) {
             Se actualiza solo con cada entrada, promediado con lo que ya había.
           </FieldDescription>
           <FieldError errors={errors.costPerUnit ? [errors.costPerUnit] : undefined} />
-        </Field>
-
-        <Field orientation="horizontal">
-          <Controller
-            control={control}
-            name="isActive"
-            render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />}
-          />
-          <FieldLabel className="mb-0">Activo</FieldLabel>
         </Field>
 
         <div className="flex gap-3 pt-2">

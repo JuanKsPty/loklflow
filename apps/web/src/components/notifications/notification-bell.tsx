@@ -37,6 +37,11 @@ function notificationHref(
   // Un descuento pendiente se resuelve en la bandeja, que solo existe en el panel.
   if (resourceType === 'discount') return '/admin/approvals';
   if (resourceType === 'order') return orderHref(area, resourceId);
+  // El aviso de stock bajo lleva a la ficha del ingrediente, que también vive solo en el panel: un
+  // cocinero o un cajero no tienen `inventory:read` y aterrizarían en un redirect al login.
+  if (resourceType === 'ingredient') {
+    return area === 'admin' ? `/admin/inventario/ingredientes/${resourceId}` : null;
+  }
   return null;
 }
 
