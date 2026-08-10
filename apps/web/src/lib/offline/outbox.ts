@@ -1,5 +1,5 @@
 import { liveQuery, type Observable } from 'dexie';
-import { ApiError, OfflineError } from '@/lib/api/client';
+import { ApiError } from '@/lib/api/client';
 import { newClientId } from '@/lib/client-id';
 import { reportBrowserError } from '@/lib/observability/report';
 import { isSupported, outbox } from './db';
@@ -16,7 +16,9 @@ import type { OperationKind } from './queueable';
  * ítem, y corregir una cantidad después de haberla puesto.
  *
  * **Un 4xx es terminal; la red y un 5xx se reintentan.** Reintentar un 400 es pedirle al
- * servidor mil veces que acepte algo que ya dijo que está mal.
+ * servidor mil veces que acepte algo que ya dijo que está mal. Con tres excepciones que
+ * deciden si se pierde trabajo o no —404 en un DELETE, la sesión, y «ahora no»— explicadas
+ * en `classify`.
  *
  * **`occurredAt` viaja con la operación.** Sin él, la bitácora y `order_status_history`
  * registran la hora del envío y no la del hecho, y el informe de tiempos de preparación pasa a
@@ -146,7 +148,14 @@ export function observeFailed(): Observable<QueuedOperation[]> {
 }
 
 export function observePendingCount(): Observable<number> {
-  return liveQuery(() => outbox().where('status').equals('pending').count());
+  // El guard de `isSupported()` no es cosmético: sus tres hermanas lo tienen y esta no, así
+  // que evaluada en el servidor lanzaba en vez de devolver 0, y bastaba con que un componente
+  // la tocara fuera del navegador para tumbar el render de la ruta entera.
+  return liveQuery(() => (isSupported() ? outbox().where('status').equals('pending').count() : 0));
+}
+
+export function observeFailedCount(): Observable<number> {
+  return liveQuery(() => (isSupported() ? outbox().where('status').equals('failed').count() : 0));
 }
 
 /**
@@ -159,12 +168,70 @@ export async function remove(seq: number): Promise<void> {
   await outbox().delete(seq);
 }
 
+/**
+ * Devuelve a la cola una operación que se había rendido. Es el «Reintentar» de la bandeja.
+ *
+ * **`seq` no se toca**, que es todo el asunto: es la clave de orden dentro de la partición, y
+ * reencolar con uno nuevo colaría la operación detrás de otras posteriores — «añadir ítem»
+ * podría acabar delante de «crear la comanda». Lo que se reinicia es el contador de intentos
+ * y el retroceso, para que salga en el primer drenado y no dentro de cinco minutos.
+ */
+export async function requeue(seq: number): Promise<void> {
+  const op = await outbox().get(seq);
+  if (!op || op.status !== 'failed') return;
+  const { lastAttemptAt: _at, lastError: _err, ...rest } = op;
+  await outbox().put({ ...rest, status: 'pending', attempts: 0 });
+}
+
+/**
+ * Reintenta toda una partición de golpe.
+ *
+ * Es lo que llama la bandeja, que agrupa por cuenta: reintentar una sola operación de una
+ * cuenta cuyas anteriores siguen fallando la manda contra el mismo muro. Y como `seq` se
+ * conserva, el orden dentro de la cuenta se mantiene sin tener que pensarlo.
+ */
+export async function requeuePartition(partition: string): Promise<number> {
+  const ops = await outbox().where('partition').equals(partition).toArray();
+  const stuck = ops.filter((op) => op.status === 'failed');
+  await Promise.all(stuck.map((op) => requeue(op.seq)));
+  return stuck.length;
+}
+
+/**
+ * Tira una operación que no se va a enviar nunca. Es el «Descartar» de la bandeja.
+ *
+ * Deja rastro a propósito. Una comanda que alguien decide no enviar es exactamente el tipo de
+ * cosa que después nadie recuerda, y la diferencia entre «se perdió» y «se descartó a las
+ * 21:14» es la que permite responder cuando el dueño pregunta.
+ */
+export async function discard(seq: number): Promise<void> {
+  const op = await outbox().get(seq);
+  if (!op) return;
+  await outbox().delete(seq);
+  reportBrowserError('outbox:discarded', new Error(op.lastError ?? 'descartada a mano'), {
+    kind: op.kind,
+    path: op.path,
+    partition: op.partition,
+    occurredAt: op.occurredAt,
+  });
+}
+
 export interface DrainResult {
   sent: number;
   failed: number;
   /** Quedaron para más tarde: no había red o el servidor devolvió 5xx. */
   retry: number;
+  /**
+   * La sesión no vale y el drenado se detuvo entero.
+   *
+   * No es un fallo de las operaciones: siguen siendo válidas y siguen `pending`. Quien lo
+   * reciba tiene que decirlo con esas palabras —«vuelve a iniciar sesión para enviar N»— en
+   * vez de dejar que el operario crea que se enviaron.
+   */
+  needsAuth: boolean;
 }
+
+const EMPTY_DRAIN: DrainResult = { sent: 0, failed: 0, retry: 0, needsAuth: false };
 
 /** Envía una operación. La inyecta el llamador para poder probar la cola sin red. */
 export type Sender = (op: QueuedOperation) => Promise<void>;
@@ -181,7 +248,7 @@ let draining = false;
  * hacer ruido, que es la peor forma de perder una garantía.
  */
 export async function drain(send: Sender): Promise<DrainResult> {
-  if (draining) return { sent: 0, failed: 0, retry: 0 };
+  if (draining) return { ...EMPTY_DRAIN };
   draining = true;
   try {
     const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
@@ -189,7 +256,7 @@ export async function drain(send: Sender): Promise<DrainResult> {
     return await locks.request('loklflow-outbox', { ifAvailable: true }, async (lock) =>
       // Sin cerrojo disponible hay otra pestaña drenando: no es un error, es el caso que
       // esto viene a evitar.
-      lock ? drainOnce(send) : { sent: 0, failed: 0, retry: 0 },
+      lock ? drainOnce(send) : { ...EMPTY_DRAIN },
     );
   } finally {
     draining = false;
@@ -197,7 +264,7 @@ export async function drain(send: Sender): Promise<DrainResult> {
 }
 
 async function drainOnce(send: Sender): Promise<DrainResult> {
-  const result: DrainResult = { sent: 0, failed: 0, retry: 0 };
+  const result: DrainResult = { ...EMPTY_DRAIN };
   const queue = await pending();
   if (queue.length === 0) return result;
 
@@ -212,6 +279,11 @@ async function drainOnce(send: Sender): Promise<DrainResult> {
   await Promise.all(
     [...byPartition.values()].map(async (ops) => {
       for (const op of ops) {
+        // Un problema de sesión detiene el drenado **entero**, no solo su partición: no es
+        // culpa de esta operación ni de esta cuenta, y seguir intentando con las demás solo
+        // sirve para gastar ocho intentos de cada una contra el mismo 401.
+        if (result.needsAuth) return;
+
         // El retroceso se mide desde la última tentativa. Con la espera pendiente, el resto
         // de la partición tampoco avanza: saltárselo rompería el orden, que es justo lo que
         // la partición garantiza.
@@ -231,6 +303,11 @@ async function drainOnce(send: Sender): Promise<DrainResult> {
           // siempre: se marca y se sigue. La bandeja de fallos decide qué hacer con ella.
           continue;
         }
+        if (outcome === 'auth') {
+          result.needsAuth = true;
+          result.retry += 1;
+          return;
+        }
         // Reintentable: se para la partición aquí para no romper el orden.
         result.retry += 1;
         return;
@@ -241,13 +318,29 @@ async function drainOnce(send: Sender): Promise<DrainResult> {
   return result;
 }
 
-async function attempt(op: QueuedOperation, send: Sender): Promise<Terminal | 'retry'> {
+async function attempt(op: QueuedOperation, send: Sender): Promise<Verdict> {
   try {
     await send(op);
     await remove(op.seq);
     return 'sent';
   } catch (err) {
-    if (isTerminal(err)) {
+    const verdict = classify(err, op.method);
+
+    // El borrado de algo que ya no está **es** el resultado que se buscaba. Se saca de la cola
+    // como enviada y sin ruido.
+    if (verdict === 'sent') {
+      await remove(op.seq);
+      return 'sent';
+    }
+
+    // La sesión no vale: la operación sigue siendo buena y se queda `pending`. Solo se anota
+    // el intento, para no reescribir su historia con un error que no es suyo.
+    if (verdict === 'auth') {
+      await outbox().put({ ...op, lastAttemptAt: Date.now(), lastError: messageOf(err) });
+      return 'auth';
+    }
+
+    if (verdict === 'failed') {
       await outbox().put({
         ...op,
         status: 'failed',
@@ -263,11 +356,9 @@ async function attempt(op: QueuedOperation, send: Sender): Promise<Terminal | 'r
     // Rendirse tras muchos intentos no es descartar: pasa a la bandeja, donde una persona
     // decide. Perder una comanda en silencio sería peor que cualquier error visible.
     const exhausted = attempts >= MAX_ATTEMPTS;
-    // `createdAt` NO se toca. Es la clave de orden dentro de la partición, y moverla al
-    // reintentar colaría la operación detrás de otras creadas después: crear la comanda
-    // `seq` NO se toca: es la clave de orden dentro de la partición, y moverla al reintentar
-    // colaría la operación detrás de otras creadas después. El retroceso lo mide
-    // `lastAttemptAt`.
+    // `seq` NO se toca: es la clave de orden dentro de la partición, y moverlo al reintentar
+    // colaría la operación detrás de otras creadas después —«añadir ítem» podría adelantar a
+    // «crear la comanda»—. El retroceso lo mide `lastAttemptAt`.
     await outbox().put({
       ...op,
       attempts,
@@ -280,17 +371,38 @@ async function attempt(op: QueuedOperation, send: Sender): Promise<Terminal | 'r
   }
 }
 
+type Verdict = Terminal | 'retry' | 'auth';
+
 /**
- * Un error del que no tiene sentido volver.
+ * Qué hacer con el error de un envío.
  *
- * Los 4xx lo son: el servidor entendió y dijo que no. Un 404 en un borrado es el caso
- * amable —ya no estaba— y también termina, sin ruido. Los 5xx y los fallos de red, no: ahí el
- * servidor ni siquiera pudo decidir.
+ * «Todo 4xx es terminal» era demasiado grueso, y las tres excepciones son las que deciden si
+ * se pierde trabajo o no:
+ *
+ * - **404 en un DELETE es éxito.** Quitar una línea que ya no está es exactamente el resultado
+ *   buscado. La cola lo daba por fallo definitivo y llenaba la bandeja —y el log— de errores
+ *   que no lo eran, justo lo contrario de lo que su propio comentario prometía.
+ * - **401 y 403 no son culpa de la operación.** Son la sesión. Tratarlos como terminales
+ *   significa que un turno que empieza con el token caducado manda **la cola entera** a la
+ *   bandeja en el primer drenado: cada comanda del corte marcada como fallida por un motivo
+ *   que se arregla volviendo a entrar. Se detiene el drenado y se avisa.
+ * - **408, 425 y 429 son «ahora no».** El 429 importa de verdad: en cuanto la API tenga
+ *   límite de peticiones, la ráfaga de reconexión de una tablet con veinte operaciones lo
+ *   dispararía, y darlo por definitivo sería perder comandas por defenderse de un ataque que
+ *   nadie estaba haciendo.
+ *
+ * El resto de 4xx sí termina: el servidor entendió y dijo que no, y repetirlo mil veces no va
+ * a cambiar la respuesta. Los 5xx y los fallos de red se reintentan, porque ahí el servidor ni
+ * siquiera llegó a decidir.
  */
-function isTerminal(err: unknown): boolean {
-  if (err instanceof OfflineError) return false;
-  if (err instanceof ApiError) return err.status >= 400 && err.status < 500;
-  return false;
+function classify(err: unknown, method: QueuedOperation['method']): Verdict {
+  if (!(err instanceof ApiError)) return 'retry';
+  const { status } = err;
+  if (status === 401 || status === 403) return 'auth';
+  if (status === 404 && method === 'DELETE') return 'sent';
+  if (status === 408 || status === 425 || status === 429) return 'retry';
+  if (status >= 400 && status < 500) return 'failed';
+  return 'retry';
 }
 
 function messageOf(err: unknown): string {

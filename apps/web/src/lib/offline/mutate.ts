@@ -1,6 +1,6 @@
-import { api, OfflineError } from '@/lib/api/client';
+import { api, replayApi, OfflineError } from '@/lib/api/client';
 import { isQueueable, whyNotQueueable, type OperationKind } from './queueable';
-import { enqueue, drain, type QueuedOperation } from './outbox';
+import { enqueue, drain, type DrainResult, type QueuedOperation } from './outbox';
 import { probe } from './net';
 
 /**
@@ -48,24 +48,37 @@ export async function mutate(input: MutateInput): Promise<MutateResult> {
   }
 }
 
-/** Intenta vaciar la cola, si de verdad hay servidor al otro lado. */
-export async function flush(): Promise<void> {
-  if (!(await probe())) return;
-  await drain(async (op) => {
-    await send(op.method, op.path, withOccurredAt(op.body, op.occurredAt));
+/**
+ * Intenta vaciar la cola, si de verdad hay servidor al otro lado.
+ *
+ * El reenvío va por `replayApi` y no por `api`: este último, ante un 401 que el refresco no
+ * arregla, hace `window.location.href = '/login'` —desde dentro del bucle de drenado—, lo que
+ * tira la pantalla a media sincronización y deja al operario sin saber qué se envió.
+ */
+export async function flush(): Promise<DrainResult> {
+  if (!(await probe())) return { sent: 0, failed: 0, retry: 0, needsAuth: false };
+  return drain(async (op) => {
+    await send(op.method, op.path, withOccurredAt(op.body, op.occurredAt), replayApi);
   });
 }
 
-function send(method: QueuedOperation['method'], path: string, body?: unknown) {
+type Client = Pick<typeof api, 'post' | 'patch' | 'put' | 'delete'>;
+
+function send(
+  method: QueuedOperation['method'],
+  path: string,
+  body?: unknown,
+  client: Client = api,
+) {
   switch (method) {
     case 'POST':
-      return api.post<unknown>(path, body);
+      return client.post<unknown>(path, body);
     case 'PATCH':
-      return api.patch<unknown>(path, body);
+      return client.patch<unknown>(path, body);
     case 'PUT':
-      return api.put<unknown>(path, body);
+      return client.put<unknown>(path, body);
     case 'DELETE':
-      return api.delete<unknown>(path);
+      return client.delete<unknown>(path);
   }
 }
 
@@ -74,8 +87,11 @@ function send(method: QueuedOperation['method'], path: string, body?: unknown) {
  *
  * Sin esto, una comanda tomada a las 20:10 y enviada a las 21:30 queda registrada a las 21:30:
  * la bitácora miente y el informe de tiempos de preparación pasa a medir cuándo volvió el WiFi.
- * El servidor aún no lee este campo —lo hará cuando se cablee la cola—, pero viajar desde ya
- * evita tener que versionar las operaciones que queden en cola de un despliegue al siguiente.
+ *
+ * El servidor lo declara en los seis DTOs que una operación encolable puede alcanzar, y lo
+ * guarda en `orders.occurred_at` y `order_status_history.occurred_at`. Eso no es opcional: el
+ * pipe global corre con `forbidNonWhitelisted`, así que sin declararlo **toda** operación
+ * reenviada recibiría un 400 y acabaría en la bandeja de fallos.
  */
 function withOccurredAt(body: unknown, occurredAt: string): unknown {
   if (body === undefined || body === null) return { occurredAt };

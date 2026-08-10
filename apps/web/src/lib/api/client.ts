@@ -74,6 +74,11 @@ async function apiFetch<T>(
   method: HttpMethod = 'GET',
   body?: unknown,
   retried = false,
+  /**
+   * Si al fallar el refresco hay que expulsar al login. Verdadero para todo lo que nace de un
+   * toque del operario; **falso** para lo que reenvía la cola sin conexión — ver `replayApi`.
+   */
+  bounce = true,
 ): Promise<T> {
   const res = await request(`${BASE_URL}/api${path}`, {
     method,
@@ -90,8 +95,9 @@ async function apiFetch<T>(
     if (refreshed.ok) {
       // Se reenvía el mismo cuerpo, con la misma clave de idempotencia si la lleva, así que
       // un reintento nunca duplica una orden ni un cobro.
-      return apiFetch<T>(path, method, body, true);
+      return apiFetch<T>(path, method, body, true, bounce);
     }
+    if (!bounce) throw new ApiError(401, 'Sesión caducada', undefined, requestIdOf(res));
     bounceToLogin();
   }
 
@@ -114,6 +120,23 @@ export const api = {
   patch: <T>(path: string, body?: unknown) => apiFetch<T>(path, 'PATCH', body),
   put: <T>(path: string, body?: unknown) => apiFetch<T>(path, 'PUT', body),
   delete: <T>(path: string) => apiFetch<T>(path, 'DELETE'),
+};
+
+/**
+ * El mismo cliente, pero **sin expulsar al login**. Lo usa la cola sin conexión al reenviar.
+ *
+ * `bounceToLogin()` hace `window.location.href = '/login'`, y llamarlo desde dentro del bucle
+ * de drenado tira la pantalla a media sincronización: el operario ve desaparecer su cuenta y
+ * lo que quedaba en la cola no se envía ni deja rastro de por qué. Aquí el 401 se convierte
+ * en un `ApiError` normal, que la cola sabe clasificar: no es un fallo de la operación, es un
+ * problema de sesión, así que detiene el drenado y lo dice en el indicador en vez de
+ * mandar toda la cola a la bandeja de fallos.
+ */
+export const replayApi = {
+  post: <T>(path: string, body?: unknown) => apiFetch<T>(path, 'POST', body, false, false),
+  patch: <T>(path: string, body?: unknown) => apiFetch<T>(path, 'PATCH', body, false, false),
+  put: <T>(path: string, body?: unknown) => apiFetch<T>(path, 'PUT', body, false, false),
+  delete: <T>(path: string) => apiFetch<T>(path, 'DELETE', undefined, false, false),
 };
 
 /**
