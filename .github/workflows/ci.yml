@@ -37,6 +37,39 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
+      # ─── e2e contra el build de producción ──────────────────────────────────
+      # Va después de `build` porque Playwright arranca el servidor standalone, que es el
+      # que acaba dentro de la imagen. Contra `next dev` se probaría algo que no se despliega,
+      # y el Service Worker del cascarón —lo que este arnés existe para sostener— se comporta
+      # distinto en desarrollo.
+      - name: Caché del navegador de Playwright
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      # Solo chromium: bastan las diferencias que importan y descargar tres navegadores
+      # multiplicaría por tres el minuto más lento del pipeline.
+      - name: Instalar chromium
+        run: pnpm --filter=web exec playwright install --with-deps chromium
+
+      - name: Pruebas e2e
+        run: pnpm --filter=web test:e2e
+        env:
+          # `verifyToken` lo lee en cada petición del servidor de Next y rechaza el valor de
+          # ejemplo: sin uno propio, toda ruta protegida rebotaría a /login y el test que
+          # comprueba justo eso pasaría por el motivo equivocado.
+          JWT_SECRET: ${{ github.run_id }}-clave-efimera-de-e2e
+
+      - name: Guardar el rastro de los fallos
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 7
+
   # ─── El hueco que no cubría nada: guards, controladores y migraciones reales ────
   integration:
     name: Integración contra Postgres

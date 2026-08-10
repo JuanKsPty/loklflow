@@ -19,5 +19,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.spec.ts'],
+    // Instala una IndexedDB de mentira para los specs de la cola. Va aquí y no en cada spec
+    // porque `db.ts` la busca en el ámbito global al abrirse.
+    setupFiles: ['./vitest.setup.ts'],
   },
 });
