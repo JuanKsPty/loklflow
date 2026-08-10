@@ -1,14 +1,11 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { LogOutIcon } from 'lucide-react';
 import type { ShiftSummary } from '@loklflow/types';
-import { authApi } from '@/lib/api/auth.api';
-import { useAuthStore } from '@/stores/auth.store';
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { NotificationBell } from '@/components/notifications/notification-bell';
+import { ConnectivityIndicator } from '@/components/offline/connectivity-indicator';
+import { LogoutButton } from '@/components/offline/logout-button';
 import { ShiftControl } from '@/components/pos/shift-control';
 
 export function WaiterHeader({
@@ -20,20 +17,6 @@ export function WaiterHeader({
   roleName: string;
   shift: ShiftSummary | null | undefined;
 }) {
-  const router = useRouter();
-  const clearUser = useAuthStore((s) => s.clearUser);
-
-  async function handleLogout() {
-    try {
-      await authApi.logout();
-    } catch {
-      // ignora errores de red al cerrar sesión
-    }
-    clearUser();
-    router.push('/login');
-    router.refresh();
-  }
-
   return (
     <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur">
       <Avatar size="sm">
@@ -46,11 +29,10 @@ export function WaiterHeader({
         <p className="truncate text-xs text-muted-foreground">{roleName}</p>
       </div>
       <ShiftControl current={shift} />
+      <ConnectivityIndicator />
       <NotificationBell area="waiter" />
       <ThemeToggle />
-      <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Cerrar sesión">
-        <LogOutIcon />
-      </Button>
+      <LogoutButton />
     </header>
   );
 }

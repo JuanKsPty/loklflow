@@ -1,13 +1,11 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { LogOutIcon, WalletIcon } from 'lucide-react';
+import { WalletIcon } from 'lucide-react';
 import type { ShiftSummary } from '@loklflow/types';
-import { authApi } from '@/lib/api/auth.api';
-import { useAuthStore } from '@/stores/auth.store';
-import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { NotificationBell } from '@/components/notifications/notification-bell';
+import { ConnectivityIndicator } from '@/components/offline/connectivity-indicator';
+import { LogoutButton } from '@/components/offline/logout-button';
 import { ShiftControl } from '@/components/pos/shift-control';
 
 export function PosHeader({
@@ -19,20 +17,6 @@ export function PosHeader({
   roleName: string;
   shift: ShiftSummary | null | undefined;
 }) {
-  const router = useRouter();
-  const clearUser = useAuthStore((s) => s.clearUser);
-
-  async function handleLogout() {
-    try {
-      await authApi.logout();
-    } catch {
-      // ignora errores de red al cerrar sesión
-    }
-    clearUser();
-    router.push('/login');
-    router.refresh();
-  }
-
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4">
       <WalletIcon className="size-5 text-primary" />
@@ -44,11 +28,10 @@ export function PosHeader({
       </div>
       <div className="ml-auto flex items-center gap-1">
         <ShiftControl current={shift} />
+        <ConnectivityIndicator />
         <NotificationBell area="pos" />
         <ThemeToggle />
-        <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Cerrar sesión">
-          <LogOutIcon />
-        </Button>
+        <LogoutButton />
       </div>
     </header>
   );
