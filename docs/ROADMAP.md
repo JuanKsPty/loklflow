@@ -172,7 +172,12 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 - [x] Documentación Swagger completa y publicada _(hecho en Fase 3)_
 - [ ] README con screenshots y GIFs del sistema
 - [ ] Video demo de 2-3 minutos
-- [ ] Auditoría de seguridad básica (OWASP top 10)
+- [x] Auditoría de seguridad básica (OWASP top 10) — `docs/SECURITY.md`, con los **riesgos
+      residuales escritos con nombre y apellido**: CSP en modo informe, `unsafe-inline` en estilos,
+      bloqueo en memoria, `tokenVersion` que falla en abierto, sin MFA, roster del PIN público y sin
+      escaneo de dependencias. Se cerraron el machaqueo del PIN, la revocación de sesión, las
+      cabeceras de las dos apps, el CORS sin validar, la tabla de refrescos sin tope y un logout que
+      podía no cerrar nada
 - [ ] Optimización de performance (Lighthouse)
 
 **Entregable:** Proyecto completo, documentado y presentable para portafolio.
