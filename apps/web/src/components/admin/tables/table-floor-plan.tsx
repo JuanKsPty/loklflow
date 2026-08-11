@@ -405,16 +405,22 @@ export function TableFloorPlan({ sectors, tables, canEdit }: Props) {
               }}
             >
               <span
-                className={`absolute -top-2.5 left-3 flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold text-white ${
+                // Mismo motivo que en el mapa del mesero: blanco sobre un color elegido a mano
+                // no llega al contraste mínimo. El color se conserva como punto.
+                className={`absolute -top-2.5 left-3 flex items-center gap-1.5 rounded-full border bg-background px-2 py-0.5 text-[11px] font-semibold text-foreground ${
                   editing ? 'pointer-events-auto cursor-grab touch-none select-none active:cursor-grabbing' : ''
                 }`}
-                style={{ backgroundColor: r.accent }}
                 title={editing ? 'Arrastra para mover toda la zona' : undefined}
                 onPointerDown={editing ? (e) => onGroupPointerDown(e, r.id) : undefined}
                 onPointerMove={editing ? onGroupPointerMove : undefined}
                 onPointerUp={editing ? onGroupPointerUp : undefined}
               >
                 {editing && <MoveIcon className="size-3" />}
+                <span
+                  aria-hidden
+                  className="size-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: r.accent }}
+                />
                 {r.name}
               </span>
             </div>

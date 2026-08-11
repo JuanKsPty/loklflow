@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { z } from 'zod';
+import { z } from '@/lib/validations/zod';
 import type { BusinessConfig } from '@loklflow/types';
 import { taxBreakdown } from '@loklflow/types';
 import { businessConfigApi } from '@/lib/api/business-config.api';

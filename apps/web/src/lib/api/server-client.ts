@@ -51,6 +51,35 @@ export function isOffline(err: unknown): boolean {
   return err instanceof ServerOfflineError;
 }
 
+/**
+ * Cuerpo vacío con 200 → `null`.
+ *
+ * `GET /shifts/current` devuelve `null` cuando el cajero no tiene turno abierto, y Nest lo
+ * serializa como **cuerpo vacío**, no como `"null"`. Con `res.json()` a secas eso era un
+ * `SyntaxError: Unexpected end of JSON input`, así que el estado más normal de la caja —recién
+ * llegado, sin turno— pasaba por el `catch` y dejaba una traza de error en cada carga de `/pos`,
+ * más otra en el layout del mesero. La pantalla acertaba de casualidad: `null` por fallo se ve
+ * igual que `null` por «no hay turno».
+ *
+ * Se lee el texto y se decide, en lugar de mirar `content-length`: con `transfer-encoding:
+ * chunked` esa cabecera no viene, que es justo lo que hace un proxy por delante.
+ */
+async function parseBody<T>(res: Response, path: string): Promise<T> {
+  const text = await res.text();
+  if (text.trim() === '') return null as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch (err) {
+    // Un 200 con basura dentro es un fallo del servidor, no un dato: pasa por `ServerApiError`
+    // para que `reportApiFailure` lo cuente como tal y no se confunda con falta de red.
+    throw new ServerApiError(
+      res.status,
+      `Respuesta ilegible de ${path}: ${err instanceof Error ? err.message : String(err)}`,
+      res.headers.get('x-request-id') ?? undefined,
+    );
+  }
+}
+
 export async function serverFetch<T>(path: string): Promise<T> {
   const cookieStore = await cookies();
   const token = cookieStore.get('access_token')?.value;
@@ -74,7 +103,7 @@ export async function serverFetch<T>(path: string): Promise<T> {
       res.headers.get('x-request-id') ?? undefined,
     );
   }
-  return res.json() as Promise<T>;
+  return parseBody<T>(res, path);
 }
 
 /**
@@ -104,5 +133,5 @@ export async function serverPublicFetch<T>(path: string): Promise<T> {
       res.headers.get('x-request-id') ?? undefined,
     );
   }
-  return res.json() as Promise<T>;
+  return parseBody<T>(res, `public${path}`);
 }

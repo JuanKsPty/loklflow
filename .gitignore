@@ -46,3 +46,8 @@ coverage/
 # Playwright
 apps/web/playwright-report/
 apps/web/test-results/
+apps/web/e2e/.auth/
+apps/web/blob-report/
+
+# Vídeo de la demo: se graba, se sube fuera y se enlaza. En git solo el guion.
+docs/video/

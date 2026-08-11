@@ -22,7 +22,8 @@
     "migration:revert:prod": "pnpm typeorm:prod migration:revert",
     "seed:prod": "node dist/database/seeds/seed.js",
     "seed:deploy": "node dist/database/seeds/seed-prod.js",
-    "test:cov:all": "jest --config jest.coverage.config.ts --runInBand"
+    "test:cov:all": "jest --config jest.coverage.config.ts --runInBand",
+    "db:e2e": "TEST_DATABASE_NAME=loklflow_e2e ts-node -r tsconfig-paths/register test/prepare-e2e-db.ts"
   },
   "dependencies": {
     "@loklflow/config": "workspace:^",

@@ -78,6 +78,21 @@ function bounceToLogin(): never {
   throw new ApiError(401, 'Session expired');
 }
 
+/**
+ * Rutas donde un 401 significa «esas credenciales no valen», no «tu sesión caducó».
+ *
+ * Sin esta distinción, **teclear mal el PIN echaba al operario a `/login`**: el 401 de
+ * `/auth/pin` disparaba el refresco, el refresco daba otro 401 —no hay sesión que refrescar—, y
+ * `bounceToLogin()` lo mandaba al formulario de correo, donde un mesero no tiene credenciales. Un
+ * dedo torpe se convertía en «llama al encargado».
+ *
+ * De paso deja de haber una petición inútil a `/auth/refresh` en cada intento fallido, que era la
+ * que alimentaba el contador de bloqueo desde el lado equivocado.
+ */
+function isCredentialCheck(path: string): boolean {
+  return path === '/auth/login' || path === '/auth/pin';
+}
+
 async function apiFetch<T>(
   path: string,
   method: HttpMethod = 'GET',
@@ -96,7 +111,7 @@ async function apiFetch<T>(
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  if (res.status === 401 && !retried) {
+  if (res.status === 401 && !retried && !isCredentialCheck(path)) {
     const refreshed = await request(`${BASE_URL}/api/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
@@ -120,7 +135,12 @@ async function apiFetch<T>(
   }
 
   if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
+  // Un 200 con cuerpo vacío es `null`, no un error de sintaxis: `GET /shifts/current` responde
+  // así cuando el cajero no tiene turno abierto, que es el estado normal al llegar. Con
+  // `res.json()` a secas eso reventaba con «Unexpected end of JSON input» y la caja lo trataba
+  // como una caída de la API.
+  const text = await res.text();
+  return (text.trim() === '' ? null : JSON.parse(text)) as T;
 }
 
 export const api = {

@@ -1,6 +1,7 @@
 import { DataSource, type DataSourceOptions } from 'typeorm';
 import { databaseOptions } from '../src/config/database.config';
 import { TEST_DATABASE, withDatabase } from './env';
+import { TRANSACTIONAL_TABLES } from './transactional-tables';
 
 /**
  * Opciones de conexión apuntando a `database`. Reescribe la URL además del campo
@@ -39,29 +40,6 @@ export async function ensureTestDatabase(): Promise<void> {
     await admin.destroy();
   }
 }
-
-/** Tablas que guardan la operación del día y que cada suite puede querer vaciar. */
-const TRANSACTIONAL_TABLES = [
-  'order_item_modifiers',
-  'order_items',
-  'order_status_history',
-  'payments',
-  'discounts',
-  'orders',
-  'shifts',
-  'notifications',
-  'audit_logs',
-  'reservations',
-  // Inventario. El seed no lo siembra, así que vaciarlo no destruye catálogo. Van explícitas
-  // aunque `TRUNCATE ... CASCADE` sobre `orders` ya arrastraría `stock_movements` —CASCADE
-  // alcanza a cualquier tabla que referencie, al margen del `ON DELETE` declarado—: depender
-  // de ese efecto lateral dejaría el stock de los ingredientes intacto y las suites se
-  // contaminarían entre sí.
-  'stock_movements',
-  'recipe_ingredients',
-  'ingredients',
-  'suppliers',
-];
 
 /**
  * Vacía la operación (órdenes, pagos, turnos…) y deja intacto el catálogo que siembra el

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from './zod';
 import { TABLE_STATUSES, TABLE_SHAPES, RESERVATION_STATUSES } from '@loklflow/types';
 
 export const sectorSchema = z.object({

@@ -16,6 +16,28 @@ jobs:
   verify:
     name: Lint, tipos, tests y build
     runs-on: ubuntu-latest
+
+    # Postgres aquí, y no un job nuevo, porque el e2e de servicio necesita la API viva y la API
+    # necesita una base. Mover el e2e al job de integración obligaría a reconstruir el web allí.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: loklflow
+          POSTGRES_PASSWORD: loklflow
+          POSTGRES_DB: loklflow_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U loklflow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://loklflow:loklflow@localhost:5432/loklflow_db
+      DATABASE_SSL: 'false'
+
     steps:
       - uses: actions/checkout@v5
 
@@ -54,13 +76,28 @@ jobs:
       - name: Instalar chromium
         run: pnpm --filter=web exec playwright install --with-deps chromium
 
-      - name: Pruebas e2e
+      # ─── Primero el aislado: el núcleo sin conexión, con la red interceptada ──────
+      # Necesita que **no** haya API al otro lado; corre contra el build normal, con
+      # `NEXT_PUBLIC_API_URL` en su valor por defecto y nada escuchando ahí.
+      - name: Pruebas e2e del núcleo sin conexión
         run: pnpm --filter=web test:e2e
         env:
           # `verifyToken` lo lee en cada petición del servidor de Next y rechaza el valor de
           # ejemplo: sin uno propio, toda ruta protegida rebotaría a /login y el test que
           # comprueba justo eso pasaría por el motivo equivocado.
           JWT_SECRET: ${{ github.run_id }}-clave-efimera-de-e2e
+
+      # ─── Y luego el de servicio, con la API y Postgres de verdad ──────────────────
+      # Reconstruye el web porque `NEXT_PUBLIC_API_URL` se hornea en el bundle: un mismo build no
+      # puede a la vez hablar con una API viva y no tener ninguna al otro lado. Son ~10 s.
+      - name: Construir el web apuntando a la API del e2e
+        run: pnpm --filter=web build:e2e
+
+      - name: Pruebas e2e del servicio completo
+        run: pnpm --filter=web test:e2e:servicio
+        env:
+          JWT_SECRET: ${{ github.run_id }}-clave-efimera-de-e2e
+          JWT_REFRESH_SECRET: ${{ github.run_id }}-clave-efimera-de-refresco
 
       - name: Guardar el rastro de los fallos
         if: failure()

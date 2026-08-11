@@ -41,7 +41,6 @@ function sumPaid(order: Order): number {
 }
 
 export function CheckoutPanel({ order, onSettled, maxDiscountPercentage }: Props) {
-
   /** Cobro en curso: su firma y la clave de idempotencia que le corresponde. */
   const attempt = useRef<{ signature: string; key: string } | null>(null);
 
@@ -165,8 +164,11 @@ export function CheckoutPanel({ order, onSettled, maxDiscountPercentage }: Props
         <div className="mt-1 flex flex-wrap items-end justify-between gap-2">
           <div className="flex items-end gap-2">
             <Field className="w-28">
-              <FieldLabel className="text-xs">Propina</FieldLabel>
+              <FieldLabel className="text-xs" htmlFor="propina">
+                Propina
+              </FieldLabel>
               <Input
+                id="propina"
                 type="number"
                 min={0}
                 step="0.01"
@@ -176,7 +178,13 @@ export function CheckoutPanel({ order, onSettled, maxDiscountPercentage }: Props
                 placeholder="0.00"
               />
             </Field>
-            <Button type="button" variant="outline" size="touch" onClick={applyTip} disabled={busy || settled}>
+            <Button
+              type="button"
+              variant="outline"
+              size="touch"
+              onClick={applyTip}
+              disabled={busy || settled}
+            >
               Aplicar
             </Button>
           </div>
@@ -210,7 +218,12 @@ export function CheckoutPanel({ order, onSettled, maxDiscountPercentage }: Props
           <span>Pagado</span>
           <span className="tabular-nums">{formatPrice(summary.paid)}</span>
         </div>
-        <div className={cn('flex justify-between text-sm font-medium', settled ? 'text-success' : 'text-primary')}>
+        <div
+          className={cn(
+            'flex justify-between text-sm font-medium',
+            settled ? 'text-success' : 'text-primary',
+          )}
+        >
           <span>Restante</span>
           <span className="tabular-nums">{formatPrice(summary.remaining)}</span>
         </div>
@@ -253,22 +266,50 @@ export function CheckoutPanel({ order, onSettled, maxDiscountPercentage }: Props
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Dividir:</span>
             {[2, 3, 4].map((n) => (
-              <Button key={n} type="button" variant="ghost" size="touch" onClick={() => splitInto(n)} disabled={busy}>
+              <Button
+                key={n}
+                type="button"
+                variant="ghost"
+                size="touch"
+                onClick={() => splitInto(n)}
+                disabled={busy}
+              >
                 ÷{n}
               </Button>
             ))}
           </div>
 
           <Field>
-            <FieldLabel className="text-xs">Monto a cobrar</FieldLabel>
-            <Input type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={busy} />
+            <FieldLabel className="text-xs" htmlFor="monto-a-cobrar">
+              Monto a cobrar
+            </FieldLabel>
+            <Input
+              id="monto-a-cobrar"
+              type="number"
+              min={0}
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              disabled={busy}
+            />
           </Field>
 
           {method === 'cash' && (
             <div className="flex items-end gap-3">
               <Field className="flex-1">
-                <FieldLabel className="text-xs">Recibido</FieldLabel>
-                <Input type="number" min={0} step="0.01" value={received} onChange={(e) => setReceived(e.target.value)} disabled={busy} placeholder="0.00" />
+                <FieldLabel className="text-xs" htmlFor="recibido">
+                  Recibido
+                </FieldLabel>
+                <Input
+                  id="recibido"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={received}
+                  onChange={(e) => setReceived(e.target.value)}
+                  disabled={busy}
+                  placeholder="0.00"
+                />
               </Field>
               <div className="pb-2 text-sm">
                 <span className="text-muted-foreground">Cambio: </span>
@@ -279,8 +320,16 @@ export function CheckoutPanel({ order, onSettled, maxDiscountPercentage }: Props
 
           {(method === 'card' || method === 'transfer' || method === 'digital_wallet') && (
             <Field>
-              <FieldLabel className="text-xs">Referencia (opcional)</FieldLabel>
-              <Input value={reference} onChange={(e) => setReference(e.target.value)} disabled={busy} placeholder="Folio / terminal" />
+              <FieldLabel className="text-xs" htmlFor="referencia-pago">
+                Referencia (opcional)
+              </FieldLabel>
+              <Input
+                id="referencia-pago"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                disabled={busy}
+                placeholder="Folio / terminal"
+              />
             </Field>
           )}
 

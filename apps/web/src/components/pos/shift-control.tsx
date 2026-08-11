@@ -85,8 +85,11 @@ function OpenShiftButton() {
           <DialogDescription>Registra el fondo inicial de efectivo.</DialogDescription>
         </DialogHeader>
         <Field>
-          <FieldLabel className="text-xs">Fondo inicial</FieldLabel>
+          <FieldLabel className="text-xs" htmlFor="fondo-inicial">
+            Fondo inicial
+          </FieldLabel>
           <Input
+            id="fondo-inicial"
             type="number"
             min={0}
             step="0.01"
@@ -96,8 +99,15 @@ function OpenShiftButton() {
           />
         </Field>
         <Field>
-          <FieldLabel className="text-xs">Notas (opcional)</FieldLabel>
-          <Input value={notes} onChange={(e) => setNotes(e.target.value)} disabled={busy} />
+          <FieldLabel className="text-xs" htmlFor="notas-apertura">
+            Notas (opcional)
+          </FieldLabel>
+          <Input
+            id="notas-apertura"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            disabled={busy}
+          />
         </Field>
         <DialogFooter>
           <DialogClose render={<Button variant="outline" disabled={busy} />}>Cancelar</DialogClose>
@@ -119,7 +129,8 @@ function CloseShiftButton({ current }: { current: ShiftSummary }) {
   const [busy, setBusy] = useState(false);
 
   const countedNum = Number(closingCash) || 0;
-  const difference = closingCash.trim() === '' ? null : Number((countedNum - current.expectedCash).toFixed(2));
+  const difference =
+    closingCash.trim() === '' ? null : Number((countedNum - current.expectedCash).toFixed(2));
 
   async function submit() {
     setBusy(true);
@@ -190,8 +201,11 @@ function CloseShiftButton({ current }: { current: ShiftSummary }) {
         </div>
 
         <Field>
-          <FieldLabel className="text-xs">Efectivo contado</FieldLabel>
+          <FieldLabel className="text-xs" htmlFor="efectivo-contado">
+            Efectivo contado
+          </FieldLabel>
           <Input
+            id="efectivo-contado"
             type="number"
             min={0}
             step="0.01"
@@ -219,8 +233,15 @@ function CloseShiftButton({ current }: { current: ShiftSummary }) {
         )}
 
         <Field>
-          <FieldLabel className="text-xs">Notas (opcional)</FieldLabel>
-          <Input value={notes} onChange={(e) => setNotes(e.target.value)} disabled={busy} />
+          <FieldLabel className="text-xs" htmlFor="notas-cierre">
+            Notas (opcional)
+          </FieldLabel>
+          <Input
+            id="notas-cierre"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            disabled={busy}
+          />
         </Field>
 
         <DialogFooter>

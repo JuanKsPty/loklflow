@@ -155,10 +155,19 @@ export function WaiterFloorMap({
                 backgroundColor: `${r.accent}0f`,
               }}
             >
-              <span
-                className="absolute -top-2.5 left-3 rounded-full px-2 py-0.5 text-[11px] font-semibold text-white"
-                style={{ backgroundColor: r.accent }}
-              >
+              {/*
+                El nombre de la zona iba en blanco sobre el color del sector, y el color del
+                sector lo elige un humano: con el índigo del seed sale a 4.46 y con el rosa a
+                3.52, por debajo del 4.5 que pide WCAG AA. Ningún ajuste lo arregla para
+                *cualquier* color, así que el texto va sobre el fondo del sistema —que sí tiene
+                contraste garantizado— y el color se conserva como punto.
+              */}
+              <span className="absolute -top-2.5 left-3 flex items-center gap-1.5 rounded-full border bg-background px-2 py-0.5 text-[11px] font-semibold text-foreground">
+                <span
+                  aria-hidden
+                  className="size-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: r.accent }}
+                />
                 {r.name}
               </span>
             </div>

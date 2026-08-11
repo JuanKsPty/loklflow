@@ -95,7 +95,11 @@ export function TableView({
           <p className="text-sm font-medium text-muted-foreground">
             Cuentas {accounts.length > 0 && `(${accounts.length})`}
           </p>
-          <Button size="touch" nativeButton={false} render={<Link href={`/waiter/nueva?tableId=`} />}>
+          <Button
+            size="touch"
+            nativeButton={false}
+            render={<Link href={`/waiter/nueva?tableId=${table.id}`} />}
+          >
             <PlusIcon />
             Nueva cuenta
           </Button>

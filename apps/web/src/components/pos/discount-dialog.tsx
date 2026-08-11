@@ -34,12 +34,7 @@ interface Props {
   onApplied: () => void;
 }
 
-export function DiscountDialog({
-  order,
-  maxDiscountPercentage,
-  disabled,
-  onApplied,
-}: Props) {
+export function DiscountDialog({ order, maxDiscountPercentage, disabled, onApplied }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<DiscountType>('percentage');
@@ -58,8 +53,7 @@ export function DiscountDialog({
 
   const needsApproval = percentage > maxDiscountPercentage;
   const exceedsSubtotal = amount > subtotal;
-  const canSubmit =
-    !busy && valueNum > 0 && reason.trim().length >= 3 && !exceedsSubtotal;
+  const canSubmit = !busy && valueNum > 0 && reason.trim().length >= 3 && !exceedsSubtotal;
 
   async function submit() {
     setBusy(true);
@@ -146,8 +140,11 @@ export function DiscountDialog({
         </Field>
 
         <Field>
-          <FieldLabel className="text-xs">Motivo</FieldLabel>
+          <FieldLabel className="text-xs" htmlFor="motivo-descuento">
+            Motivo
+          </FieldLabel>
           <Input
+            id="motivo-descuento"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Cliente frecuente, error de cocina…"
@@ -161,9 +158,7 @@ export function DiscountDialog({
           <p
             className={cn(
               'rounded-lg px-3 py-2 text-xs',
-              needsApproval
-                ? 'bg-amber-500/10 text-amber-600'
-                : 'bg-success/10 text-success',
+              needsApproval ? 'bg-amber-500/10 text-amber-600' : 'bg-success/10 text-success',
             )}
           >
             {needsApproval
@@ -173,9 +168,7 @@ export function DiscountDialog({
         )}
 
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" disabled={busy} />}>
-            Cancelar
-          </DialogClose>
+          <DialogClose render={<Button variant="outline" disabled={busy} />}>Cancelar</DialogClose>
           <Button onClick={submit} disabled={!canSubmit} size="touch">
             {busy && <Spinner />}
             {needsApproval ? 'Enviar a aprobación' : 'Aplicar'}

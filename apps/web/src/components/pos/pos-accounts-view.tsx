@@ -85,7 +85,7 @@ export function PosAccountsView({
       )}
 
       {!shiftOpen && !shiftUnknown && (
-        <div className="mb-4 flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-3 text-sm text-primary">
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-3 text-sm text-primary">
           <LockOpenIcon className="size-4 shrink-0" />
           <span>No tienes turno abierto. Abre tu turno (botón arriba) para poder cobrar.</span>
         </div>
