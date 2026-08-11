@@ -1,9 +1,8 @@
 import { redirect } from 'next/navigation';
-import type { ShiftSummary } from '@loklflow/types';
 import { getServerUser } from '@/lib/auth/server-user';
-import { serverFetch } from '@/lib/api/server-client';
-import { reportApiFailure } from '@/lib/observability/api-failure';
+import { currentShift } from '@/lib/api/current-shift';
 import { SocketProvider } from '@/components/realtime/socket-provider';
+import { OfflineProvider } from '@/components/offline/offline-provider';
 import { WaiterHeader } from '@/components/waiter/waiter-header';
 import { WaiterNav } from '@/components/waiter/waiter-nav';
 
@@ -17,21 +16,19 @@ export default async function WaiterLayout({ children }: { children: React.React
   // `undefined` = no se pudo consultar, distinto de `null` = no hay turno abierto.
   // Antes las dos cosas eran `null`, así que un fallo de red hacía que la cabecera
   // ofreciera «Abrir turno» sobre un turno que ya estaba abierto.
-  let shift: ShiftSummary | null | undefined;
-  try {
-    shift = await serverFetch<ShiftSummary | null>('/shifts/current');
-  } catch (err) {
-    reportApiFailure('waiter:layout', err);
-    shift = undefined;
-  }
+  const shift = await currentShift();
 
   return (
     <SocketProvider>
-      <div className="mx-auto flex h-dvh w-full max-w-5xl flex-col bg-background">
-        <WaiterHeader name={user.email ?? user.roleName} roleName={user.roleName} shift={shift} />
-        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-20 pt-4">{children}</main>
-        <WaiterNav />
-      </div>
+      <OfflineProvider>
+        <div className="mx-auto flex h-dvh w-full max-w-5xl flex-col bg-background">
+          <WaiterHeader name={user.email ?? user.roleName} roleName={user.roleName} shift={shift} />
+          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-20 pt-4">
+            {children}
+          </main>
+          <WaiterNav />
+        </div>
+      </OfflineProvider>
     </SocketProvider>
   );
 }

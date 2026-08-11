@@ -1,6 +1,7 @@
 import { DataSource, type DataSourceOptions } from 'typeorm';
 import { databaseOptions } from '../src/config/database.config';
 import { TEST_DATABASE, withDatabase } from './env';
+import { TRANSACTIONAL_TABLES } from './transactional-tables';
 
 /**
  * Opciones de conexión apuntando a `database`. Reescribe la URL además del campo
@@ -40,29 +41,6 @@ export async function ensureTestDatabase(): Promise<void> {
   }
 }
 
-/** Tablas que guardan la operación del día y que cada suite puede querer vaciar. */
-const TRANSACTIONAL_TABLES = [
-  'order_item_modifiers',
-  'order_items',
-  'order_status_history',
-  'payments',
-  'discounts',
-  'orders',
-  'shifts',
-  'notifications',
-  'audit_logs',
-  'reservations',
-  // Inventario. El seed no lo siembra, así que vaciarlo no destruye catálogo. Van explícitas
-  // aunque `TRUNCATE ... CASCADE` sobre `orders` ya arrastraría `stock_movements` —CASCADE
-  // alcanza a cualquier tabla que referencie, al margen del `ON DELETE` declarado—: depender
-  // de ese efecto lateral dejaría el stock de los ingredientes intacto y las suites se
-  // contaminarían entre sí.
-  'stock_movements',
-  'recipe_ingredients',
-  'ingredients',
-  'suppliers',
-];
-
 /**
  * Vacía la operación (órdenes, pagos, turnos…) y deja intacto el catálogo que siembra el
  * seed: usuarios, roles, permisos, productos y mesas. Así cada suite parte de un estado
@@ -78,7 +56,12 @@ export async function resetOperationalData(ds: DataSource): Promise<void> {
   );
   // Las mesas quedan como las dejó la última orden; devolverlas a 'available' es parte del
   // estado conocido, porque varias comprobaciones miran si una mesa se liberó.
-  await ds.query(`UPDATE "tables" SET status = 'available'`);
+  //
+  // `status_changed_at` se retrasa a propósito en vez de ponerse en `now()`: es lo que
+  // `updateStatus` compara contra el `occurredAt` de una operación encolada, y dejarlo en el
+  // instante del reset haría que cualquier prueba con una hora «de hace un momento» quedara
+  // por detrás del reset y se descartara — un fallo que dependería de milisegundos.
+  await ds.query(`UPDATE "tables" SET status = 'available', status_changed_at = now() - interval '1 day'`);
 }
 
 /** Todas las tablas del esquema público menos el registro de migraciones. */

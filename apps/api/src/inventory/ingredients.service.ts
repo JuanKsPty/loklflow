@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Ingredient } from './entities/ingredient.entity';
@@ -69,7 +69,25 @@ export class IngredientsService {
     return ingredient;
   }
 
+
+  /**
+   * `isActive: false` **no** se acepta por aquí, y la asimetría es deliberada.
+   *
+   * Desactivar es una baja lógica: tiene su propio endpoint, con permiso `inventory:delete`, y su
+   * comentario explicando por qué no se borra. Permitirlo también en el PATCH —que va con
+   * `inventory:update`— hacía que ese permiso no sirviera para nada: cualquiera con permiso de
+   * edición podía dar de baja, que es justo lo que el controlador guarda aparte. Los formularios lo
+   * hacían así con un interruptor, y por eso `inventory:delete` no lo ejercía nadie.
+   *
+   * Reactivar **sí** se permite por PATCH: no es destructivo, y exigir un endpoint aparte para
+   * volver a poner algo en circulación sería ceremonia sin motivo.
+   */
   async update(id: string, dto: UpdateIngredientDto) {
+    if (dto.isActive === false) {
+      throw new BadRequestException(
+        'Para dar de baja un ingrediente usa la baja lógica, no la edición.',
+      );
+    }
     const ingredient = await this.findOne(id);
     Object.assign(ingredient, dto);
     return this.ingredientsRepo.save(ingredient);

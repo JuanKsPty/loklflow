@@ -1,13 +1,17 @@
+import dynamic from 'next/dynamic';
+import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import {
   BanknoteIcon,
   ClockIcon,
+  PackageIcon,
   PercentIcon,
   ReceiptTextIcon,
   TimerIcon,
   UtensilsCrossedIcon,
 } from 'lucide-react';
 import type {
+  Ingredient,
   PrepTimeMetric,
   SalesByDay,
   SalesSummary,
@@ -19,8 +23,26 @@ import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { StatCard } from '@/components/admin/dashboard/stat-card';
-import { SalesChart } from '@/components/admin/dashboard/sales-chart';
-import { MethodChart } from '@/components/admin/dashboard/method-chart';
+
+/**
+ * Las gráficas se cargan aparte, no con el resto de la pantalla.
+ *
+ * `recharts` es la dependencia más pesada del proyecto y se importaba de forma síncrona en
+ * `/admin`, que es la primera pantalla que ve el dueño: su código entraba en el arranque aunque
+ * los indicadores de arriba se pinten mucho antes.
+ *
+ * **Sin `ssr: false`**, que en un Server Component de Next ≥15 es ilegal. La ganancia buscada es
+ * la del bundle de cliente, no la de saltarse el render en servidor; el `loading` evita además
+ * que la maqueta salte cuando llega el trozo.
+ */
+const SalesChart = dynamic(
+  () => import('@/components/admin/dashboard/sales-chart').then((m) => m.SalesChart),
+  { loading: () => <Skeleton className="h-64 w-full rounded-xl" /> },
+);
+const MethodChart = dynamic(
+  () => import('@/components/admin/dashboard/method-chart').then((m) => m.MethodChart),
+  { loading: () => <Skeleton className="h-64 w-full rounded-xl" /> },
+);
 import { ExportButton } from '@/components/admin/dashboard/export-button';
 import { RealtimeRefresher } from '@/components/realtime/realtime-refresher';
 
@@ -69,13 +91,21 @@ export default async function DashboardPage({ searchParams }: Props) {
     openOrdersValue: 0,
   };
 
-  const [summary, topProducts, prep, byDay] = await Promise.all([
+  const [summary, topProducts, prep, byDay, lowStock] = await Promise.all([
     serverFetch<SalesSummary>(`/reports/sales-summary${q}`).catch(() => empty),
     serverFetch<TopProduct[]>(`/reports/top-products${q}`).catch(() => [] as TopProduct[]),
-    serverFetch<PrepTimeMetric>(`/reports/prep-times${q}`).catch(
-      () => ({ averageMinutes: null, averageKitchenMinutes: null, sampleSize: 0 }),
-    ),
+    serverFetch<PrepTimeMetric>(`/reports/prep-times${q}`).catch(() => ({
+      averageMinutes: null,
+      averageKitchenMinutes: null,
+      sampleSize: 0,
+    })),
     serverFetch<SalesByDay[]>(`/reports/sales-by-day${q}`).catch(() => [] as SalesByDay[]),
+    // El aviso de stock mínimo existía como notificación —que se lee una vez y se pierde— y como
+    // filtro que nadie llamaba. Aquí es lo primero que ve el dueño al abrir el panel, que es
+    // cuando de verdad puede hacer algo al respecto: pedir.
+    serverFetch<Ingredient[]>('/inventory/ingredients?lowStock=true').catch(
+      () => [] as Ingredient[],
+    ),
   ]);
 
   const maxQty = Math.max(1, ...topProducts.map((p) => p.quantity));
@@ -104,6 +134,28 @@ export default async function DashboardPage({ searchParams }: Props) {
           </Link>
         ))}
       </div>
+
+      {lowStock.length > 0 && (
+        // Enlaza al filtro, así que el aviso lleva directamente a la lista de lo que hay que
+        // pedir en vez de dejar al dueño buscándolo.
+        <Link
+          href="/admin/inventario?tab=ingredients&lowStock=true"
+          className="mb-3 flex items-center gap-2 rounded-xl border border-warning/30 bg-warning/10 px-3 py-3 text-sm text-warning transition-colors hover:bg-warning/15"
+        >
+          <PackageIcon className="size-4 shrink-0" />
+          <span>
+            <strong>
+              {lowStock.length} {lowStock.length === 1 ? 'ingrediente' : 'ingredientes'}
+            </strong>{' '}
+            bajo el mínimo:{' '}
+            {lowStock
+              .slice(0, 3)
+              .map((i) => i.name)
+              .join(', ')}
+            {lowStock.length > 3 && ` y ${lowStock.length - 3} más`}.
+          </span>
+        </Link>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -225,9 +277,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                 <UtensilsCrossedIcon className="size-4" />
                 Propinas
               </span>
-              <span className="tabular-nums font-medium">
-                {formatPrice(summary.totalTips)}
-              </span>
+              <span className="tabular-nums font-medium">{formatPrice(summary.totalTips)}</span>
             </div>
           </CardContent>
         </Card>

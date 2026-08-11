@@ -4,6 +4,7 @@ import { reportApiFailure } from '@/lib/observability/api-failure';
 import { PageHeader } from '@/components/page-header';
 import { ApiDownNotice } from '@/components/offline/api-down-notice';
 import { SupplierForm } from '@/components/admin/inventory/supplier-form';
+import { ActiveControl } from '@/components/admin/inventory/active-control';
 import type { Supplier } from '@loklflow/types';
 
 interface Props {
@@ -35,6 +36,14 @@ export default async function EditSupplierPage({ params }: Props) {
     <div>
       <PageHeader title="Editar proveedor" description={supplier.name} />
       <SupplierForm supplier={supplier} />
+      <div className="mt-6">
+        <ActiveControl
+          kind="supplier"
+          id={supplier.id}
+          isActive={supplier.isActive}
+          name={supplier.name}
+        />
+      </div>
     </div>
   );
 }

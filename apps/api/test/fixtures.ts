@@ -16,11 +16,14 @@ export interface SeededUser {
   name: string;
   roleId: string;
   roleName: string;
+  /** Versión de sesión actual. La necesita `sessionAs` para firmar un token que no esté revocado. */
+  tokenVersion: number;
 }
 
 export async function seededUser(app: INestApplication, email: string): Promise<SeededUser> {
   const rows: SeededUser[] = await app.get(DataSource).query(
-    `SELECT u.id, u.name, u.role_id AS "roleId", r.name AS "roleName"
+    `SELECT u.id, u.name, u.role_id AS "roleId", r.name AS "roleName",
+            u.token_version AS "tokenVersion"
        FROM users u JOIN roles r ON r.id = u.role_id
       WHERE u.email = $1`,
     [email],
@@ -72,6 +75,15 @@ export async function tableStatus(app: INestApplication, tableId: string): Promi
  * quieran dar. Los permisos siguen siendo explícitos —no se leen del rol— para que cada
  * test declare exactamente la autorización que necesita.
  */
+/**
+ * Sesión firmada para un usuario sembrado.
+ *
+ * **Lleva la `tokenVersion` actual del usuario**, leída de la base en el momento. No es opcional:
+ * `JwtStrategy` rechaza un token cuya versión no coincida, así que cualquier test que corra después
+ * de otro que haya dado de baja a alguien o cambiado permisos de un rol se encontraría con 401 en
+ * todas sus peticiones —y el fallo aparecería en una suite que no tiene nada que ver, según el
+ * orden de ejecución.
+ */
 export async function sessionAs(
   app: INestApplication,
   email: string,
@@ -84,5 +96,6 @@ export async function sessionAs(
     email,
     roleId: user.roleId,
     roleName: user.roleName,
+    tv: user.tokenVersion,
   });
 }

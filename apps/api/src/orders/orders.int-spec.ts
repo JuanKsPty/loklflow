@@ -315,4 +315,111 @@ describe('Órdenes de punta a punta', () => {
       await list('?estado=pending').expect(400);
     });
   });
+
+  // El pipe global corre con `forbidNonWhitelisted`, así que hasta que estos campos se
+  // declararon, TODA operación reenviada por la cola sin conexión recibía un 400 — que la
+  // cola clasifica como fallo definitivo. La función que se probaba a sí misma mandaba cada
+  // comanda diferida directa a la bandeja de fallos.
+  describe('la hora del hecho que reporta el dispositivo', () => {
+    const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
+
+    it('acepta occurredAt al crear y lo guarda junto a created_at, sin pisarlo', async () => {
+      const at = ago(20 * 60 * 1000);
+      const res = await createOrder({
+        occurredAt: at,
+        items: [{ productId: product.id, quantity: 1, occurredAt: at }],
+      }).expect(201);
+
+      // Instantes, nunca cadenas: el arnés fuerza TZ=America/Mexico_City y CI corre en UTC.
+      expect(new Date(res.body.occurredAt).getTime()).toBe(new Date(at).getTime());
+      expect(new Date(res.body.createdAt).getTime()).toBeGreaterThan(new Date(at).getTime());
+      expect(new Date(res.body.statusHistory[0].occurredAt).getTime()).toBe(new Date(at).getTime());
+    });
+
+    it('guarda la hora del hecho en el historial al cambiar de estado', async () => {
+      const created = await createOrder({
+        items: [{ productId: product.id, quantity: 1 }],
+      }).expect(201);
+      const at = ago(12 * 60 * 1000);
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/orders/${created.body.id}/status`)
+        .set('Cookie', cookie)
+        .send({ status: 'preparing', occurredAt: at })
+        .expect(200);
+
+      const entry = res.body.statusHistory.find(
+        (h: { toStatus: string }) => h.toStatus === 'preparing',
+      );
+      expect(new Date(entry.occurredAt).getTime()).toBe(new Date(at).getTime());
+    });
+
+    it('descarta un reloj imposible en lugar de rechazar la comanda', async () => {
+      // Una tablet con la fecha mal puesta no puede costar una comanda: el sello se cae, la
+      // orden entra.
+      const res = await createOrder({
+        occurredAt: '2126-01-01T00:00:00.000Z',
+        items: [{ productId: product.id, quantity: 1 }],
+      }).expect(201);
+
+      expect(res.body.occurredAt).toBeNull();
+    });
+
+    it('no rompe las operaciones que no guardan la hora, pero la aceptan', async () => {
+      // `updateItem` y `updateItemStatus` no tienen dónde ponerla. Declaran el campo solo para
+      // que `forbidNonWhitelisted` no convierta el reenvío en un 400 definitivo.
+      const created = await createOrder({
+        items: [{ productId: product.id, quantity: 1 }],
+      }).expect(201);
+      const itemId = created.body.items[0].id;
+
+      await request(app.getHttpServer())
+        .patch(`/api/orders/${created.body.id}/items/${itemId}`)
+        .set('Cookie', cookie)
+        .send({ quantity: 2, occurredAt: ago(60_000) })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .patch(`/api/orders/${created.body.id}/items/${itemId}/status`)
+        .set('Cookie', cookie)
+        .send({ status: 'preparing', occurredAt: ago(60_000) })
+        .expect(200);
+    });
+
+    it('una operación de mesa vieja no pisa un estado más reciente', async () => {
+      // El conflicto que sí es alcanzable: el mesero marca la mesa libre sin red mientras la
+      // caja la marca ocupada. Gana el hecho más nuevo, no el que llegue más tarde. Y se
+      // responde 200: nadie debe encontrar una entrada en la bandeja de fallos por el color
+      // de una mesa.
+      const tablesCookie = await sessionAs(app, 'admin@loklflow.com', [
+        'tables:read',
+        'tables:update',
+      ]);
+      const patch = (body: Record<string, unknown>) =>
+        request(app.getHttpServer())
+          .patch(`/api/tables/${table.id}/status`)
+          .set('Cookie', tablesCookie)
+          .send(body);
+
+      await patch({ status: 'occupied' }).expect(200);
+      const res = await patch({ status: 'available', occurredAt: ago(60 * 60 * 1000) }).expect(200);
+
+      expect(res.body.status).toBe('occupied');
+      expect(await tableStatus(app, table.id)).toBe('occupied');
+    });
+
+    it('una operación de mesa reciente sí se aplica', async () => {
+      const tablesCookie = await sessionAs(app, 'admin@loklflow.com', [
+        'tables:read',
+        'tables:update',
+      ]);
+      const res = await request(app.getHttpServer())
+        .patch(`/api/tables/${table.id}/status`)
+        .set('Cookie', tablesCookie)
+        .send({ status: 'cleaning', occurredAt: new Date().toISOString() })
+        .expect(200);
+
+      expect(res.body.status).toBe('cleaning');
+    });
+  });
 });

@@ -4,6 +4,7 @@ import {
   IsArray,
   IsIn,
   IsInt,
+  IsISO8601,
   IsOptional,
   IsString,
   IsUUID,
@@ -38,6 +39,19 @@ export class CreateOrderItemDto {
   @IsArray()
   @IsUUID('all', { each: true })
   modifierOptionIds?: string[];
+
+  /**
+   * Hora a la que la línea se añadió de verdad en el salón. La pone la cola sin conexión al
+   * reenviar (`withOccurredAt`), y para `order.addItem` **el ítem es el cuerpo de la
+   * petición**, así que el campo tiene que estar aquí y no solo en `CreateOrderDto`.
+   *
+   * Anidada dentro de `CreateOrderDto.items` no se usa para nada, pero se acepta: el pipe
+   * global corre con `forbidNonWhitelisted`, así que un campo no declarado devolvería 400 y
+   * la cola trataría ese 400 como definitivo. Perderíamos la comanda por un sello de hora.
+   */
+  @IsOptional()
+  @IsISO8601()
+  occurredAt?: string;
 }
 
 export class CreateOrderDto {
@@ -71,6 +85,15 @@ export class CreateOrderDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  /**
+   * Hora a la que se abrió la cuenta en el salón, no aquella en que el servidor se entera.
+   * Se guarda en `orders.occurred_at` tras pasar por `saneOccurredAt`, que descarta relojes
+   * imposibles en vez de rechazar la comanda.
+   */
+  @IsOptional()
+  @IsISO8601()
+  occurredAt?: string;
 
   @IsArray()
   @ArrayMinSize(1)

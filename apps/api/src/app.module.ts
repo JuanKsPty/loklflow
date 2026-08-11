@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -23,6 +24,7 @@ import { ShiftsModule } from './shifts/shifts.module';
 import { DiscountsModule } from './discounts/discounts.module';
 import { ReportsModule } from './reports/reports.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { PublicModule } from './public/public.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
@@ -42,6 +44,21 @@ import { ShutdownLogger } from './common/logging/shutdown.logger';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => config.get('database')!,
     }),
+    /**
+     * Límite de peticiones, **sin guard global**.
+     *
+     * Se declara el módulo para que `AuthThrottlerGuard` tenga su almacén, y el guard se aplica
+     * a mano solo en `AuthController`. Un `APP_GUARD` aquí estrangularía el local entero: todo
+     * el tráfico de lectura sale de la IP del servidor de Next, `RealtimeRefresher` genera 12–18
+     * peticiones por acción humana, y la ráfaga de reconexión de la cola sin conexión dispararía
+     * el límite justo cuando lo que se está enviando son comandas.
+     *
+     * Almacén en memoria, que es el que trae por defecto: hay **un** servidor dentro del local.
+     * Redis está declarado en `redis.config.ts` y nadie conecta a él; el día que haya varias
+     * instancias, la pieza es `@nest-lab/throttler-storage-redis`, igual que el adaptador de
+     * Socket.io. Coste asumido hasta entonces: los contadores se pierden al reiniciar el proceso.
+     */
+    ThrottlerModule.forRoot([{ name: 'sesion', ttl: 60_000, limit: 10 }]),
     AuthModule,
     UsersModule,
     RolesModule,
@@ -57,6 +74,7 @@ import { ShutdownLogger } from './common/logging/shutdown.logger';
     DiscountsModule,
     ReportsModule,
     InventoryModule,
+    PublicModule,
   ],
   controllers: [AppController],
   providers: [

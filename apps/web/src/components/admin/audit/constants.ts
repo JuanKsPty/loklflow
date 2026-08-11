@@ -11,21 +11,33 @@ export const AUDIT_ACTION_BADGE: Record<AuditAction, string> = {
   'role.deleted': 'border-destructive/30 bg-destructive/10 text-destructive',
   'order.cancelled': 'border-destructive/30 bg-destructive/10 text-destructive',
   'auth.login_failed': 'border-destructive/30 bg-destructive/10 text-destructive',
+  // Alguien estuvo probando lo suficiente como para que el sistema lo parara. Es lo primero que
+  // el dueño quiere ver en la bitácora.
+  'auth.login_locked': 'border-destructive/30 bg-destructive/10 text-destructive',
 
   // Cambios de privilegios: el mayor impacto en seguridad
-  'user.role_changed': 'border-amber-500/30 bg-amber-500/10 text-amber-600',
-  'role.permissions_changed': 'border-amber-500/30 bg-amber-500/10 text-amber-600',
+  'user.role_changed': 'border-warning/30 bg-warning/10 text-warning',
+  'role.permissions_changed': 'border-warning/30 bg-warning/10 text-warning',
 
   // Dinero
   'payment.recorded': 'border-success/30 bg-success/10 text-success',
-  'shift.opened': 'border-teal-500/30 bg-teal-500/10 text-teal-600',
-  'shift.closed': 'border-teal-500/30 bg-teal-500/10 text-teal-600',
+  'shift.opened': 'border-info/30 bg-info/10 text-info',
+  'shift.closed': 'border-info/30 bg-info/10 text-info',
 
   // Alta y edición de datos maestros
   'user.created': 'border-primary/30 bg-primary/10 text-primary',
   'user.updated': 'border-primary/30 bg-primary/10 text-primary',
   'role.created': 'border-primary/30 bg-primary/10 text-primary',
   'role.updated': 'border-primary/30 bg-primary/10 text-primary',
+
+  // Invalida material impreso: las hojas de QR que estén en las mesas dejan de servir en el
+  // instante en que esto ocurre, así que no es rutina.
+  'table.qr_rotated': 'border-warning/30 bg-warning/10 text-warning',
+
+  // Mueve dinero de una cuenta a otra sin cobrar nada: no es destructivo, pero cambia qué se
+  // cobra y dónde, así que tiene que verse.
+  'order.merged': 'border-info/30 bg-info/10 text-info',
+  'order.unmerged': 'border-info/30 bg-info/10 text-info',
 
   // Rutina
   'auth.login': 'border-border bg-muted text-muted-foreground',

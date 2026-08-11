@@ -10,9 +10,10 @@ interface Props {
   tables: ReactNode;
   sectors: ReactNode;
   reservations: ReactNode;
+  qr: ReactNode;
 }
 
-export function TablesTabs({ initial, map, tables, sectors, reservations }: Props) {
+export function TablesTabs({ initial, map, tables, sectors, reservations, qr }: Props) {
   const [value, setValue] = useState(initial);
   const router = useRouter();
   const pathname = usePathname();
@@ -29,6 +30,7 @@ export function TablesTabs({ initial, map, tables, sectors, reservations }: Prop
         <TabsTrigger value="tables">Mesas</TabsTrigger>
         <TabsTrigger value="sectors">Sectores</TabsTrigger>
         <TabsTrigger value="reservations">Reservas</TabsTrigger>
+        <TabsTrigger value="qr">Códigos QR</TabsTrigger>
       </TabsList>
 
       <TabsContent value="map" className="mt-4">
@@ -42,6 +44,9 @@ export function TablesTabs({ initial, map, tables, sectors, reservations }: Prop
       </TabsContent>
       <TabsContent value="reservations" className="mt-4">
         {reservations}
+      </TabsContent>
+      <TabsContent value="qr" className="mt-4">
+        {qr}
       </TabsContent>
     </Tabs>
   );

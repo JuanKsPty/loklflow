@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity';
 import { RolesService } from '../roles/roles.service';
+import { TokenVersionCache } from '../token-version/token-version.cache';
 import { AuditService } from '../audit/audit.service';
 import type { AuditAction } from '../audit/audit-actions.constants';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
@@ -21,6 +22,7 @@ export class UsersService {
     private usersRepo: Repository<User>,
     private rolesService: RolesService,
     private readonly audit: AuditService,
+    private readonly tokenVersions: TokenVersionCache,
   ) {}
 
   findAll() {
@@ -49,14 +51,55 @@ export class UsersService {
     });
   }
 
+  /**
+   * La lista del PIN pad, que es **pública**.
+   *
+   * Se conserva pública en vez de cerrarse: sin ella habría que teclear un uuid para entrar, y el
+   * «secreto» que protegería es la plantilla de un restaurante — visible para cualquiera que se
+   * acerque a la barra. Ocultarla contra un PIN de cuatro dígitos sería seguridad por oscuridad; lo
+   * que de verdad protege es el bloqueo por intentos fallidos.
+   *
+   * Lo que sí se estrecha es **qué** devuelve: fuera `role.id`, que es un identificador interno que
+   * la pantalla no usa —solo pinta `role.name`— y que no hay ninguna razón para publicar. Los
+   * administradores no aparecen sin necesidad de filtrarlos: entran por correo y no tienen PIN.
+   */
   async findOperationalUsers() {
     return this.usersRepo
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.role', 'role')
+      .leftJoin('user.role', 'role')
       .where('user.isActive = :active', { active: true })
       .andWhere('user.pin IS NOT NULL')
-      .select(['user.id', 'user.name', 'role.id', 'role.name'])
-      .getMany();
+      .select(['user.id', 'user.name'])
+      .addSelect('role.name', 'roleName')
+      .orderBy('user.name', 'ASC')
+      .getRawMany<{ user_id: string; user_name: string; roleName: string }>()
+      .then((rows) =>
+        rows.map((r) => ({ id: r.user_id, name: r.user_name, role: { name: r.roleName } })),
+      );
+  }
+
+  /**
+   * Un solo usuario operativo, para la pantalla del PIN pad de `/pin/[userId]`.
+   *
+   * Existe porque esa pantalla se descargaba **el roster completo** y hacía `.find()`: dos volcados
+   * anónimos de la plantilla por cada carga del teclado, cuando solo necesita un nombre.
+   */
+  async findOperationalUser(id: string) {
+    const rows = await this.usersRepo
+      .createQueryBuilder('user')
+      .leftJoin('user.role', 'role')
+      .where('user.id = :id', { id })
+      .andWhere('user.isActive = :active', { active: true })
+      .andWhere('user.pin IS NOT NULL')
+      .select(['user.id', 'user.name'])
+      .addSelect('role.name', 'roleName')
+      .getRawMany<{ user_id: string; user_name: string; roleName: string }>();
+
+    // El mismo 404 para «no existe», «está de baja» y «no tiene PIN»: distinguirlos convertiría
+    // este endpoint en un buscador de empleados para quien no ha entrado.
+    if (rows.length === 0) throw new NotFoundException('Usuario no encontrado');
+    const [row] = rows;
+    return { id: row.user_id, name: row.user_name, role: { name: row.roleName } };
   }
 
   /** Usuarios activos de un rol por nombre (para fan-out de notificaciones). */
@@ -125,6 +168,17 @@ export class UsersService {
 
     await this.log('user.updated', id, actor, { oldValue: before, newValue: after });
 
+    /**
+     * Los dos cambios que hacen que el token deje de reflejar la realidad **invalidan la sesión**.
+     *
+     * Los permisos y el rol viven dentro del token, así que sin esto un cambio de rol no surtía
+     * efecto hasta que el token caducara; y desactivar a alguien tampoco lo echaba. Es el punto
+     * entero de `token_version`.
+     */
+    if (dto.isActive === false || (dto.roleId && saved.role?.name !== previousRoleName)) {
+      await this.tokenVersions.bump(id);
+    }
+
     // El cambio de rol se registra aparte porque es la acción de mayor impacto en
     // seguridad y hay que poder filtrarla sin leer el diff de cada edición.
     if (dto.roleId && saved.role?.name !== previousRoleName) {
@@ -141,6 +195,9 @@ export class UsersService {
     const user = await this.findOne(id);
     user.isActive = false;
     await this.usersRepo.save(user);
+    // Dar de baja a alguien tiene que echarlo **ahora**, no cuando su token caduque. Con una
+    // sesión por PIN eso eran cuatro horas de acceso operativo tras el despido.
+    await this.tokenVersions.bump(id);
     await this.log('user.deactivated', id, actor, {
       oldValue: { isActive: true },
       newValue: { isActive: false },

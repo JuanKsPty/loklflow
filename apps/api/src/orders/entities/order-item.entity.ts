@@ -64,6 +64,16 @@ export class OrderItem {
   })
   modifiers!: OrderItemModifier[];
 
+  /**
+   * De qué cuenta venía esta línea antes de una fusión. `null` si nunca se movió.
+   *
+   * Es lo que hace **exacto** el deshacer: sin ella no hay forma de distinguir las líneas que
+   * llegaron de otra cuenta de las que la cuenta destino ya tenía, y «no se puede deshacer» sería
+   * la única respuesta honesta en algo que toca el dinero.
+   */
+  @Column({ name: 'original_order_id', type: 'uuid', nullable: true })
+  originalOrderId!: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 }

@@ -146,7 +146,16 @@ export function whyNotQueueable(op: Operation): string | undefined {
   return RULES[op.kind]?.reason ?? 'Esta operación necesita conexión.';
 }
 
-export function idempotencyOf(kind: OperationKind): IdempotencyKind {
+/**
+ * Cómo se protege cada operación de llegar dos veces. **No lo aplica este módulo**: las claves
+ * las acuñan `withOrderIds`/`withItemId` en `orders.api.ts` y `withRequestId` en
+ * `payments.api.ts`, que es el único sitio donde se generan.
+ *
+ * Se expone para que el spec pueda afirmar que esa tabla y ese código no se han separado. Antes
+ * había una función `idempotencyOf()` que nadie llamaba: documentación con forma de código, que
+ * es la que se queda desactualizada sin que nada se rompa.
+ */
+export function idempotencyFor(kind: OperationKind): IdempotencyKind {
   return RULES[kind].idempotency;
 }
 

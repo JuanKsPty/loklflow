@@ -250,6 +250,13 @@ export class DiscountsService {
     if (order.status === 'closed' || order.status === 'cancelled') {
       throw new BadRequestException('La cuenta ya está cerrada o cancelada');
     }
+    // Un descuento sobre una cuenta fusionada se aplicaría a un total de 0 y no aparecería en
+    // ningún sitio. El descuento va en la cuenta principal, que es la que se cobra.
+    if (order.mergedIntoOrderId) {
+      throw new BadRequestException(
+        'Esta cuenta se fusionó en otra. Aplica el descuento en la cuenta principal.',
+      );
+    }
   }
 
   private paidOf(order: Order): number {

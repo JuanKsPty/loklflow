@@ -1,6 +1,7 @@
 import { config as loadEnv } from 'dotenv';
 import path from 'node:path';
 import type { NextConfig } from 'next';
+import { securityHeaders } from './src/lib/security-headers';
 
 // Next solo lee los .env de su propio directorio (apps/web), pero en este monorepo el
 // .env vive en la raíz y lo comparte con la API: si el frontend no lo carga, JWT_SECRET
@@ -19,6 +20,19 @@ const nextConfig: NextConfig = {
   // Con la salida standalone Next solo copia lo que el trazado detecta; los ficheros de
   // los workspaces vecinos quedan fuera si no se le dice dónde está la raíz.
   outputFileTracingRoot: path.resolve(__dirname, '../..'),
+  /**
+   * Cabeceras de seguridad en todas las rutas.
+   *
+   * Aquí y no en `proxy.ts`: `headers()` de Next cubre también los estáticos y el Service Worker,
+   * que el matcher del proxy excluye a propósito. Y duplicarlo en los dos sitios sería otra copia
+   * que se desincroniza — el mismo error que ya se cometió triplicando `jwtVerify`.
+   *
+   * El valor de las cabeceras se calcula en `src/lib/security-headers.ts`, que tiene spec: el CSP
+   * es una cadena larga donde una directiva de menos rompe el tiempo real sin ningún error visible.
+   */
+  async headers() {
+    return [{ source: '/:path*', headers: securityHeaders() }];
+  },
 };
 
 export default nextConfig;

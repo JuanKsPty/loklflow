@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, OfflineError } from '@/lib/api/client';
+import { reportBrowserError } from '@/lib/observability/report';
 import { CACHE, OUTBOX, clear, resetConnection } from './db';
 import {
   backoffFor,
+  discard,
   drain,
   enqueue,
   failed,
@@ -10,8 +12,15 @@ import {
   observePendingCount,
   pending,
   pendingFor,
+  requeue,
+  requeuePartition,
   type QueuedOperation,
 } from './outbox';
+
+// La cola llama a `reportBrowserError` en los caminos que dejan rastro (terminal, agotada,
+// descartada). Se espía en vez de dejarlo pasar: que una comanda descartada deje traza es
+// parte del contrato, no un efecto secundario.
+vi.mock('@/lib/observability/report', () => ({ reportBrowserError: vi.fn() }));
 
 /**
  * La cola contra una IndexedDB real (de mentira, pero real: `fake-indexeddb` implementa la
@@ -126,6 +135,139 @@ describe('cola de salida', () => {
 
       expect(await pending()).toHaveLength(0);
       expect(await failed()).toHaveLength(1);
+    });
+
+    /**
+     * El caso amable que la cola prometía en su comentario y no cumplía: quitar una línea que
+     * ya no está **es** el resultado que se buscaba. Se daba por fallo definitivo, así que
+     * llenaba la bandeja y el log de errores que no lo eran.
+     */
+    it('un 404 borrando es éxito, no un fallo', async () => {
+      await op({ method: 'DELETE', kind: 'order.removeItem', path: '/orders/1/items/9' });
+
+      await drain(async () => {
+        throw new ApiError(404, 'Item not found in order');
+      });
+
+      expect(await pending()).toHaveLength(0);
+      expect(await failed()).toHaveLength(0);
+    });
+
+    it('un 404 que no es un borrado sigue siendo terminal', async () => {
+      // Un 404 en `POST /orders/:id/items` no dice «ya estaba»: dice que la cuenta no existe.
+      await op({ method: 'POST', path: '/orders/desaparecida/items' });
+
+      await drain(async () => {
+        throw new ApiError(404, 'Order not found');
+      });
+
+      expect(await failed()).toHaveLength(1);
+    });
+
+    /**
+     * El fallo que borraría un turno entero: con el token caducado, tratar el 401 como
+     * terminal manda **la cola completa** a la bandeja en el primer drenado tras el corte.
+     */
+    it('un 401 detiene el drenado sin marcar nada como fallido', async () => {
+      await op({ partition: 'order:1', path: '/a' });
+      await op({ partition: 'order:2', path: '/b' });
+
+      const result = await drain(async () => {
+        throw new ApiError(401, 'Sesión caducada');
+      });
+
+      expect(result.needsAuth).toBe(true);
+      expect(result.failed).toBe(0);
+      expect(await failed()).toHaveLength(0);
+      expect(await pending()).toHaveLength(2);
+    });
+
+    it('un 401 no gasta intentos: la operación no hizo nada mal', async () => {
+      await op();
+
+      await drain(async () => {
+        throw new ApiError(401, 'Sesión caducada');
+      });
+
+      expect((await pending())[0].attempts).toBe(0);
+    });
+
+    /**
+     * En cuanto la API tenga límite de peticiones, la ráfaga de reconexión de una tablet con
+     * veinte operaciones lo dispara. Darlo por definitivo sería perder comandas por
+     * defenderse de un ataque que nadie estaba haciendo.
+     */
+    it.each([408, 425, 429])('un %i se reintenta, no termina', async (status) => {
+      await op();
+
+      await drain(async () => {
+        throw new ApiError(status, 'ahora no');
+      });
+
+      expect(await pending()).toHaveLength(1);
+      expect(await failed()).toHaveLength(0);
+    });
+  });
+
+  describe('bandeja de fallos', () => {
+    const sendFailing = async () => {
+      throw new ApiError(400, 'no');
+    };
+
+    it('reintentar devuelve la operación a la cola conservando su orden', async () => {
+      await op({ path: '/primera' });
+      await op({ path: '/segunda' });
+      await drain(sendFailing);
+
+      const tray = await failed();
+      const primera = tray.find((o) => o.path === '/primera')!;
+      await requeue(primera.seq);
+
+      const queue = await pending();
+      expect(queue).toHaveLength(1);
+      // `seq` intacto: reencolar con uno nuevo colaría la operación detrás de las posteriores.
+      expect(queue[0].seq).toBe(primera.seq);
+      expect(queue[0].attempts).toBe(0);
+      expect(queue[0].lastError).toBeUndefined();
+    });
+
+    it('reintentar una partición devuelve todas sus operaciones de golpe', async () => {
+      await op({ partition: 'order:1', path: '/a' });
+      await op({ partition: 'order:1', path: '/b' });
+      await op({ partition: 'order:2', path: '/c' });
+      await drain(sendFailing);
+
+      const moved = await requeuePartition('order:1');
+
+      expect(moved).toBe(2);
+      expect((await pending()).map((o) => o.path).sort()).toEqual(['/a', '/b']);
+      expect(await failed()).toHaveLength(1);
+    });
+
+    it('descartar la saca de la cola y deja rastro', async () => {
+      await op();
+      await drain(sendFailing);
+      const [stuck] = await failed();
+
+      await discard(stuck.seq);
+
+      expect(await list()).toHaveLength(0);
+      // Una comanda que alguien decide no enviar es justo lo que después nadie recuerda.
+      expect(reportBrowserError).toHaveBeenCalledWith(
+        'outbox:discarded',
+        expect.any(Error),
+        expect.objectContaining({ kind: stuck.kind, partition: stuck.partition }),
+      );
+    });
+
+    it('reintentar algo que no está en la bandeja no hace nada', async () => {
+      await op();
+      const [queued] = await pending();
+
+      await requeue(queued.seq);
+
+      expect((await pending())[0].attempts).toBe(0);
+      expect(await failed()).toHaveLength(0);
     });
   });
 

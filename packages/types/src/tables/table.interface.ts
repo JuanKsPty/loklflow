@@ -45,6 +45,12 @@ export type UpdateTablePayload = Partial<CreateTablePayload>;
 
 export interface UpdateTableStatusPayload {
   status: TableStatus;
+  /**
+   * Hora del cambio en el salón. La pone la cola sin conexión al reenviar. El servidor la
+   * usa para **descartar** el cambio si el hecho que describe es anterior al último que ya
+   * conoce: es el único dato encolable que dos dispositivos pueden pisarse.
+   */
+  occurredAt?: string;
 }
 
 export interface BulkCreateTablePayload {

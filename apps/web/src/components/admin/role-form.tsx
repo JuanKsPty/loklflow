@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { z } from '@/lib/validations/zod';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import type { RoleWithPermissions, Permission } from '@loklflow/types';

@@ -34,6 +34,18 @@ export class OrderStatusHistory {
   @Column({ name: 'changed_by', type: 'uuid', nullable: true })
   changedBy!: string | null;
 
+  /**
+   * Hora a la que el cambio ocurrió en el salón, cuando el dispositivo la reporta.
+   *
+   * Es la que da sentido al tiempo de preparación con una cocina sin red: `changed_at` dice
+   * cuándo llegó la operación al servidor, y con un corte de veinte minutos esos veinte
+   * minutos se sumarían al tiempo de cocina de todas las órdenes del corte.
+   *
+   * `null` en todo lo registrado en línea. Léase como `occurredAt ?? changedAt`.
+   */
+  @Column({ name: 'occurred_at', type: 'timestamptz', nullable: true })
+  occurredAt!: Date | null;
+
   @CreateDateColumn({ name: 'changed_at' })
   changedAt!: Date;
 

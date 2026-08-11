@@ -67,9 +67,10 @@ export class NotificationsService {
     return this.repo.save(notification);
   }
 
+  /** Devuelve cuántas se marcaron. Antes devolvía `0` fijo, que es una respuesta falsa. */
   async markAllRead(userId: string) {
-    await this.repo.update({ userId, isRead: false }, { isRead: true });
-    return { count: 0 };
+    const result = await this.repo.update({ userId, isRead: false }, { isRead: true });
+    return { count: result.affected ?? 0 };
   }
 
   private buildRow(userId: string, input: NotifyInput) {

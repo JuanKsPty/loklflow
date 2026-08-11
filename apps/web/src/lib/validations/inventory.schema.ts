@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from './zod';
 import { INGREDIENT_UNITS, MANUAL_MOVEMENT_TYPES } from '@loklflow/types';
 
 export const supplierSchema = z.object({

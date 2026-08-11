@@ -26,7 +26,9 @@ export const inventoryApi = {
 
   ingredients: {
     list: () => api.get<Ingredient[]>('/inventory/ingredients'),
-    lowStock: () => api.get<Ingredient[]>('/inventory/ingredients?lowStock=true'),
+    // `lowStock()` vivió aquí sin que nadie la llamara. Las pantallas que lo necesitan son Server
+    // Components y piden `?lowStock=true` por `serverFetch`, así que el envoltorio de cliente era
+    // documentación con forma de código — la que se queda vieja sin que nada se rompa.
     get: (id: string) => api.get<Ingredient>(`/inventory/ingredients/${id}`),
     create: (payload: CreateIngredientPayload) =>
       api.post<Ingredient>('/inventory/ingredients', payload),

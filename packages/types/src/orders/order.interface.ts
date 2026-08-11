@@ -31,6 +31,11 @@ export interface OrderStatusHistory {
   toStatus: OrderStatus;
   changedBy: string | null;
   changedAt: string;
+  /**
+   * Hora a la que el cambio ocurrió en el salón, cuando el dispositivo la reportó; `null`
+   * en todo lo registrado en línea. Léase siempre como `occurredAt ?? changedAt`.
+   */
+  occurredAt: string | null;
   notes: string | null;
 }
 
@@ -50,6 +55,8 @@ export interface Order {
   tipAmount: number;
   total: number;
   mergedIntoOrderId: string | null;
+  /** Hora de apertura en el salón; `null` en todo lo creado en línea. Ver `OrderStatusHistory`. */
+  occurredAt: string | null;
   items?: OrderItem[];
   statusHistory?: OrderStatusHistory[];
   payments?: Payment[];
@@ -64,6 +71,11 @@ export interface CreateOrderItemPayload {
   quantity: number;
   notes?: string;
   modifierOptionIds?: string[];
+  /**
+   * Hora a la que la acción ocurrió en el salón. La pone la cola sin conexión al reenviar;
+   * las llamadas en línea la omiten y el servidor usa la suya.
+   */
+  occurredAt?: string;
 }
 
 export interface CreateOrderPayload {
@@ -79,19 +91,39 @@ export interface CreateOrderPayload {
   label?: string;
   source?: OrderSource;
   notes?: string;
+  /**
+   * Hora a la que la acción ocurrió en el salón. La pone la cola sin conexión al reenviar;
+   * las llamadas en línea la omiten y el servidor usa la suya.
+   */
+  occurredAt?: string;
   items: CreateOrderItemPayload[];
 }
 
 export interface UpdateOrderItemPayload {
   quantity?: number;
   notes?: string;
+  /**
+   * Hora a la que la acción ocurrió en el salón. La pone la cola sin conexión al reenviar;
+   * las llamadas en línea la omiten y el servidor usa la suya.
+   */
+  occurredAt?: string;
 }
 
 export interface UpdateOrderStatusPayload {
   status: OrderStatus;
   notes?: string;
+  /**
+   * Hora a la que la acción ocurrió en el salón. La pone la cola sin conexión al reenviar;
+   * las llamadas en línea la omiten y el servidor usa la suya.
+   */
+  occurredAt?: string;
 }
 
 export interface UpdateOrderItemStatusPayload {
   status: OrderItemStatus;
+  /**
+   * Hora a la que la acción ocurrió en el salón. La pone la cola sin conexión al reenviar;
+   * las llamadas en línea la omiten y el servidor usa la suya.
+   */
+  occurredAt?: string;
 }

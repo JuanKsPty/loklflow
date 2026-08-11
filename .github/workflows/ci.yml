@@ -16,6 +16,28 @@ jobs:
   verify:
     name: Lint, tipos, tests y build
     runs-on: ubuntu-latest
+
+    # Postgres aquí, y no un job nuevo, porque el e2e de servicio necesita la API viva y la API
+    # necesita una base. Mover el e2e al job de integración obligaría a reconstruir el web allí.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: loklflow
+          POSTGRES_PASSWORD: loklflow
+          POSTGRES_DB: loklflow_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U loklflow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://loklflow:loklflow@localhost:5432/loklflow_db
+      DATABASE_SSL: 'false'
+
     steps:
       - uses: actions/checkout@v5
 
@@ -54,13 +76,28 @@ jobs:
       - name: Instalar chromium
         run: pnpm --filter=web exec playwright install --with-deps chromium
 
-      - name: Pruebas e2e
+      # ─── Primero el aislado: el núcleo sin conexión, con la red interceptada ──────
+      # Necesita que **no** haya API al otro lado; corre contra el build normal, con
+      # `NEXT_PUBLIC_API_URL` en su valor por defecto y nada escuchando ahí.
+      - name: Pruebas e2e del núcleo sin conexión
         run: pnpm --filter=web test:e2e
         env:
           # `verifyToken` lo lee en cada petición del servidor de Next y rechaza el valor de
           # ejemplo: sin uno propio, toda ruta protegida rebotaría a /login y el test que
           # comprueba justo eso pasaría por el motivo equivocado.
           JWT_SECRET: ${{ github.run_id }}-clave-efimera-de-e2e
+
+      # ─── Y luego el de servicio, con la API y Postgres de verdad ──────────────────
+      # Reconstruye el web porque `NEXT_PUBLIC_API_URL` se hornea en el bundle: un mismo build no
+      # puede a la vez hablar con una API viva y no tener ninguna al otro lado. Son ~10 s.
+      - name: Construir el web apuntando a la API del e2e
+        run: pnpm --filter=web build:e2e
+
+      - name: Pruebas e2e del servicio completo
+        run: pnpm --filter=web test:e2e:servicio
+        env:
+          JWT_SECRET: ${{ github.run_id }}-clave-efimera-de-e2e
+          JWT_REFRESH_SECRET: ${{ github.run_id }}-clave-efimera-de-refresco
 
       - name: Guardar el rastro de los fallos
         if: failure()
@@ -116,7 +153,19 @@ jobs:
           echo "JWT_SECRET=$(openssl rand -base64 48)" >> "$GITHUB_ENV"
           echo "JWT_REFRESH_SECRET=$(openssl rand -base64 48)" >> "$GITHUB_ENV"
 
-      - run: pnpm --filter=api test:int
+      # Las dos suites en una pasada, con cobertura y umbral. Sustituye a `test:int`: corre los
+      # mismos int-specs más los unitarios, así que separarlos sería ejecutarlo todo dos veces.
+      # El umbral vive solo aquí; `pnpm test` sigue siendo el rápido y sin base.
+      - run: pnpm --filter=api test:cov:all
+
+      - name: Guardar el informe de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-api
+          path: apps/api/coverage/lcov-report
+          retention-days: 7
+          if-no-files-found: warn
 
   # ─── Que las imágenes se construyan y arranquen de verdad ───────────────────────
   images:
@@ -288,4 +337,14 @@ jobs:
           test -n "$asset" || { echo "No se encontró ningún CSS en /login"; exit 1; }
           curl -fsS "http://localhost:3000$asset" > /dev/null \
             || { echo "El asset $asset no se sirve: falta .next/static en la imagen"; exit 1; }
+          # `public/` tampoco viaja dentro de standalone y también se copia aparte. Si ese
+          # COPY faltara, el modo sin conexión se desplegaría roto sin que nada fallara de
+          # forma visible: con red la aplicación funciona exactamente igual, y el fallo solo
+          # aparecería el día del corte, que es justo el día en que no se puede investigar.
+          curl -fsS http://localhost:3000/sw.js > /dev/null \
+            || { echo "/sw.js no se sirve: falta public/ en la imagen"; exit 1; }
+          curl -fsS http://localhost:3000/manifest.webmanifest > /dev/null \
+            || { echo "/manifest.webmanifest no se sirve: falta public/ en la imagen"; exit 1; }
+          curl -fsS http://localhost:3000/icons/icon-192.png > /dev/null \
+            || { echo "Los iconos del manifiesto no se sirven"; exit 1; }
           docker rm -f web

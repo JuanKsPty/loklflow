@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
@@ -87,32 +87,45 @@ export function TableFloorPlan({ sectors, tables, canEdit }: Props) {
     startY: number;
     snapshot: Record<string, { x: number; y: number }>;
   } | null>(null);
-  const dimsRef = useRef<{ w: number; h: number }>({ w: DEFAULT_W, h: DEFAULT_H });
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [activeZone, setActiveZone] = useState<string>('all');
   const [positions, setPositions] = useState<Record<string, Pos>>(() => buildPositions(tables));
-  const [userSize, setUserSize] = useState<{ w: number; h: number }>({ w: DEFAULT_W, h: DEFAULT_H });
-
-  // Carga el tamaño guardado del lienzo (solo cliente).
-  useEffect(() => {
+  /**
+   * El tamaño guardado del lienzo es **estado inicial**, no un efecto.
+   *
+   * Leerlo en un `useEffect` y escribirlo con `setUserSize` hacía dos cosas malas: un render en
+   * cascada al montar, y —lo que se veía— el plano aparecía con el tamaño por defecto y **daba
+   * un salto** al tamaño guardado. El inicializador perezoso de `useState` solo corre en el
+   * cliente en el primer render, que es exactamente cuando hay `localStorage`.
+   */
+  const [userSize, setUserSize] = useState<{ w: number; h: number }>(() => {
+    if (typeof window === 'undefined') return { w: DEFAULT_W, h: DEFAULT_H };
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.w && parsed?.h) setUserSize({ w: parsed.w, h: parsed.h });
-      }
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed?.w && parsed?.h) return { w: parsed.w, h: parsed.h };
     } catch {
       // ignora
     }
-  }, []);
+    return { w: DEFAULT_W, h: DEFAULT_H };
+  });
 
-  // Resincroniza con el servidor cuando no se está editando (p. ej. tras guardar y refrescar).
-  useEffect(() => {
-    if (!editing) setPositions(buildPositions(tables));
-  }, [tables, editing]);
+  /**
+   * Resincronizar con el servidor cuando no se está editando (p. ej. tras guardar y refrescar).
+   *
+   * Es **estado derivado**, con el patrón que React documenta para «ajustar al cambiar props»:
+   * comparar contra el valor anterior durante el render y corregir ahí mismo. Hacerlo en un
+   * efecto pintaba primero las posiciones viejas y luego las nuevas — un parpadeo del plano
+   * entero cada vez que llegaba un evento de tiempo real.
+   */
+  const [syncedFrom, setSyncedFrom] = useState(tables);
+  if (!editing && syncedFrom !== tables) {
+    setSyncedFrom(tables);
+    setPositions(buildPositions(tables));
+  }
 
   function persistSize(w: number, h: number) {
     setUserSize({ w, h });
@@ -139,7 +152,14 @@ export function TableFloorPlan({ sectors, tables, canEdit }: Props) {
   }
   const canvasW = Math.max(userSize.w, contentW);
   const canvasH = Math.max(userSize.h, contentH);
-  dimsRef.current = { w: canvasW, h: canvasH };
+  /**
+   * Las dimensiones vivían en un ref que se escribía **durante el render**. Con render
+   * concurrente eso guarda el valor de un render que React puede descartar, y los manejadores de
+   * arrastre —que son quienes lo leen— acabarían moviendo mesas contra un lienzo que no es el
+   * que se está viendo. Se pasan por argumento a quien las necesita, que además hace explícito
+   * de dónde salen.
+   */
+  const dims = { w: canvasW, h: canvasH };
 
   // Regiones (delimitación visual) por sector, a partir de las mesas visibles.
   const regions = sectors
@@ -204,8 +224,8 @@ export function TableFloorPlan({ sectors, tables, canEdit }: Props) {
     if (!drag || drag.id !== table.id) return;
     const rect = canvasRef.current!.getBoundingClientRect();
     const size = tableSize(table.capacity);
-    const x = clamp(snap(e.clientX - rect.left - drag.offsetX), dimsRef.current.w - size);
-    const y = clamp(snap(e.clientY - rect.top - drag.offsetY), dimsRef.current.h - size);
+    const x = clamp(snap(e.clientX - rect.left - drag.offsetX), dims.w - size);
+    const y = clamp(snap(e.clientY - rect.top - drag.offsetY), dims.h - size);
     setPositions((prev) => ({ ...prev, [table.id]: { ...prev[table.id], x, y } }));
   }
 
@@ -240,9 +260,9 @@ export function TableFloorPlan({ sectors, tables, canEdit }: Props) {
       const size = tableSize(t.capacity);
       const { x, y } = g.snapshot[id];
       minDx = Math.max(minDx, -x);
-      maxDx = Math.min(maxDx, dimsRef.current.w - size - x);
+      maxDx = Math.min(maxDx, dims.w - size - x);
       minDy = Math.max(minDy, -y);
-      maxDy = Math.min(maxDy, dimsRef.current.h - size - y);
+      maxDy = Math.min(maxDy, dims.h - size - y);
     }
     const dx = Math.min(Math.max(snap(e.clientX - g.startX), minDx), maxDx);
     const dy = Math.min(Math.max(snap(e.clientY - g.startY), minDy), maxDy);
@@ -405,16 +425,22 @@ export function TableFloorPlan({ sectors, tables, canEdit }: Props) {
               }}
             >
               <span
-                className={`absolute -top-2.5 left-3 flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold text-white ${
+                // Mismo motivo que en el mapa del mesero: blanco sobre un color elegido a mano
+                // no llega al contraste mínimo. El color se conserva como punto.
+                className={`absolute -top-2.5 left-3 flex items-center gap-1.5 rounded-full border bg-background px-2 py-0.5 text-[11px] font-semibold text-foreground ${
                   editing ? 'pointer-events-auto cursor-grab touch-none select-none active:cursor-grabbing' : ''
                 }`}
-                style={{ backgroundColor: r.accent }}
                 title={editing ? 'Arrastra para mover toda la zona' : undefined}
                 onPointerDown={editing ? (e) => onGroupPointerDown(e, r.id) : undefined}
                 onPointerMove={editing ? onGroupPointerMove : undefined}
                 onPointerUp={editing ? onGroupPointerUp : undefined}
               >
                 {editing && <MoveIcon className="size-3" />}
+                <span
+                  aria-hidden
+                  className="size-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: r.accent }}
+                />
                 {r.name}
               </span>
             </div>

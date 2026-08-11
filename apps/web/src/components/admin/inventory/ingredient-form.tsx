@@ -11,7 +11,6 @@ import { inventoryApi } from '@/lib/api/inventory.api';
 import { ingredientSchema, type IngredientFormValues } from '@/lib/validations/inventory.schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
 import {
   Field,
@@ -20,6 +19,13 @@ import {
   FieldGroup,
   FieldLabel,
 } from '@/components/ui/field';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface Props {
   ingredient?: Ingredient;
@@ -42,7 +48,6 @@ export function IngredientForm({ ingredient }: Props) {
       initialStock: 0,
       minimumStock: ingredient?.minimumStock ?? 0,
       costPerUnit: ingredient?.costPerUnit ?? 0,
-      isActive: ingredient?.isActive ?? true,
     },
   });
 
@@ -56,7 +61,6 @@ export function IngredientForm({ ingredient }: Props) {
           unit: values.unit,
           minimumStock: values.minimumStock ?? 0,
           costPerUnit: values.costPerUnit ?? 0,
-          isActive: values.isActive,
         });
       } else {
         await inventoryApi.ingredients.create({
@@ -65,7 +69,6 @@ export function IngredientForm({ ingredient }: Props) {
           initialStock: values.initialStock ?? 0,
           minimumStock: values.minimumStock ?? 0,
           costPerUnit: values.costPerUnit ?? 0,
-          isActive: values.isActive,
         });
       }
       toast.success(editing ? 'Ingrediente actualizado' : 'Ingrediente creado');
@@ -92,17 +95,27 @@ export function IngredientForm({ ingredient }: Props) {
 
         <Field>
           <FieldLabel htmlFor="unit">Unidad</FieldLabel>
-          <select
-            id="unit"
-            {...register('unit')}
-            className="h-9 w-40 rounded-md border border-input bg-transparent px-3 text-sm"
-          >
-            {INGREDIENT_UNITS.map((u) => (
-              <option key={u} value={u}>
-                {INGREDIENT_UNIT_LABELS[u]}
-              </option>
-            ))}
-          </select>
+          <Controller
+            control={control}
+            name="unit"
+            render={({ field }) => (
+              <Select
+                value={field.value ?? null}
+                onValueChange={(val) => val && field.onChange(val)}
+              >
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Unidad" />
+                </SelectTrigger>
+                <SelectContent>
+                  {INGREDIENT_UNITS.map((u) => (
+                    <SelectItem key={u} value={u}>
+                      {INGREDIENT_UNIT_LABELS[u]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
           <FieldDescription>
             No hay conversión entre unidades: la receta se escribe en esta misma.
           </FieldDescription>
@@ -157,15 +170,6 @@ export function IngredientForm({ ingredient }: Props) {
             Se actualiza solo con cada entrada, promediado con lo que ya había.
           </FieldDescription>
           <FieldError errors={errors.costPerUnit ? [errors.costPerUnit] : undefined} />
-        </Field>
-
-        <Field orientation="horizontal">
-          <Controller
-            control={control}
-            name="isActive"
-            render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />}
-          />
-          <FieldLabel className="mb-0">Activo</FieldLabel>
         </Field>
 
         <div className="flex gap-3 pt-2">

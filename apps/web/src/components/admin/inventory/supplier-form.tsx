@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import type { Supplier } from '@loklflow/types';
@@ -10,11 +10,9 @@ import { inventoryApi } from '@/lib/api/inventory.api';
 import { supplierSchema, type SupplierFormValues } from '@/lib/validations/inventory.schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -32,7 +30,6 @@ export function SupplierForm({ supplier }: Props) {
   const {
     register,
     handleSubmit,
-    control,
     formState: { errors, isSubmitting },
   } = useForm<SupplierFormValues>({
     resolver: zodResolver(supplierSchema),
@@ -42,7 +39,6 @@ export function SupplierForm({ supplier }: Props) {
       phone: supplier?.phone ?? '',
       email: supplier?.email ?? '',
       notes: supplier?.notes ?? '',
-      isActive: supplier?.isActive ?? true,
     },
   });
 
@@ -50,7 +46,6 @@ export function SupplierForm({ supplier }: Props) {
     try {
       const payload = {
         name: values.name,
-        isActive: values.isActive,
         ...(values.contactName ? { contactName: values.contactName } : {}),
         ...(values.phone ? { phone: values.phone } : {}),
         ...(values.email ? { email: values.email } : {}),
@@ -106,19 +101,6 @@ export function SupplierForm({ supplier }: Props) {
           <FieldLabel htmlFor="notes">Notas</FieldLabel>
           <Input id="notes" {...register('notes')} placeholder="Días de reparto, mínimos…" />
         </Field>
-
-        <Field orientation="horizontal">
-          <Controller
-            control={control}
-            name="isActive"
-            render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />}
-          />
-          <FieldLabel className="mb-0">Activo</FieldLabel>
-        </Field>
-        <FieldDescription>
-          Desactivar lo saca de los desplegables y conserva el historial de compras. Por eso no
-          se puede borrar.
-        </FieldDescription>
 
         <div className="flex gap-3 pt-2">
           <Button type="submit" disabled={isSubmitting} size="lg">

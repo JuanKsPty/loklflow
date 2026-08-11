@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { DeleteIcon, CheckIcon } from 'lucide-react';
 import { authApi } from '@/lib/api/auth.api';
+import { landingFor } from '@/lib/auth/landing';
 import { useAuthStore } from '@/stores/auth.store';
 import type { AuthUser } from '@loklflow/types';
 import { Button } from '@/components/ui/button';
@@ -42,13 +43,7 @@ export function PinPad({ userId, userName }: PinPadProps) {
     try {
       const user = (await authApi.pinLogin({ userId, pin })) as AuthUser;
       setUser(user);
-      // Rol-aware: mesero (tables:update) → salón; cajero (pos:create) → caja;
-      // cocina (orders:update) → KDS; resto → admin.
-      const perms = user.permissions ?? [];
-      if (perms.includes('tables:update')) router.push('/waiter');
-      else if (perms.includes('pos:create')) router.push('/pos');
-      else if (perms.includes('orders:update')) router.push('/kitchen');
-      else router.push('/admin');
+      router.push(landingFor(user.permissions));
     } catch {
       toast.error('PIN incorrecto');
       setPin('');

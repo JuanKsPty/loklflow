@@ -17,7 +17,9 @@ import { UpdateTableStatusDto } from './dto/update-table-status.dto';
 import { UpdateLayoutDto } from './dto/update-layout.dto';
 import { BulkCreateTableDto } from './dto/bulk-create-table.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
+import { Audit } from '../common/decorators/audit.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
+import { saneOccurredAt } from '../common/occurred-at';
 
 @ApiTags('tables')
 @Controller('tables')
@@ -58,7 +60,22 @@ export class TablesController {
   @Patch(':id/status')
   @RequirePermissions('tables:update')
   updateStatus(@Param('id', ParseUuidPipe) id: string, @Body() dto: UpdateTableStatusDto) {
-    return this.tablesService.updateStatus(id, dto.status);
+    return this.tablesService.updateStatus(id, dto.status, saneOccurredAt(dto.occurredAt));
+  }
+
+  /**
+   * Ruta literal antes del comodín `:id`, como `layout`, o `@Patch(':id')` se la comería.
+   *
+   * `POST` y no `PATCH` porque no se está actualizando un valor que el cliente elige: el
+   * servidor genera uno nuevo. Y `qrCode` sigue **fuera** de `CreateTableDto` —del que
+   * `UpdateTableDto` es un `PartialType`—, así que ningún cliente puede escoger el token de una
+   * mesa. Hoy eso es cierto por accidente; este comentario lo hace deliberado.
+   */
+  @Post(':id/qr/rotate')
+  @RequirePermissions('tables:update')
+  @Audit('table.qr_rotated', 'table')
+  rotateQr(@Param('id', ParseUuidPipe) id: string) {
+    return this.tablesService.rotateQrCode(id);
   }
 
   @Patch(':id')

@@ -1,0 +1,18 @@
+{
+  // Los tests de extremo a extremo, comprobados aparte del build de la aplicación.
+  //
+  // Están fuera del `tsconfig.json` principal por una razón concreta: `next build` type-checkea
+  // todo lo que ese archivo incluye, y `e2e/support/db.ts` importa la lista de tablas del
+  // **paquete de la API** —es un monorepo y duplicarla sería peor—. La imagen de Docker del web
+  // solo copia `apps/web`, así que dentro del contenedor ese import no existe y la construcción
+  // de la imagen se caía con un error de tipos en código que ni siquiera va dentro.
+  //
+  // `pnpm typecheck` corre las dos configuraciones, así que los e2e siguen comprobándose.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["e2e/**/*.ts", "playwright.config.ts", "playwright.service.config.ts"],
+  "exclude": ["node_modules"]
+}

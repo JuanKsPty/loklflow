@@ -66,7 +66,21 @@ Escala: títulos de página `text-xl font-semibold tracking-tight`; secciones `t
 - **Espaciado**: escala Tailwind estándar. Padding de página `p-4 md:p-6`; gap entre campos `gap-5`; secciones `space-y-6`.
 - **Densidad por superficie**:
   - **Admin (escritorio)**: controles `size="default"`/`"lg"` (h-8/h-9). Densidad cómoda.
-  - **POS / KDS / mesero (táctil)**: objetivos ≥44px. Usa `size="lg"` + alturas explícitas (`h-14`) como en el [`PinPad`](../apps/web/src/components/auth/pin-pad.tsx). Cuando se aborden esas fases, añadir un tamaño `touch` a `buttonVariants`.
+  - **POS / KDS / mesero (táctil)**: objetivos ≥44px con `size="touch"` (`h-11`) e `size="icon-touch"` (`size-11`), que son 44px exactos en la escala de Tailwind. Los usa todo `components/{pos,kitchen,waiter}`; no queda ahí un solo `Button size="sm"`.
+    Los tamaños táctiles se **añadieron** al sistema, no reemplazaron a los compactos: `/admin` se
+    usa con ratón y agrandarlo todo reflujaría maquetas densas que funcionan. `e2e/responsive.spec.ts`
+    vigila el suelo en las pantallas de servicio y **salta a propósito** en las de administración.
+
+### Tablas en móvil — decisión aceptada
+
+Quince componentes usan `ui/table`, que envuelve en `overflow-x-auto`: **no se rompen**, se
+desplazan dentro de su propio contenedor. Solo dos tienen versión de tarjeta-por-fila —el listado
+de órdenes de `/admin/orders`— porque son las que un dueño abre desde el teléfono.
+
+Las otras trece siguen desplazándose, y es deliberado: quince renderizados duales son una semana
+de trabajo para pantallas que se usan en portátil. Lo que sí se comprueba en cada ejecución es
+que **la página no se desborde a lo ancho** (`e2e/responsive.spec.ts`, proyecto `movil`), que es
+la diferencia entre «esta tabla se desplaza» y «esta pantalla está rota».
 
 ## 5. Dark mode
 

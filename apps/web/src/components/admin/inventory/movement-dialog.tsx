@@ -24,13 +24,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface Props {
   ingredients: Ingredient[];
   suppliers: Supplier[];
 }
 
-const SELECT_CLASS = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm';
 
 /**
  * Registrar entrada de mercancía, merma o ajuste.
@@ -104,26 +110,57 @@ export function MovementDialog({ ingredients, suppliers }: Props) {
           <FieldGroup className="py-2">
             <Field data-invalid={errors.ingredientId ? true : undefined}>
               <FieldLabel htmlFor="ingredientId">Ingrediente</FieldLabel>
-              <select id="ingredientId" {...register('ingredientId')} className={SELECT_CLASS}>
-                <option value="">Elige uno…</option>
-                {ingredients
-                  .filter((i) => i.isActive)
-                  .map((i) => (
-                    <option key={i.id} value={i.id}>
-                      {i.name} ({i.currentStock} {INGREDIENT_UNIT_LABELS[i.unit]})
-                    </option>
-                  ))}
-              </select>
+              <Controller
+                control={control}
+                name="ingredientId"
+                render={({ field }) => (
+                  <Select
+                    value={field.value || null}
+                    onValueChange={(val) => field.onChange(val ?? '')}
+                  >
+                    <SelectTrigger className="w-full" aria-invalid={errors.ingredientId ? true : undefined}>
+                      <SelectValue placeholder="Elige uno…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ingredients
+                        .filter((i) => i.isActive)
+                        .map((i) => (
+                          <SelectItem key={i.id} value={i.id}>
+                            {i.name} ({i.currentStock} {INGREDIENT_UNIT_LABELS[i.unit]})
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
               <FieldError errors={errors.ingredientId ? [errors.ingredientId] : undefined} />
             </Field>
 
             <Field>
               <FieldLabel htmlFor="type">Tipo</FieldLabel>
-              <select id="type" {...register('type')} className={SELECT_CLASS}>
-                <option value="entry">{STOCK_MOVEMENT_LABELS.entry} de mercancía</option>
-                <option value="waste">{STOCK_MOVEMENT_LABELS.waste}</option>
-                <option value="adjustment">{STOCK_MOVEMENT_LABELS.adjustment} de inventario</option>
-              </select>
+              <Controller
+                control={control}
+                name="type"
+                render={({ field }) => (
+                  <Select
+                    value={field.value || null}
+                    onValueChange={(val) => field.onChange(val ?? '')}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Tipo de movimiento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="entry">
+                        {STOCK_MOVEMENT_LABELS.entry} de mercancía
+                      </SelectItem>
+                      <SelectItem value="waste">{STOCK_MOVEMENT_LABELS.waste}</SelectItem>
+                      <SelectItem value="adjustment">
+                        {STOCK_MOVEMENT_LABELS.adjustment} de inventario
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </Field>
 
             <Field data-invalid={errors.quantity ? true : undefined}>
@@ -147,15 +184,18 @@ export function MovementDialog({ ingredients, suppliers }: Props) {
                   control={control}
                   name="direction"
                   render={({ field }) => (
-                    <select
-                      id="direction"
-                      className={SELECT_CLASS}
+                    <Select
                       value={field.value ?? 'increase'}
-                      onChange={(e) => field.onChange(e.target.value)}
+                      onValueChange={(val) => field.onChange(val ?? 'increase')}
                     >
-                      <option value="increase">Sumar al stock</option>
-                      <option value="decrease">Restar del stock</option>
-                    </select>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Dirección" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="increase">Sumar al stock</SelectItem>
+                        <SelectItem value="decrease">Restar del stock</SelectItem>
+                      </SelectContent>
+                    </Select>
                   )}
                 />
               </Field>
@@ -165,16 +205,29 @@ export function MovementDialog({ ingredients, suppliers }: Props) {
               <>
                 <Field>
                   <FieldLabel htmlFor="supplierId">Proveedor</FieldLabel>
-                  <select id="supplierId" {...register('supplierId')} className={SELECT_CLASS}>
-                    <option value="">Sin especificar</option>
-                    {suppliers
-                      .filter((s) => s.isActive)
-                      .map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                  </select>
+                  <Controller
+                    control={control}
+                    name="supplierId"
+                    render={({ field }) => (
+                      <Select
+                        value={field.value || null}
+                        onValueChange={(val) => field.onChange(val ?? '')}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Sin especificar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {suppliers
+                            .filter((s) => s.isActive)
+                            .map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                {s.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="costPerUnit">Costo por unidad de esta compra</FieldLabel>

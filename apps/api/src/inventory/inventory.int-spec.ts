@@ -308,6 +308,154 @@ describe('Inventario', () => {
     });
   });
 
+  /**
+   * La baja lógica tiene endpoint y permiso propios (`inventory:delete`), y el controlador la
+   * guarda aparte por eso. Los formularios la hacían con un interruptor que mandaba
+   * `isActive: false` por PATCH —que va con `inventory:update`—, así que **`inventory:delete` no lo
+   * ejercía nadie en toda la aplicación** y cualquiera con permiso de edición podía dar de baja.
+   */
+  describe('baja lógica', () => {
+    it('la edición no puede desactivar: para eso está la baja', async () => {
+      const ingrediente = await createIngredient();
+
+      const res = await http()
+        .patch(`/api/inventory/ingredients/${ingrediente.id}`)
+        .set('Cookie', admin)
+        .send({ isActive: false });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/baja lógica/i);
+    });
+
+    it('reactivar por edición sí se permite: no destruye nada', async () => {
+      const ingrediente = await createIngredient();
+      await http()
+        .patch(`/api/inventory/ingredients/${ingrediente.id}/deactivate`)
+        .set('Cookie', admin)
+        .expect(200);
+
+      const res = await http()
+        .patch(`/api/inventory/ingredients/${ingrediente.id}`)
+        .set('Cookie', admin)
+        .send({ isActive: true })
+        .expect(200);
+
+      expect(res.body.isActive).toBe(true);
+    });
+
+    it('dar de baja exige inventory:delete, no basta con inventory:update', async () => {
+      const editor = await sessionAs(app, 'admin@loklflow.com', [
+        'inventory:read',
+        'inventory:update',
+      ]);
+      const ingrediente = await createIngredient();
+
+      await http()
+        .patch(`/api/inventory/ingredients/${ingrediente.id}/deactivate`)
+        .set('Cookie', editor)
+        .expect(403);
+
+      // Y tampoco puede colarlo por la puerta de atrás.
+      await http()
+        .patch(`/api/inventory/ingredients/${ingrediente.id}`)
+        .set('Cookie', editor)
+        .send({ isActive: false })
+        .expect(400);
+    });
+
+    it('lo mismo vale para proveedores', async () => {
+      const proveedor = (
+        await http()
+          .post('/api/inventory/suppliers')
+          .set('Cookie', admin)
+          .send({ name: `Proveedor ${Math.random()}` })
+          .expect(201)
+      ).body as { id: string };
+
+      await http()
+        .patch(`/api/inventory/suppliers/${proveedor.id}`)
+        .set('Cookie', admin)
+        .send({ isActive: false })
+        .expect(400);
+
+      await http()
+        .patch(`/api/inventory/suppliers/${proveedor.id}/deactivate`)
+        .set('Cookie', admin)
+        .expect(200);
+    });
+
+    it('reactivar un proveedor sí se hace por edición', async () => {
+      // La asimetría es deliberada: volver a poner algo en circulación no es destructivo, y
+      // exigirle un endpoint aparte sería ceremonia sin motivo.
+      const proveedor = (
+        await http()
+          .post('/api/inventory/suppliers')
+          .set('Cookie', admin)
+          .send({ name: `Proveedor ${Math.random()}` })
+          .expect(201)
+      ).body as { id: string };
+
+      await http()
+        .patch(`/api/inventory/suppliers/${proveedor.id}/deactivate`)
+        .set('Cookie', admin)
+        .expect(200);
+
+      const reactivado = await http()
+        .patch(`/api/inventory/suppliers/${proveedor.id}`)
+        .set('Cookie', admin)
+        .send({ isActive: true })
+        .expect(200);
+      expect(reactivado.body.isActive).toBe(true);
+    });
+
+    it('un proveedor que no existe da 404', async () => {
+      await http()
+        .get('/api/inventory/suppliers/00000000-0000-4000-8000-000000000999')
+        .set('Cookie', admin)
+        .expect(404);
+    });
+
+    it('los proveedores se listan y se editan', async () => {
+      const proveedor = (
+        await http()
+          .post('/api/inventory/suppliers')
+          .set('Cookie', admin)
+          .send({ name: `Proveedor ${Math.random()}`, phone: '5550000' })
+          .expect(201)
+      ).body as { id: string };
+
+      const editado = await http()
+        .patch(`/api/inventory/suppliers/${proveedor.id}`)
+        .set('Cookie', admin)
+        .send({ phone: '5551111' })
+        .expect(200);
+      expect(editado.body.phone).toBe('5551111');
+
+      const listado = await http()
+        .get('/api/inventory/suppliers')
+        .set('Cookie', admin)
+        .expect(200);
+      expect((listado.body as { id: string }[]).some((s) => s.id === proveedor.id)).toBe(true);
+    });
+
+    it('un ingrediente de baja conserva su historial', async () => {
+      // Es el motivo de que sea baja y no borrado: la clave ajena de los movimientos es RESTRICT,
+      // y el libro mayor tiene que poder explicar de dónde salió cada unidad.
+      const ingrediente = await createIngredient({ initialStock: 7 });
+      await http()
+        .patch(`/api/inventory/ingredients/${ingrediente.id}/deactivate`)
+        .set('Cookie', admin)
+        .expect(200);
+
+      const movimientos = await http()
+        .get(`/api/inventory/movements?ingredientId=${ingrediente.id}`)
+        .set('Cookie', admin)
+        .expect(200);
+
+      expect(movimientos.body.length).toBeGreaterThan(0);
+    });
+  });
+
   describe('recetas', () => {
     it('se reemplazan enteras y rechazan un ingrediente repetido', async () => {
       const a = await createIngredient();

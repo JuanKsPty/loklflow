@@ -36,6 +36,18 @@ export class UsersController {
     return this.usersService.findOperationalUsers();
   }
 
+  /**
+   * Ruta literal **antes** de `@Get(':id')` o el comodín se la come.
+   *
+   * La pantalla del PIN pad de un empleado concreto solo necesita su nombre; antes se traía el
+   * roster entero y hacía `.find()`.
+   */
+  @Get('operational/:id')
+  @Public()
+  findOperationalOne(@Param('id', ParseUuidPipe) id: string) {
+    return this.usersService.findOperationalUser(id);
+  }
+
   @Get(':id')
   @RequirePermissions('users:read')
   findOne(@Param('id', ParseUuidPipe) id: string) {

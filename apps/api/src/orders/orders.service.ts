@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, In, MoreThan, Not, QueryFailedError, Repository } from 'typeorm';
+import { FindOptionsWhere, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
 import { Product } from '../menu/entities/product.entity';
 import { ModifierOption } from '../menu/entities/modifier-option.entity';
 import { Order } from './entities/order.entity';
@@ -24,6 +24,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { TablesService } from '../tables/tables.service';
 import { AuditService } from '../audit/audit.service';
 import { StockService } from '../inventory/stock.service';
+import { saneOccurredAt } from '../common/occurred-at';
+import { isConcurrentWriteConflict } from '../common/write-conflict';
 
 const ORDER_RELATIONS = {
   table: true,
@@ -59,8 +61,19 @@ export class OrdersService {
    * respuesta acotada de más se nota y se corrige, una sin acotar se degrada en silencio a
    * medida que crece el histórico.
    */
+  /**
+   * Las cuentas fusionadas quedan fuera **siempre**, no detrás de un filtro opcional.
+   *
+   * Una cuenta fusionada no es una cuenta: no tiene ítems, su total es 0 y su trabajo vive en la
+   * principal. Excluirla aquí arregla de una vez `/pos`, el KDS, `/waiter/ordenes`,
+   * `/waiter/mesa/:id` y `/admin/orders`, en vez de dejar cinco sitios donde acordarse.
+   *
+   * `findOne` **no** filtra: el detalle de una cuenta fusionada tiene que poder abrirse, porque la
+   * bitácora enlaza a ella y porque es desde donde se deshace la fusión.
+   */
   findAll(filters?: QueryOrdersDto) {
     const where: FindOptionsWhere<Order> = {
+      mergedIntoOrderId: IsNull(),
       ...(filters?.status ? { status: filters.status } : {}),
       ...(filters?.tableId ? { tableId: filters.tableId } : {}),
       // `open` y `status` son compatibles: si llegan los dos, manda el estado concreto.
@@ -83,7 +96,16 @@ export class OrdersService {
     return order;
   }
 
-  async create(dto: CreateOrderDto, waiterId: string) {
+  /**
+   * `waiterId` admite `null`: un pedido que llega por el QR del cliente no lo tomó nadie del
+   * personal. `DATA_MODEL.md` lo dice desde el principio («null si la orden viene del cliente por
+   * QR») y hasta ahora esto escribía el id de quien firmara la petición.
+   *
+   * Ensanchar el parámetro es compatible con todo lo que ya llamaba: el controlador sigue pasando
+   * `user.sub`. Y las dos columnas donde acaba —`orders.waiter_id` y
+   * `order_status_history.changed_by`— ya eran nullable en el esquema inicial.
+   */
+  async create(dto: CreateOrderDto, waiterId: string | null) {
     // El dispositivo puede traer su propio uuid para poder crear la cuenta sin conexión y
     // encolar contra ella («añade ítem», «cobra») antes de que el servidor la conozca. Si
     // ese id ya existe, la petición es un reenvío: se devuelve la orden tal cual, sin
@@ -103,6 +125,11 @@ export class OrdersService {
       items.push(await this.buildItem(itemDto));
     }
 
+    // La hora que reporta el dispositivo, si es creíble. `saneOccurredAt` descarta relojes
+    // imposibles en vez de rechazar la petición: una comanda perdida porque una tablet tiene
+    // mal la fecha es mucho peor que un sello unos minutos corrido.
+    const occurredAt = saneOccurredAt(dto.occurredAt);
+
     const order = this.ordersRepo.create({
       orderNumber: await this.nextOrderNumber(),
       ...(dto.id ? { id: dto.id } : {}),
@@ -114,12 +141,14 @@ export class OrdersService {
       notes: dto.notes ?? null,
       discountAmount: 0,
       tipAmount: 0,
+      occurredAt,
       items,
       statusHistory: [
         Object.assign(new OrderStatusHistory(), {
           fromStatus: null,
           toStatus: 'pending',
           changedBy: waiterId,
+          occurredAt,
         }),
       ],
     });
@@ -129,11 +158,22 @@ export class OrdersService {
     try {
       saved = await this.ordersRepo.save(order);
     } catch (err) {
-      // Dos reenvíos simultáneos del mismo id: ambos comprobaron antes de que existiera y
-      // ambos insertan. El que pierde recibe una violación de clave primaria, y la respuesta
-      // correcta es la orden que acaba de crear el otro, no un error.
-      if (dto.id && err instanceof QueryFailedError && /unique|duplicate/i.test(err.message)) {
-        return this.findOne(dto.id);
+      /**
+       * Dos reenvíos simultáneos del mismo id: ambos comprobaron antes de que existiera y ambos
+       * insertan. La respuesta correcta es la orden que acaba de crear el otro, no un error.
+       *
+       * Se atrapaba solo la violación de unicidad, y **no es la única forma en que Postgres
+       * resuelve esta carrera**: como la inserción arrastra en cascada los ítems y el historial,
+       * las dos transacciones toman los cerrojos en distinto orden y salta un `deadlock detected`.
+       * Ese caso salía como 500 — y para la cola sin conexión un 500 es un fallo definitivo, así
+       * que la comanda acababa en la bandeja de fallos **habiendo sido creada**.
+       *
+       * Se relee antes de responder: si el conflicto fue por otra cosa y la orden no está, el
+       * error se propaga en vez de devolver un 404 confuso.
+       */
+      if (dto.id && isConcurrentWriteConflict(err)) {
+        const winner = await this.ordersRepo.findOne({ where: { id: dto.id } });
+        if (winner) return this.findOne(dto.id);
       }
       throw err;
     }
@@ -243,6 +283,10 @@ export class OrdersService {
       toStatus: dto.status,
       changedBy: userId,
       notes: dto.notes ?? null,
+      // Aquí es donde `occurredAt` gana su sueldo: con la cocina sin red, `changed_at` diría
+      // cuándo volvió el WiFi y el reporte de tiempos de preparación sumaría el corte entero
+      // al tiempo de cocina de todas las órdenes afectadas.
+      occurredAt: saneOccurredAt(dto.occurredAt),
     });
     order.status = dto.status;
     order.statusHistory = [...(order.statusHistory ?? []), history];
@@ -368,7 +412,14 @@ export class OrdersService {
   private async maybeFreeTable(order: Order) {
     if (!order.tableId) return;
     const open = await this.ordersRepo.count({
-      where: { tableId: order.tableId, status: In(OPEN_STATUSES), id: Not(order.id) },
+      where: {
+        tableId: order.tableId,
+        status: In(OPEN_STATUSES),
+        id: Not(order.id),
+        // Una cuenta fusionada no cuenta como cuenta abierta: si no, la mesa se quedaría
+        // «ocupada» para siempre por una cuenta que ya no existe operativamente.
+        mergedIntoOrderId: IsNull(),
+      },
     });
     if (open === 0) {
       try {
@@ -481,6 +532,14 @@ export class OrdersService {
   private assertOpen(order: Order) {
     if (order.status === 'closed' || order.status === 'cancelled') {
       throw new BadRequestException('La orden ya está cerrada o cancelada');
+    }
+    // Una cuenta fusionada no tiene ítems propios y no aparece en ningún listado: escribir en ella
+    // sería trabajo que nadie va a ver. El estado sigue siendo «abierto» a propósito —fusionar no
+    // es cerrar—, así que esta comprobación tiene que ser explícita.
+    if (order.mergedIntoOrderId) {
+      throw new BadRequestException(
+        'Esta cuenta se fusionó en otra. Trabaja sobre la cuenta principal.',
+      );
     }
   }
 }

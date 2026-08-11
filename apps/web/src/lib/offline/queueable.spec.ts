@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALL_OPERATION_KINDS,
+  idempotencyFor,
   isQueueable,
   whyNotQueueable,
   type OperationKind,
@@ -93,5 +94,32 @@ describe('qué se puede diferir sin conexión', () => {
       // O se difiere, o hay un motivo escrito. Nunca las dos ni ninguna.
       expect(queueable ? reason === undefined : typeof reason === 'string').toBe(true);
     }
+  });
+
+  /**
+   * La tabla dice cómo se protege cada operación de llegar dos veces, pero **no lo aplica**:
+   * las claves se acuñan en `orders.api.ts` y `payments.api.ts`, que es el único sitio donde se
+   * generan. Esto ata las dos cosas, para que la tabla no se convierta en un comentario viejo.
+   */
+  describe('claves de idempotencia declaradas', () => {
+    it('las creaciones llevan un id acuñado en el dispositivo', () => {
+      // `withOrderIds` pone uno a la orden y otro a cada línea; `withItemId`, a la línea suelta.
+      expect(idempotencyFor('order.create')).toBe('clientId');
+      expect(idempotencyFor('order.addItem')).toBe('clientId');
+    });
+
+    it('el cobro lleva clientRequestId, que es una forma distinta', () => {
+      // Plana, no un id por línea anidada. Por eso el transporte diferido no acuña claves por
+      // su cuenta: no hay una regla genérica que valga para las dos formas.
+      expect(idempotencyFor('payment.add')).toBe('clientRequestId');
+    });
+
+    it('el resto es idempotente por naturaleza, sin clave', () => {
+      const conClave = ['order.create', 'order.addItem', 'payment.add'];
+      for (const kind of ALL_OPERATION_KINDS.filter((k) => !conClave.includes(k))) {
+        // Fijar un estado o una cantidad a un valor concreto da lo mismo repetido.
+        expect(idempotencyFor(kind)).toBe('natural');
+      }
+    });
   });
 });

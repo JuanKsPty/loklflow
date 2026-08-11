@@ -3,7 +3,8 @@ import type { User, CreateUserPayload, UpdateUserPayload } from '@loklflow/types
 
 export const usersApi = {
   getAll: () => api.get<User[]>('/users'),
-  getOperational: () => api.get<Pick<User, 'id' | 'name' | 'roleName'>[]>('/users/operational'),
+  getOperational: () =>
+    api.get<{ id: string; name: string; role: { name: string } }[]>('/users/operational'),
   getOne: (id: string) => api.get<User>(`/users/${id}`),
   create: (payload: CreateUserPayload) => api.post<User>('/users', payload),
   update: (id: string, payload: UpdateUserPayload) => api.patch<User>(`/users/${id}`, payload),

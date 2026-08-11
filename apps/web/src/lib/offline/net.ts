@@ -50,8 +50,15 @@ export async function probe(): Promise<boolean> {
  *
  * El `connect` del socket queda fuera a propósito como disparador principal: si el token
  * caducó durante el corte —cuatro horas para una sesión por PIN—, `connect` no llega nunca.
+ *
+ * **El intervalo es el peor caso para volver a enviar.** Cuando la red se recupera en silencio
+ * —el caso normal: alguien reinicia el router y nadie toca nada— este temporizador es el único
+ * que se va a enterar, así que su periodo es literalmente el tiempo que una comanda sigue
+ * existiendo solo en una tablet. Quince segundos son cuatro peticiones por minuto a un endpoint
+ * que no toca la base de datos, contra las 12–18 que ya genera una sola acción humana con
+ * varias pantallas abiertas: el coste no se nota y la ventana de riesgo se parte en dos.
  */
-export function onBackOnline(callback: () => void, intervalMs = 30_000): () => void {
+export function onBackOnline(callback: () => void, intervalMs = 15_000): () => void {
   if (typeof window === 'undefined') return () => undefined;
 
   let stopped = false;

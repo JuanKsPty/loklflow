@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { PlusIcon } from 'lucide-react';
 import type {
@@ -13,7 +12,11 @@ import type {
 import { ORDER_ITEM_STATUSES, PREPARATION_STATION_LABELS } from '@loklflow/types';
 import { CreditCardIcon } from 'lucide-react';
 import { CheckoutPanel } from '@/components/pos/checkout-panel';
-import { ordersApi } from '@/lib/api/orders.api';
+import { addItem, updateItemStatus, updateStatus } from '@/lib/api/orders.offline';
+import { withItemId } from '@/lib/api/orders.api';
+import { addItemLocally } from '@/lib/offline/optimistic';
+import { PendingBadge } from '@/components/offline/pending-badge';
+import type { MutateResult } from '@/lib/offline/mutate';
 import { formatPrice } from '@/lib/format';
 import {
   ALLOWED_TRANSITIONS,
@@ -49,19 +52,38 @@ interface Props {
   products: Product[];
   /** Umbral de descuento del rol; llega del token desde el server component. */
   maxDiscountPercentage?: number;
+  /**
+   * Relee la cuenta del servidor. Solo la llaman las acciones que exigen conexión —cobrar,
+   * propina, descuento—, donde el total resultante tiene que venir de él y no de una suma
+   * hecha en el dispositivo.
+   */
+  onServerChange?: () => void;
 }
 
-export function MobileOrderDetail({ order, products, maxDiscountPercentage }: Props) {
-  const router = useRouter();
+export function MobileOrderDetail({
+  order,
+  products,
+  maxDiscountPercentage,
+  onServerChange,
+}: Props) {
   const [busy, setBusy] = useState(false);
   const open = order.status !== 'closed' && order.status !== 'cancelled';
 
-  async function run(fn: () => Promise<unknown>, okMsg: string) {
+  /**
+   * Sin `router.refresh()`: la vista lee de la copia local y superpone la cola, así que el
+   * cambio se ve solo. Refrescar reejecutaría el Server Component —que sin red falla— y
+   * resembraría la pantalla con los datos anteriores al toque.
+   *
+   * `rejected` se enseña con el motivo que escribe `queueable.ts`, redactado para que lo lea
+   * un operario y no un programador.
+   */
+  async function run(fn: () => Promise<MutateResult>, okMsg: string) {
     setBusy(true);
     try {
-      await fn();
-      toast.success(okMsg);
-      router.refresh();
+      const result = await fn();
+      if (result.outcome === 'rejected') toast.error(result.reason);
+      else if (result.outcome === 'queued') toast.success(`${okMsg} · pendiente de enviar`);
+      else toast.success(okMsg);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error');
     } finally {
@@ -80,15 +102,23 @@ export function MobileOrderDetail({ order, products, maxDiscountPercentage }: Pr
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">{order.label || `Orden #${order.orderNumber}`}</h1>
+          {/* Sin conexión el servidor todavía no ha asignado número —viene de su secuencia, y
+              adivinarlo daría dos comandas iguales—, así que se enseña la mesa o la etiqueta,
+              que es como el mesero la reconoce de todas formas. */}
+          <h1 className="text-2xl font-semibold">
+            {order.label || (order.orderNumber > 0 ? `Orden #${order.orderNumber}` : 'Cuenta nueva')}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            {order.label && `#${order.orderNumber} · `}
+            {order.label && order.orderNumber > 0 && `#${order.orderNumber} · `}
             {order.table ? `Mesa ${order.table.number}` : 'Para llevar'}
           </p>
         </div>
-        <Badge variant="outline" className={ORDER_STATUS_BADGE[order.status]}>
-          {ORDER_STATUS_LABELS[order.status]}
-        </Badge>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <Badge variant="outline" className={ORDER_STATUS_BADGE[order.status]}>
+            {ORDER_STATUS_LABELS[order.status]}
+          </Badge>
+          <PendingBadge partition={`order:${order.id}`} />
+        </div>
       </div>
 
       {nextStates.length > 0 && (
@@ -96,12 +126,12 @@ export function MobileOrderDetail({ order, products, maxDiscountPercentage }: Pr
           {nextStates.map((s: OrderStatus) => (
             <Button
               key={s}
-              size="lg"
+              size="touch"
               variant={s === 'cancelled' ? 'outline' : 'default'}
               disabled={busy}
               onClick={() =>
                 run(
-                  () => ordersApi.updateStatus(order.id, { status: s }),
+                  () => updateStatus(order.id, { status: s }),
                   `Orden ${ORDER_STATUS_LABELS[s].toLowerCase()}`,
                 )
               }
@@ -116,14 +146,14 @@ export function MobileOrderDetail({ order, products, maxDiscountPercentage }: Pr
         <CobrarDialog
           order={order}
           maxDiscountPercentage={maxDiscountPercentage}
-          onSettled={() => router.refresh()}
+          onSettled={() => onServerChange?.()}
         />
       )}
 
       <div>
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm font-medium">Ítems</span>
-          {open && <AddItemDialog order={order} products={products} onDone={() => router.refresh()} />}
+          {open && <AddItemDialog order={order} products={products} />}
         </div>
         <Card>
           <CardContent className="flex flex-col gap-3 py-4">
@@ -151,7 +181,7 @@ export function MobileOrderDetail({ order, products, maxDiscountPercentage }: Pr
                   value={item.status}
                   onValueChange={(v) =>
                     run(
-                      () => ordersApi.updateItemStatus(order.id, item.id, { status: (v as OrderItemStatus) ?? 'pending' }),
+                      () => updateItemStatus(order.id, item.id, { status: (v as OrderItemStatus) ?? 'pending' }),
                       'Ítem actualizado',
                     )
                   }
@@ -187,15 +217,7 @@ export function MobileOrderDetail({ order, products, maxDiscountPercentage }: Pr
   );
 }
 
-function AddItemDialog({
-  order,
-  products,
-  onDone,
-}: {
-  order: Order;
-  products: Product[];
-  onDone: () => void;
-}) {
+function AddItemDialog({ order, products }: { order: Order; products: Product[] }) {
   const [open, setOpen] = useState(false);
   const [productId, setProductId] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -208,12 +230,29 @@ function AddItemDialog({
     }
     setSubmitting(true);
     try {
-      await ordersApi.addItem(order.id, { productId, quantity });
-      toast.success('Ítem agregado');
+      // La clave se acuña aquí y se usa dos veces: en la operación que sale hacia el servidor
+      // y en la línea que se escribe en el dispositivo. Con el mismo id, cuando la operación
+      // se sincronice el servidor devolverá esa misma línea y la sobrescribirá sin duplicarla.
+      const payload = withItemId({ productId, quantity });
+      const result = await addItem(order.id, payload);
+
+      if (result.outcome === 'rejected') {
+        toast.error(result.reason);
+        return;
+      }
+      if (result.outcome === 'queued') {
+        // El precio y el nombre solo los sabe esta pantalla, que acaba de elegirlos del
+        // catálogo. La superposición de la cola no puede reconstruirlos sin inventárselos.
+        const product = products.find((p) => p.id === productId);
+        if (product) await addItemLocally(order.id, payload.id, product, quantity);
+        toast.success('Ítem agregado · pendiente de enviar');
+      } else {
+        toast.success('Ítem agregado');
+      }
+
       setOpen(false);
       setProductId('');
       setQuantity(1);
-      onDone();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al agregar');
     } finally {
@@ -225,7 +264,7 @@ function AddItemDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="touch">
             <PlusIcon />
             Agregar
           </Button>
@@ -292,7 +331,7 @@ function CobrarDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button size="lg" className="w-full">
+          <Button size="touch" className="w-full">
             <CreditCardIcon />
             Cobrar
           </Button>

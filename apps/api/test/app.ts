@@ -2,6 +2,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { AppModule } from '../src/app.module';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import type { JwtPayload } from '../src/common/interfaces/jwt-payload.interface';
@@ -13,8 +14,11 @@ import type { JwtPayload } from '../src/common/interfaces/jwt-payload.interface'
  * `ValidationPipe` global los tests creen estar validando DTOs y no validan nada, así que
  * un endpoint que acepta basura pasaría la suite sin problema. Lo mismo con el prefijo
  * `/api` (todas las rutas quedarían en otro sitio), `cookieParser` (la estrategia JWT lee
- * el token de `req.cookies`, así que sin él toda petición autenticada daría 401) y el
- * filtro de excepciones, que decide la forma del cuerpo de error que los tests comprueban.
+ * el token de `req.cookies`, así que sin él toda petición autenticada daría 401), el
+ * filtro de excepciones, que decide la forma del cuerpo de error que los tests comprueban, y
+ * `helmet`, cuyas cabeceras comprueba `security.int-spec.ts` — que es también lo que hace que ese
+ * spec valga algo: afirma sobre esta réplica, así que si alguien añade algo a `main.ts` y no aquí,
+ * se ve.
  *
  * Se usa `init()` y no `listen()`: supertest trabaja contra `app.getHttpServer()` sin
  * necesidad de ocupar un puerto.
@@ -23,6 +27,17 @@ export async function createTestApp(): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
 
   const app = moduleRef.createNestApplication();
+  // Mismo orden y mismas opciones que `main.ts`: helmet antes que nada, para que las cabeceras
+  // lleguen incluso en una respuesta de error temprana.
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      // El default de helmet es `sameorigin`. Esta API sirve JSON: meterla en un marco no tiene
+      // ningún uso legítimo, así que `deny` es estrictamente mejor y no cuesta nada.
+      frameguard: { action: 'deny' },
+    }),
+  );
   app.setGlobalPrefix('api');
   app.use(cookieParser());
   app.useGlobalPipes(

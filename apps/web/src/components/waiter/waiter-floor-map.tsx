@@ -43,9 +43,16 @@ function buildPositions(tables: RestaurantTable[]): Record<string, Pos> {
 export function WaiterFloorMap({
   sectors,
   tables,
+  selecting = false,
+  selected,
+  onToggle,
 }: {
   sectors: Sector[];
   tables: RestaurantTable[];
+  /** Modo selección para fusionar. Ver la nota en `TableGrid`: el componente sigue siendo tonto. */
+  selecting?: boolean;
+  selected?: Set<string>;
+  onToggle?: (tableId: string) => void;
 }) {
   const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
@@ -148,10 +155,19 @@ export function WaiterFloorMap({
                 backgroundColor: `${r.accent}0f`,
               }}
             >
-              <span
-                className="absolute -top-2.5 left-3 rounded-full px-2 py-0.5 text-[11px] font-semibold text-white"
-                style={{ backgroundColor: r.accent }}
-              >
+              {/*
+                El nombre de la zona iba en blanco sobre el color del sector, y el color del
+                sector lo elige un humano: con el índigo del seed sale a 4.46 y con el rosa a
+                3.52, por debajo del 4.5 que pide WCAG AA. Ningún ajuste lo arregla para
+                *cualquier* color, así que el texto va sobre el fondo del sistema —que sí tiene
+                contraste garantizado— y el color se conserva como punto.
+              */}
+              <span className="absolute -top-2.5 left-3 flex items-center gap-1.5 rounded-full border bg-background px-2 py-0.5 text-[11px] font-semibold text-foreground">
+                <span
+                  aria-hidden
+                  className="size-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: r.accent }}
+                />
                 {r.name}
               </span>
             </div>
@@ -166,11 +182,17 @@ export function WaiterFloorMap({
               <button
                 key={t.id}
                 type="button"
-                onClick={() => router.push(`/waiter/mesa/${t.id}`)}
+                // En modo selección el toque no navega: si lo hiciera, elegir la segunda mesa
+                // sacaría al mesero de la pantalla y perdería la primera.
+                onClick={() =>
+                  selecting ? onToggle?.(t.id) : router.push(`/waiter/mesa/${t.id}`)
+                }
+                aria-pressed={selecting ? (selected?.has(t.id) ?? false) : undefined}
                 className={cn(
                   'absolute z-10 flex flex-col items-center justify-center gap-0.5 border-2 text-center transition-shadow hover:shadow-md active:scale-95',
                   shapeClass,
                   TABLE_STATUS_MAP_CLASSES[t.status],
+                  selected?.has(t.id) && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
                 )}
                 style={{ left: toX(p.x), top: toY(p.y), width: size, height: size }}
                 aria-label={`Mesa ${t.number} — ${TABLE_STATUS_LABELS[t.status]}`}

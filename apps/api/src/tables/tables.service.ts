@@ -95,12 +95,52 @@ export class TablesService {
     return result;
   }
 
-  async updateStatus(id: string, status: TableStatus) {
+  /**
+   * `occurredAt` es la hora a la que el cambio ocurrió en el salón, no aquella en que la
+   * petición llega. La manda la cola sin conexión al reenviar.
+   *
+   * El estado de una mesa es el **único** dato encolable que dos dispositivos pueden pisarse:
+   * el mesero la marca libre sin red mientras el cajero la marca ocupada desde caja. El orden
+   * de llegada no dice nada sobre el orden de los hechos, así que una operación cuyo hecho es
+   * anterior al último cambio de la mesa ya nació obsoleta y se ignora.
+   *
+   * Se ignora **con 200 y sin emitir evento**, no con 400: la cola trata cualquier 4xx como
+   * fallo definitivo, y nadie debería encontrarse una entrada en la bandeja de fallos por el
+   * color de una mesa. Para quien llamó, la operación se aplicó; el estado que devuelve es el
+   * bueno, que es lo que la pantalla necesita saber.
+   *
+   * La comparación va contra `status_changed_at` y **nunca** contra `updated_at`: esta última
+   * es `TIMESTAMP` sin zona horaria, el driver la interpreta en la zona del proceso, y con
+   * `TZ=America/Mexico_City` se lee seis horas en el futuro — con lo que el guard rechazaría
+   * absolutamente todo y el test que lo comprueba pasaría por el motivo equivocado.
+   */
+  async updateStatus(id: string, status: TableStatus, occurredAt?: Date | null) {
     const table = await this.findOne(id);
+    if (occurredAt && occurredAt.getTime() < table.statusChangedAt.getTime()) return table;
     table.status = status;
+    table.statusChangedAt = new Date();
     await this.tablesRepo.save(table);
     const result = await this.findOne(id);
     this.realtime.emitTable({ type: 'status', tableId: result.id, status: result.status });
+    return result;
+  }
+
+  /**
+   * Genera un token de QR nuevo para la mesa, invalidando el anterior.
+   *
+   * Es lo que hace útil el QR del cliente: sin rotación, un token filtrado —una foto de la hoja
+   * subida a redes, una mesa que se cambia de sitio— vale para siempre y no hay forma de
+   * revocarlo. Al rotar, el token viejo deja de resolver y el pedido desde esa hoja da 404.
+   *
+   * Se cambia el valor y no se «desactiva» nada: `qr_code` es único y no nullable, así que el
+   * token anterior desaparece del sistema en la misma escritura.
+   */
+  async rotateQrCode(id: string) {
+    const table = await this.findOne(id);
+    table.qrCode = randomUUID();
+    await this.tablesRepo.save(table);
+    const result = await this.findOne(id);
+    this.realtime.emitTable({ type: 'update', tableId: result.id, status: result.status });
     return result;
   }
 
