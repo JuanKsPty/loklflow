@@ -83,15 +83,25 @@ export function contentSecurityPolicy(
 /**
  * Las cabeceras que se sirven en todas las rutas.
  *
- * El CSP va en **`Report-Only`** por ahora. No es indecisión: una directiva de menos rompe el
- * tiempo real o el Service Worker sin ningún error de red —solo una línea en una consola que nadie
- * mira— y el modo informe permite comprobarlo con una prueba automática antes de que pueda romper
- * nada. El paso a obligatorio es el último commit del proyecto, detrás de un e2e que afirma **cero
- * violaciones** en las cinco pantallas.
+ * **El CSP es obligatorio.** Empezó en `Report-Only`, y eso no era indecisión: una directiva de
+ * menos rompe el tiempo real o el Service Worker sin ningún error de red —solo una línea en una
+ * consola que nadie mira—, así que el modo informe existía para poder comprobarlo con una prueba
+ * automática antes de que pudiera romper nada.
+ *
+ * La prueba es `e2e/seguridad.spec.ts`, que afirma **cero violaciones en consola** sobre `/login`,
+ * `/admin`, `/waiter`, `/pos` y `/kitchen`, y que además exige que la cabecera exista —si no,
+ * pasaría por no haber política ninguna—. Y se ganó el sueldo: encontró que **Zod 4 compila sus
+ * validadores con `new Function`**, que es exactamente lo que prohíbe un `script-src` sin
+ * `'unsafe-eval'`. En `Report-Only` no se notaba nada; obligando la política, el formulario de
+ * acceso habría dejado de validar. Se arregló activando el modo `jitless` de Zod, no relajando
+ * la política.
+ *
+ * `enforceCsp` se conserva como parámetro para poder volver a `Report-Only` desde un solo sitio si
+ * hay que diagnosticar algo en producción, y para que la spec pueda comprobar las dos formas.
  */
 export function securityHeaders(
   env: { NEXT_PUBLIC_API_URL?: string; NODE_ENV?: string } = process.env,
-  { enforceCsp = false }: { enforceCsp?: boolean } = {},
+  { enforceCsp = true }: { enforceCsp?: boolean } = {},
 ): HeaderPair[] {
   const headers: HeaderPair[] = [
     { key: 'X-Frame-Options', value: 'DENY' },

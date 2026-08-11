@@ -94,23 +94,29 @@ Detalle completo en [docs/ROADMAP.md](./docs/ROADMAP.md).
 
 ```
 Fase 0 ████████████████████ 100%  — Completada
-Fase 1 ███████████████████░   95%  — CI/CD e imágenes listas; deploy aplazado a propósito
-Fase 2 ███████████████████░   95%  — Casi lista (solo fusión de mesas, diferida)
+Fase 1 ████████████████████ 100%  — Completada (desplegado en producción)
+Fase 2 ████████████████████ 100%  — Completada (incluida la fusión de mesas)
 Fase 3 ████████████████████ 100%  — Completada
-Fase 4 ███░░░░░░░░░░░░░░░░░   15%  — Idempotencia del servidor lista
-Fase 5 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
-Fase 6 ░░░░░░░░░░░░░░░░░░░░    0%  — Pendiente
+Fase 4 ████████████████████ 100%  — Completada (offline y sincronización)
+Fase 5 ████████████████████ 100%  — Completada (inventario y menú QR)
+Fase 6 ████████████████████ 100%  — Completada (seguridad, cobertura, e2e y pulido)
 ```
 
-**Lo siguiente:** el resto de la Fase 4 — Service Worker, IndexedDB y la cola de
-sincronización, más migrar las vistas operativas a datos en cliente (hoy son Server
-Components, así que sin servidor no renderizan).
+Diferidos a conciencia, no olvidados: envío del recibo por correo y exportación a PDF/Excel
+(Fase 3). El resto del alcance está entregado.
 
-El deploy está **aplazado a conciencia**, no olvidado: no hay piloto ni demo agendada, y la
-arquitectura pone el servidor dentro del establecimiento, no en la nube. El repo queda listo
-y el pipeline lo verifica construyendo y arrancando las imágenes en cada push, sin alquilar
-infraestructura. Diferidos dentro de Fase 3: envío del recibo por correo y exportación a
-PDF/Excel.
+### El sistema en marcha
+
+| | |
+|---|---|
+| ![Salón del mesero](./docs/images/01-salon.png) | ![Tomando la comanda](./docs/images/02-comanda.png) |
+| **Salón** — mesas por sector con su estado en color | **Comanda** — se toca el producto, el total sube solo |
+| ![KDS de cocina](./docs/images/03-cocina.png) | ![Cobro en caja](./docs/images/05-cobro.png) |
+| **Cocina** — la comanda aparece **sin recargar**, en otra pantalla | **Caja** — cobro, split y propina; al saldarse libera la mesa |
+
+> Las capturas las produce la propia suite de e2e (`E2E_CAPTURAS=1`), recorriendo el flujo real
+> contra la API y la base. Se regeneran cuando cambia la interfaz en vez de pudrirse — el guion
+> del recorrido está en [`docs/DEMO.md`](./docs/DEMO.md).
 
 ### Módulos implementados
 
@@ -132,11 +138,13 @@ PDF/Excel.
 | **Reportes** | Exportación de ventas a CSV por rango de fechas (con BOM y CRLF para Excel) |
 | **Auditoría** | 18 acciones críticas con actor, IP y valor anterior; consulta paginada y filtrable en `/admin/audit`. Las credenciales se redactan antes de persistir |
 | **Idempotencia** | Preparación del modo sin conexión: el uuid que genera el dispositivo es la clave primaria de la orden y de sus ítems, y los pagos aceptan `clientRequestId`. Reenviar una operación devuelve el estado en lugar de duplicar la cuenta o el cobro. `order_number` sale de una secuencia de Postgres |
-| **CI/CD** | Tres jobs en GitHub Actions: lint, tipos, 127 tests unitarios y build · 55 tests de integración contra un Postgres real, con las migraciones aplicadas desde cero · construcción de las dos imágenes de Docker, que se arrancan para comprobar salud y assets |
+| **Inventario** | Ingredientes con unidad y mínimo, proveedores, recetas por producto y movimientos de stock (entrada, merma, ajuste). El cierre de cuenta descuenta el consumo de forma idempotente, así que un cobro reenviado no resta dos veces |
+| **Modo sin conexión** | Cola de operaciones en IndexedDB con orden por cuenta, reintentos con espera creciente y cerrojo entre pestañas; las tres superficies operativas leen del dispositivo y siguen funcionando con la API caída. Cobrar y abrir turno siguen exigiendo red **a propósito**. Documentado en [`docs/OFFLINE.md`](./docs/OFFLINE.md) |
+| **Menú QR** | Código por mesa con rotación e impresión en hoja; el cliente abre `/m/[código]`, ve el menú filtrado por disponibilidad horaria y pide desde su teléfono sin instalar nada ni tener cuenta. Seguimiento del pedido con un token de invitado que caduca |
+| **Fusión de cuentas** | Juntar varias cuentas en una antes de cobrar, con deshacer exacto. Las cuentas fusionadas quedan fuera de los listados y de los reportes, que si no contarían las ventas dos veces |
+| **CI/CD** | Tres jobs en GitHub Actions: lint, tipos, pruebas unitarias, build y dos suites de e2e en un navegador de verdad · integración contra un Postgres real, con las migraciones aplicadas desde cero y umbral de cobertura · construcción de las dos imágenes de Docker, que se arrancan para comprobar salud, cabeceras, formato del log y estáticos |
 
-> Pendiente diferido de Fase 2: fusión de mesas para órdenes grupales.
->
-> **API documentada** con Swagger en `/api/docs` (92 operaciones). Solo fuera de producción.
+> **API documentada** con Swagger en `/api/docs`. Solo fuera de producción.
 
 ---
 
@@ -144,12 +152,17 @@ PDF/Excel.
 
 | Documento | Descripción | Estado |
 |-----------|-------------|--------|
-| [Visión del Proyecto (RUP)](./docs/LoklFlow_Vision_v1.0.docx) | Alcance, usuarios, requerimientos y riesgos | ✅ Completo |
+| [Visión del Proyecto (RUP)](./docs/LoklFlow_Vision_v1.0_1.docx) | Alcance, usuarios, requerimientos y riesgos | ✅ Completo |
 | [Roadmap de Desarrollo](./docs/ROADMAP.md) | Fases, tareas y entregables del proyecto | ✅ Completo |
-| [Modelo de Base de Datos](./docs/DATA_MODEL.md) | 31 tablas, relaciones y decisiones de diseño | ✅ Completo |
+| [Modelo de Base de Datos](./docs/DATA_MODEL.md) | Tablas, relaciones y decisiones de diseño | ✅ Completo |
+| [Sistema de Diseño](./docs/design-system.md) | Tokens, tipografía, densidad táctil y patrones de pantalla | ✅ Completo |
+| [Sincronización sin conexión](./docs/OFFLINE.md) | Qué se difiere, la vida de una operación, conflictos y límites conocidos | ✅ Completo |
+| [Seguridad](./docs/SECURITY.md) | Auditoría OWASP Top 10 con los riesgos residuales aceptados | ✅ Completo |
+| [Demo](./docs/DEMO.md) | Guion del recorrido, minutado y cómo regenerar las capturas | ✅ Completo |
 
-> El modelo documenta 31 tablas; hay **25 creadas** (ver `apps/api/src/database/migrations/`).
-> Las 6 restantes son de inventario y proveedores, previstas para la Fase 5.
+> El esquema lo construyen las migraciones de `apps/api/src/database/migrations/`, y el CI lo
+> levanta desde cero en cada ejecución. La cuenta exacta de tablas no se cita aquí a propósito:
+> derivó tres veces y la fuente de verdad es la carpeta.
 
 ---
 
@@ -159,7 +172,7 @@ PDF/Excel.
 loklflow/
 ├── .github/workflows/ci.yml    # verify · integration · images
 ├── apps/
-│   ├── api/                    # Backend NestJS — 92 operaciones
+│   ├── api/                    # Backend NestJS
 │   │   ├── Dockerfile          # contexto de build: la raíz del monorepo
 │   │   ├── test/               # arnés de integración (arranque, sesiones, fixtures)
 │   │   └── src/
@@ -174,6 +187,10 @@ loklflow/
 │   │       ├── payments/       # cobro, split, propina
 │   │       ├── shifts/         # turnos de caja y arqueo
 │   │       ├── notifications/
+│   │       ├── discounts/      # umbral por rol y aprobaciones
+│   │       ├── inventory/      # ingredientes, proveedores, recetas y stock
+│   │       ├── reports/        # agregados y exportación a CSV
+│   │       ├── public/         # menú QR: la única superficie anónima
 │   │       ├── realtime/       # gateway de Socket.io
 │   │       ├── common/         # guards, decoradores, filtros, pipes
 │   │       └── database/       # migraciones y seeds
@@ -187,9 +204,15 @@ loklflow/
 │           │   ├── pos/        # vista del cajero
 │           │   ├── waiter/     # vista del mesero (móvil)
 │           │   └── kitchen/    # KDS de cocina
+│           │   └── (public)/m/ # menú QR, sin sesión
 │           ├── components/     # incluye ui/ (shadcn) por app
 │           ├── hooks/
 │           └── lib/
+│               ├── offline/    # cola, caché local y superposición de pendientes
+│               ├── api/
+│               └── observability/
+│       ├── e2e/                # Playwright: núcleo sin conexión y servicio completo
+│       └── public/             # Service Worker, manifiesto e iconos
 ├── packages/
 │   ├── types/                  # tipos TypeScript compartidos
 │   └── config/                 # ESLint flat config y TSConfig base
@@ -240,20 +263,93 @@ pnpm dev --filter=web
 ```bash
 pnpm lint         # ESLint 10 en las 3 workspaces
 pnpm typecheck    # tsc --noEmit
-pnpm test         # 127 tests unitarios (apps/api y packages/types)
+pnpm test         # unitarias: funciones puras del backend, tipos y componentes del web
 
-# 55 tests de integración: la app real contra un Postgres real. Usa la base
-# loklflow_test, nunca la de desarrollo, y aplica las migraciones desde cero.
+# Integración: la app real contra un Postgres real. Usa la base loklflow_test, nunca la de
+# desarrollo, y aplica las migraciones desde cero — así se comprueba que el esquema se puede
+# levantar de la nada en cada ejecución.
 docker compose up -d postgres
 pnpm --filter=api test:int
+
+# Lo mismo, más las unitarias, con cobertura y umbral. Es lo que corre el CI.
+pnpm --filter=api test:cov:all
+
+# e2e en un navegador de verdad, contra el build de producción. Son dos suites:
+pnpm --filter=web build && pnpm --filter=web test:e2e            # núcleo sin conexión
+pnpm --filter=web build:e2e && pnpm --filter=web test:e2e:servicio  # con la API y la base vivas
 ```
 
-Los mismos tres pasos, más las imágenes de Docker, corren en GitHub Actions en cada push y
-cada PR (`.github/workflows/ci.yml`).
+> Las dos suites de e2e necesitan builds distintos: `NEXT_PUBLIC_API_URL` se hornea en el
+> bundle, así que un mismo build no puede a la vez hablar con una API viva y no tener ninguna
+> al otro lado. `build:e2e` fija la variable y el puerto a la vez.
+
+Los mismos pasos, más las imágenes de Docker, corren en GitHub Actions en cada push y cada PR
+(`.github/workflows/ci.yml`).
+
+### Rendimiento
+
+La mitad **determinista** está automatizada y corre en cada PR: `jsx-a11y` en el lint y
+`@axe-core/playwright` sobre cinco pantallas, exigiendo cero violaciones `serious` o `critical`.
+
+Lighthouse **no** es un paso de CI, a propósito: sobre un servidor standalone en un runner
+compartido tiene una varianza de ±10 puntos y crea un gate intermitente que la gente aprende a
+relanzar en vez de a arreglar. Se mide a mano, contra el build de producción:
+
+```bash
+pnpm --filter=web build
+node apps/web/.next/standalone/apps/web/server.js &   # necesita el cp de .next/static y public/
+pnpm dlx lighthouse http://localhost:3000/login --preset=desktop --view
+```
+
+Lo que sí se puede afirmar sin varianza es el peso del bundle, que sale del propio build. Las
+optimizaciones que hizo la Fase 6 fueron tres, y las tres tienen un motivo concreto:
+
+- `recharts` —la dependencia más pesada— sale del arranque de `/admin` con `next/dynamic`. Era
+  carga síncrona en la primera pantalla que ve el dueño, para dos gráficas que están por debajo
+  del pliegue.
+- `/pos` pedía el turno de caja **dos veces** en cada carga: el layout y la página. Ahora
+  comparten un helper envuelto en `cache()` de React.
+- Diez `loading.tsx` cubren las rutas que hacen entre dos y seis peticiones antes de pintar. No
+  las 26 pantallas de alta y edición: un esqueleto para cuarenta milisegundos es un parpadeo.
 
 En desarrollo el esquema se sincroniza solo (`synchronize: true` cuando
 `NODE_ENV=development`). Fuera de desarrollo el esquema se aplica **solo** con
 migraciones — nunca con `synchronize`.
+
+---
+
+## Despliegue
+
+Vive en **Dokploy**, con un solo origen tras Traefik: `/api` y `/socket.io` van al backend y todo
+lo demás al web. Esa topología no es un detalle de infraestructura, cambia dos decisiones del
+código y las dos están comentadas donde importan:
+
+- El **Service Worker filtra por path**, no por origen. `url.origin !== self.location.origin`
+  funciona en desarrollo (:3000 contra :3001) y **en producción no filtra nada**, porque la API es
+  el mismo origen. La regla que sostiene «no cachear respuestas autenticadas» es saltar `/api` y
+  `/socket.io`.
+- El **`connect-src` del CSP** se deriva de `NEXT_PUBLIC_API_URL`, incluida su forma `wss://`.
+  En producción bastaría `'self'`; en desarrollo hace falta nombrar el puerto.
+
+### El orden importa
+
+1. **Las migraciones primero, y a mano.** No se aplican al arrancar: dos instancias levantando a
+   la vez se pelearían por el mismo `ALTER TABLE`. Es un paso explícito
+   (`migration:run:prod && seed:deploy`).
+2. **La API antes que el web.** Varios cambios son contratos de servidor —la hora del hecho de la
+   cola sin conexión, la versión de sesión—, y un web nuevo contra una API vieja manda toda la
+   cola a la bandeja de fallos.
+3. **`seed:deploy`, nunca `seed:prod`.** El segundo crea cuatro usuarios de demostración con
+   credenciales publicadas en un repositorio público.
+4. **`NEXT_PUBLIC_API_URL` se hornea en el build.** Cambiar de host obliga a reconstruir la imagen
+   del web, no a cambiar una variable de entorno.
+
+Ninguna migración del proyecto es destructiva: todas son columnas nuevas con valor por defecto o
+nulables, así que la API vieja sigue funcionando contra el esquema nuevo. Eso es justamente lo que
+permite migrar **antes** de desplegar.
+
+`JWT_SECRET` y `JWT_REFRESH_SECRET` no tienen valores por defecto: la API se niega a arrancar si
+faltan o si conservan el `change-this-*` del ejemplo.
 
 ---
 

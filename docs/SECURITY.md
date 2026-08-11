@@ -18,7 +18,7 @@ cualquier otro**. Varias decisiones de abajo se explican solo con eso.
 | A02 Fallos criptográficos | Cubierto |
 | A03 Inyección | Cubierto |
 | A04 Diseño inseguro | Cubierto en los flujos de dinero |
-| A05 Configuración incorrecta | Cubierto; CSP en modo informe |
+| A05 Configuración incorrecta | Cubierto; CSP obligatorio |
 | A06 Componentes vulnerables | Parcial: sin escaneo automático |
 | A07 Identificación y autenticación | Cubierto |
 | A08 Integridad de datos y software | Parcial |
@@ -134,10 +134,19 @@ Las reglas que protegen dinero viven en el servidor, no en la interfaz:
 - **Las migraciones no corren al arrancar**: son un paso explícito, para que dos instancias no
   compitan por el mismo `ALTER TABLE`.
 
-> **Riesgo residual — el más importante de este documento.** El **CSP va en `Report-Only`**. Una
-> directiva de menos rompe el tiempo real o el Service Worker sin ningún error de red, así que se
-> observa antes de obligar. El paso a obligatorio está planificado detrás de una prueba e2e que
-> afirme cero violaciones en las cinco pantallas.
+- **CSP obligatorio** (`Content-Security-Policy`, no `Report-Only`). Estuvo en modo informe
+  mientras se comprobaba que ninguna pantalla lo violaba: una directiva de menos rompe el tiempo
+  real o el Service Worker **sin ningún error de red**, solo una línea en una consola que nadie
+  mira. El paso a obligatorio fue detrás de `e2e/seguridad.spec.ts`, que afirma cero violaciones en
+  `/login`, `/admin`, `/waiter`, `/pos` y `/kitchen`, y que exige además que la cabecera exista
+  —sin eso la prueba pasaría por no haber política ninguna—.
+
+> **Lo que encontró el gate, y que justifica todo el rodeo.** Zod 4 compila sus validadores con
+> `new Function`, que es exactamente lo que prohíbe un `script-src` sin `'unsafe-eval'`. En
+> `Report-Only` no se notaba nada y la validación seguía funcionando; obligar la política sin
+> comprobarlo habría dejado **el formulario de acceso sin validar**. Se arregló activando el modo
+> `jitless` de Zod (`lib/validations/zod.ts`), no relajando la política — que era la salida fácil y
+> la que habría anulado media protección contra XSS.
 
 > **Riesgo residual.** `style-src` conserva `'unsafe-inline'`. Un nonce rompería
 > `global-error.tsx`, cuyos estilos van en línea precisamente porque una causa de llegar ahí es que

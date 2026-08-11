@@ -98,17 +98,29 @@ describe('cabeceras de seguridad del front', () => {
     });
 
     /**
-     * El CSP entra en modo informe. Una directiva de menos rompe el tiempo real o el Service
-     * Worker sin error de red, así que primero se observa y luego se obliga.
+     * El CSP es **obligatorio** por defecto. Estuvo en modo informe mientras se comprobaba que
+     * ninguna pantalla lo violaba —lo hizo `e2e/seguridad.spec.ts`, que además destapó el
+     * `new Function` de Zod—, y el interruptor se conserva para poder volver a observar desde un
+     * solo sitio si hay que diagnosticar algo en producción.
      */
-    it('el CSP empieza en modo informe y se puede forzar', () => {
-      const observando = securityHeaders(PROD);
-      expect(value(observando, 'Content-Security-Policy-Report-Only')).toBeDefined();
-      expect(value(observando, 'Content-Security-Policy')).toBeUndefined();
+    it('el CSP se sirve como obligatorio', () => {
+      const headers = securityHeaders(PROD);
+      expect(value(headers, 'Content-Security-Policy')).toBeDefined();
+      expect(value(headers, 'Content-Security-Policy-Report-Only')).toBeUndefined();
+    });
 
-      const obligatorio = securityHeaders(PROD, { enforceCsp: true });
-      expect(value(obligatorio, 'Content-Security-Policy')).toBeDefined();
-      expect(value(obligatorio, 'Content-Security-Policy-Report-Only')).toBeUndefined();
+    it('se puede volver a modo informe sin tocar la política', () => {
+      const observando = securityHeaders(PROD, { enforceCsp: false });
+      expect(value(observando, 'Content-Security-Policy-Report-Only')).toBe(
+        value(securityHeaders(PROD), 'Content-Security-Policy'),
+      );
+      expect(value(observando, 'Content-Security-Policy')).toBeUndefined();
+    });
+
+    /** Sin `'unsafe-eval'` en producción: es lo que obligó a poner Zod en modo `jitless`. */
+    it('en producción el script-src no permite evaluar cadenas', () => {
+      const csp = value(securityHeaders(PROD), 'Content-Security-Policy') ?? '';
+      expect(csp).not.toContain("'unsafe-eval'");
     });
   });
 });

@@ -28,7 +28,7 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 - [x] Panel de administración (login + gestión de usuarios)
 - [x] Guards y decoradores de permisos por módulo
 - [x] Configuración general del negocio (`business_config`)
-- [x] Log de auditoría de acciones críticas (`audit_logs`) — 15 acciones registradas
+- [x] Log de auditoría de acciones críticas (`audit_logs`) — la lista vive en `audit-actions.constants.ts`, que es la fuente de verdad; citarla aquí ya derivó dos veces
       (accesos, empleados, roles y permisos, caja, cancelaciones) con valor anterior y
       posterior, redacción de credenciales, filtros y vista en `/admin/audit`
 - [x] Esquema versionado con migraciones TypeORM (`synchronize` solo en desarrollo)
@@ -38,9 +38,14 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
       desde cero) e `images` (construye las dos imágenes, aplica migraciones y seed desde la
       imagen, y las arranca para comprobar `/api/health` y los assets)
 - [x] Imágenes de Docker de las dos apps, listas para desplegar
-- [ ] Deploy en producción _(aplazado a propósito: no hay piloto ni demo agendada, y la
-      arquitectura del producto pone el servidor dentro del establecimiento, no en la nube.
-      El repo queda listo y CI lo verifica sin alquilar nada)_
+- [x] Deploy en producción — `loklflow.juank.tech` sobre Dokploy, un solo origen tras Traefik
+      (`/api` y `/socket.io` al backend, el resto al web). Las migraciones y la siembra son un
+      paso explícito y manual, no algo que ocurra al arrancar: dos instancias levantando a la vez
+      se pelearían por el mismo `ALTER TABLE`
+
+> La nota original decía que el deploy quedaba aplazado porque no había piloto ni demo agendada
+> y la arquitectura pone el servidor dentro del establecimiento. Sigue siendo cierto para el
+> producto; el entorno vivo existe para poder enseñarlo.
 
 **Entregable:** Sistema de auth con RBAC verificado automáticamente y empaquetado.
 
@@ -55,7 +60,14 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
       con la zona horaria del negocio y las ventanas que cruzan medianoche
 - [x] Módulo de mesas y sectores (mapa visual)
 - [x] Estados de mesa en tiempo real (`available`, `occupied`, `reserved`, `cleaning`, `maintenance`)
-- [ ] Fusión de mesas para órdenes grupales _(diferida — columna `merged_into_order_id` ya existe)_
+- [x] Fusión de mesas para órdenes grupales — con una precondición que elimina los dos problemas
+      difíciles en vez de resolverlos: **no se fusiona una cuenta con pagos, descuento o propina**.
+      Es además la regla correcta de producto (se junta antes de cobrar), y deja la operación
+      reducida a mover líneas y recalcular. `original_order_id` guarda de dónde vino cada una, así
+      que deshacer es exacto. Lo peligroso no era fusionar sino **filtrar**: una cuenta fusionada
+      que se cuele en un agregado duplica las ventas del día sin romper nada visible, y por eso el
+      filtro es una constante compartida que se aplica en el listado y en cinco de los siete
+      constructores de los reportes
 - [x] Gestión de reservas de mesa
 - [x] Módulo de órdenes completo
 - [x] Historial de transiciones de estado (`order_status_history`) para métricas de tiempo
@@ -165,19 +177,42 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 ## Fase 6 — Pulido Final
 > De proyecto a producto.
 
-- [ ] UI/UX consistente en todas las vistas
-- [ ] Diseño responsive para todos los dispositivos
-- [ ] Pruebas unitarias (mínimo 70% de cobertura en servicios)
-- [ ] Pruebas e2e de los flujos principales
+- [x] UI/UX consistente en todas las vistas — tamaño táctil de 44 px donde se trabaja de pie
+      (`size="touch"`, que el sistema de diseño prometía y las tres fases táctiles entregaron sin
+      él), encabezados y estados vacíos canónicos en las pantallas operativas, el inventario deja
+      de usar `<select>` nativos, y **cero colores crudos**: las cuatro paletas de estado que
+      mezclaban `amber` y `teal` pasan a `warning` e `info`. Hubo que crear
+      `--destructive-foreground`, que no existía
+- [x] Diseño responsive para todos los dispositivos — proyecto `movil` de Playwright (Pixel 7)
+      que comprueba que ninguna pantalla se desborde a lo ancho, más tarjeta-por-fila en el
+      listado que un dueño abre desde el teléfono. Las otras trece tablas se desplazan dentro de
+      su contenedor, y eso queda escrito en `design-system.md` como decisión, no como olvido
+- [x] Pruebas unitarias (mínimo 70% de cobertura en servicios) — se mide **combinando unitarias e
+      integración**, porque el 70 % unitario sobre un servicio de orquestación se consigue
+      simulando repositorios y afirmando que el código llama a los dobles que le pusiste. Medido:
+      92 % de sentencias y 93 % de líneas; los servicios, 90 % y 93 %. Entraron int-specs para los
+      siete módulos que no aparecían en ninguna prueba
+- [x] Pruebas e2e de los flujos principales — dos suites en un navegador de verdad contra el build
+      de producción: el núcleo sin conexión con la red interceptada, y el servicio completo con la
+      API y Postgres vivos. Incluye **la única aserción de tiempo real del repo**: la comanda
+      aparece en la pantalla de cocina, en otro contexto de navegador, sin que nadie recargue
 - [x] Documentación Swagger completa y publicada _(hecho en Fase 3)_
-- [ ] README con screenshots y GIFs del sistema
-- [ ] Video demo de 2-3 minutos
+- [x] README con screenshots y GIFs del sistema — las capturas las **produce la propia suite e2e**
+      (`E2E_CAPTURAS=1`), así que se regeneran cuando cambia la interfaz en vez de pudrirse
+- [x] Video demo de 2-3 minutos — guion y minutado en `docs/DEMO.md`, que es `servicio.spec.ts` en
+      prosa. El vídeo se sube fuera y se enlaza: un archivo de decenas de megas no entra en git
 - [x] Auditoría de seguridad básica (OWASP top 10) — `docs/SECURITY.md`, con los **riesgos
       residuales escritos con nombre y apellido**: CSP en modo informe, `unsafe-inline` en estilos,
       bloqueo en memoria, `tokenVersion` que falla en abierto, sin MFA, roster del PIN público y sin
       escaneo de dependencias. Se cerraron el machaqueo del PIN, la revocación de sesión, las
       cabeceras de las dos apps, el CORS sin validar, la tabla de refrescos sin tope y un logout que
       podía no cerrar nada
-- [ ] Optimización de performance (Lighthouse)
+- [x] Optimización de performance (Lighthouse) — `recharts`, la dependencia más pesada, sale del
+      arranque de `/admin` con `next/dynamic`; `/pos` deja de pedir el turno **dos veces** por
+      carga (el layout y la página comparten un helper envuelto en `cache()`); y diez `loading.tsx`
+      cubren las rutas que hacen varias peticiones antes de pintar. La medición va documentada en
+      el README y **no** como paso de CI: Lighthouse en un runner compartido tiene ±10 puntos de
+      varianza y crea un gate intermitente que la gente aprende a relanzar. La mitad determinista
+      —accesibilidad— sí está automatizada, con `jsx-a11y` en el lint y axe en el e2e
 
-**Entregable:** Proyecto completo, documentado y presentable para portafolio.
+**Entregable:** Proyecto completo, documentado y presentable para portafolio. ✅
