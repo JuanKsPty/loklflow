@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, In, IsNull, MoreThan, Not, QueryFailedError, Repository } from 'typeorm';
+import { FindOptionsWhere, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
 import { Product } from '../menu/entities/product.entity';
 import { ModifierOption } from '../menu/entities/modifier-option.entity';
 import { Order } from './entities/order.entity';
@@ -25,6 +25,7 @@ import { TablesService } from '../tables/tables.service';
 import { AuditService } from '../audit/audit.service';
 import { StockService } from '../inventory/stock.service';
 import { saneOccurredAt } from '../common/occurred-at';
+import { isConcurrentWriteConflict } from '../common/write-conflict';
 
 const ORDER_RELATIONS = {
   table: true,
@@ -157,11 +158,22 @@ export class OrdersService {
     try {
       saved = await this.ordersRepo.save(order);
     } catch (err) {
-      // Dos reenvíos simultáneos del mismo id: ambos comprobaron antes de que existiera y
-      // ambos insertan. El que pierde recibe una violación de clave primaria, y la respuesta
-      // correcta es la orden que acaba de crear el otro, no un error.
-      if (dto.id && err instanceof QueryFailedError && /unique|duplicate/i.test(err.message)) {
-        return this.findOne(dto.id);
+      /**
+       * Dos reenvíos simultáneos del mismo id: ambos comprobaron antes de que existiera y ambos
+       * insertan. La respuesta correcta es la orden que acaba de crear el otro, no un error.
+       *
+       * Se atrapaba solo la violación de unicidad, y **no es la única forma en que Postgres
+       * resuelve esta carrera**: como la inserción arrastra en cascada los ítems y el historial,
+       * las dos transacciones toman los cerrojos en distinto orden y salta un `deadlock detected`.
+       * Ese caso salía como 500 — y para la cola sin conexión un 500 es un fallo definitivo, así
+       * que la comanda acababa en la bandeja de fallos **habiendo sido creada**.
+       *
+       * Se relee antes de responder: si el conflicto fue por otra cosa y la orden no está, el
+       * error se propaga en vez de devolver un 404 confuso.
+       */
+      if (dto.id && isConcurrentWriteConflict(err)) {
+        const winner = await this.ordersRepo.findOne({ where: { id: dto.id } });
+        if (winner) return this.findOne(dto.id);
       }
       throw err;
     }

@@ -2,7 +2,9 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Payment } from './entities/payment.entity';
+import type { PaymentMethod } from './payment-method.constants';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import { isConcurrentWriteConflict } from '../common/write-conflict';
 import { OrdersService } from '../orders/orders.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { ShiftsService } from '../shifts/shifts.service';
@@ -64,17 +66,19 @@ export class PaymentsService {
       throw new BadRequestException(`El monto excede el restante (${remaining.toFixed(2)})`);
     }
 
-    const payment = await this.paymentsRepo.save(
-      this.paymentsRepo.create({
-        orderId,
-        method: dto.method,
-        amount: dto.amount,
-        reference: dto.reference ?? null,
-        clientRequestId: dto.clientRequestId ?? null,
-        processedBy: userId,
-        shiftId: shift.id,
-      }),
-    );
+    const payment = await this.savePayment({
+      orderId,
+      method: dto.method,
+      amount: dto.amount,
+      reference: dto.reference ?? null,
+      clientRequestId: dto.clientRequestId ?? null,
+      processedBy: userId,
+      shiftId: shift.id,
+    });
+
+    // Otra petición idéntica ganó la carrera: el cobro ya está registrado y lo que toca devolver
+    // es el estado de la cuenta, no un error ni un segundo cobro.
+    if (payment === null) return this.summary(orderId);
 
     // Auditado aquí porque el handler devuelve el resumen de la cuenta, sin el id del
     // pago: el interceptor no podría identificar el movimiento registrado.
@@ -108,5 +112,39 @@ export class PaymentsService {
     }
 
     return this.summary(orderId);
+  }
+
+  /**
+   * Inserta el cobro, o devuelve `null` si otra petición idéntica lo insertó primero.
+   *
+   * La comprobación de `clientRequestId` de arriba es un **read-then-write**, y entre la lectura y
+   * la inserción cabe otra petición: un doble toque en «Registrar pago», o el reintento automático
+   * del cliente solapándose con el original. El índice único `idx_payments_client_request_id` cierra
+   * la ventana, pero sin esto la traducía a un **500 sobre la pantalla de cobro**, que es el peor
+   * sitio del producto para un error sin explicación.
+   *
+   * Sin `clientRequestId` no hay nada que deduplicar: ahí un conflicto es un problema de verdad y
+   * se propaga.
+   */
+  private async savePayment(data: {
+    orderId: string;
+    method: PaymentMethod;
+    amount: number;
+    reference: string | null;
+    clientRequestId: string | null;
+    processedBy: string;
+    shiftId: string;
+  }): Promise<Payment | null> {
+    try {
+      return await this.paymentsRepo.save(this.paymentsRepo.create(data));
+    } catch (err) {
+      if (data.clientRequestId && isConcurrentWriteConflict(err)) {
+        const winner = await this.paymentsRepo.findOne({
+          where: { clientRequestId: data.clientRequestId },
+        });
+        if (winner) return null;
+      }
+      throw err;
+    }
   }
 }

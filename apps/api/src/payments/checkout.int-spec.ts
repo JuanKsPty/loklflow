@@ -266,6 +266,33 @@ describe('Cobro de una cuenta', () => {
       expect(second.body.payments).toHaveLength(1);
     });
 
+    /**
+     * En **paralelo**, que es distinto de en secuencia: la comprobación de `clientRequestId` es un
+     * read-then-write y aquí las dos peticiones la pasan antes de que ninguna haya insertado. Lo
+     * que cierra la ventana es el índice único, y sin traducir su violación el cajero se comía un
+     * **500 en la pantalla de cobro** — el peor sitio del producto para un error sin explicación.
+     */
+    it('dos peticiones simultáneas con la misma clave dejan un solo cobro', async () => {
+      const { id, total } = await openTab();
+      const part = Number((total * 0.25).toFixed(2));
+      const body = { method: 'cash', amount: part, clientRequestId: 'doble-toque-001' };
+
+      const responses = await Promise.all(
+        Array.from({ length: 4 }, () =>
+          http().post(`/api/orders/${id}/payments`).set('Cookie', cashier).send(body),
+        ),
+      );
+
+      for (const res of responses) {
+        expect([200, 201]).toContain(res.status);
+      }
+
+      const rows = await app
+        .get(DataSource)
+        .query(`SELECT count(*)::int AS n FROM payments WHERE order_id = $1`, [id]);
+      expect(rows[0].n).toBe(1);
+    });
+
     it('reenviar el pago que cerró la cuenta devuelve el estado, no un error', async () => {
       // Sin la comprobación antes de todo lo demás, el reintento chocaría con «la cuenta ya
       // está cerrada»: un fallo falso que dejaría la cola atascada reintentando para siempre
