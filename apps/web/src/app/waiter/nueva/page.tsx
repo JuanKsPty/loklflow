@@ -37,7 +37,7 @@ export default async function WaiterNewOrderPage({ searchParams }: Props) {
           <ChevronLeftIcon />
           Volver
         </Button>
-        <h1 className="text-lg font-semibold">Nueva cuenta</h1>
+        <h1 className="font-heading text-xl font-semibold tracking-tight">Nueva cuenta</h1>
       </div>
       <div className="min-h-0 flex-1">
         <NewOrderView

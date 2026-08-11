@@ -128,7 +128,6 @@ export function DiscountDialog({ order, maxDiscountPercentage, disabled, onAppli
             value={value}
             onChange={(e) => setValue(e.target.value)}
             disabled={busy}
-            autoFocus
           />
           {valueNum > 0 && (
             <FieldDescription>
@@ -158,7 +157,7 @@ export function DiscountDialog({ order, maxDiscountPercentage, disabled, onAppli
           <p
             className={cn(
               'rounded-lg px-3 py-2 text-xs',
-              needsApproval ? 'bg-amber-500/10 text-amber-600' : 'bg-success/10 text-success',
+              needsApproval ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success',
             )}
           >
             {needsApproval

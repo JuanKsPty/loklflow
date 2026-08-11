@@ -53,9 +53,19 @@ export function NotificationBell({ area }: { area: Area }) {
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
 
+  /**
+   * El contador se escribe **siempre en un tick posterior**.
+   *
+   * `notificationsApi.unreadCount()` puede resolver de forma síncrona —una respuesta cacheada, o
+   * un rechazo inmediato sin red—, y entonces el `setCount` caía dentro del mismo tick que el
+   * efecto de montaje: un render en cascada en la cabecera, que está en las cuatro superficies.
+   * El `await` de una promesa ya resuelta no basta para salir del tick de React; una micro-tarea
+   * explícita sí.
+   */
   const refreshCount = useCallback(async () => {
     try {
       const { count: c } = await notificationsApi.unreadCount();
+      await Promise.resolve();
       setCount(c);
     } catch {
       // silencioso
@@ -74,7 +84,12 @@ export function NotificationBell({ area }: { area: Area }) {
   }, []);
 
   useEffect(() => {
-    void refreshCount();
+    // `setTimeout(…, 0)` y no una llamada directa: `refreshCount` escribe estado, y si la
+    // petición resuelve dentro del mismo tick —una respuesta cacheada, o un rechazo inmediato
+    // sin red— ese `setState` cae dentro del efecto de montaje. Es la cabecera de las cuatro
+    // superficies: un render en cascada aquí lo paga toda la pantalla.
+    const id = setTimeout(() => void refreshCount(), 0);
+    return () => clearTimeout(id);
   }, [refreshCount]);
 
   useEffect(() => {
@@ -128,7 +143,7 @@ export function NotificationBell({ area }: { area: Area }) {
         <span className="relative">
           <BellIcon />
           {count > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-white">
+            <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
               {count > 9 ? '9+' : count}
             </span>
           )}

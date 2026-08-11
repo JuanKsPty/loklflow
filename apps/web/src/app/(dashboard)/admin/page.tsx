@@ -1,3 +1,5 @@
+import dynamic from 'next/dynamic';
+import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import {
   BanknoteIcon,
@@ -21,8 +23,26 @@ import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { StatCard } from '@/components/admin/dashboard/stat-card';
-import { SalesChart } from '@/components/admin/dashboard/sales-chart';
-import { MethodChart } from '@/components/admin/dashboard/method-chart';
+
+/**
+ * Las gráficas se cargan aparte, no con el resto de la pantalla.
+ *
+ * `recharts` es la dependencia más pesada del proyecto y se importaba de forma síncrona en
+ * `/admin`, que es la primera pantalla que ve el dueño: su código entraba en el arranque aunque
+ * los indicadores de arriba se pinten mucho antes.
+ *
+ * **Sin `ssr: false`**, que en un Server Component de Next ≥15 es ilegal. La ganancia buscada es
+ * la del bundle de cliente, no la de saltarse el render en servidor; el `loading` evita además
+ * que la maqueta salte cuando llega el trozo.
+ */
+const SalesChart = dynamic(
+  () => import('@/components/admin/dashboard/sales-chart').then((m) => m.SalesChart),
+  { loading: () => <Skeleton className="h-64 w-full rounded-xl" /> },
+);
+const MethodChart = dynamic(
+  () => import('@/components/admin/dashboard/method-chart').then((m) => m.MethodChart),
+  { loading: () => <Skeleton className="h-64 w-full rounded-xl" /> },
+);
 import { ExportButton } from '@/components/admin/dashboard/export-button';
 import { RealtimeRefresher } from '@/components/realtime/realtime-refresher';
 
@@ -74,9 +94,11 @@ export default async function DashboardPage({ searchParams }: Props) {
   const [summary, topProducts, prep, byDay, lowStock] = await Promise.all([
     serverFetch<SalesSummary>(`/reports/sales-summary${q}`).catch(() => empty),
     serverFetch<TopProduct[]>(`/reports/top-products${q}`).catch(() => [] as TopProduct[]),
-    serverFetch<PrepTimeMetric>(`/reports/prep-times${q}`).catch(
-      () => ({ averageMinutes: null, averageKitchenMinutes: null, sampleSize: 0 }),
-    ),
+    serverFetch<PrepTimeMetric>(`/reports/prep-times${q}`).catch(() => ({
+      averageMinutes: null,
+      averageKitchenMinutes: null,
+      sampleSize: 0,
+    })),
     serverFetch<SalesByDay[]>(`/reports/sales-by-day${q}`).catch(() => [] as SalesByDay[]),
     // El aviso de stock mínimo existía como notificación —que se lee una vez y se pierde— y como
     // filtro que nadie llamaba. Aquí es lo primero que ve el dueño al abrir el panel, que es
@@ -125,7 +147,11 @@ export default async function DashboardPage({ searchParams }: Props) {
             <strong>
               {lowStock.length} {lowStock.length === 1 ? 'ingrediente' : 'ingredientes'}
             </strong>{' '}
-            bajo el mínimo: {lowStock.slice(0, 3).map((i) => i.name).join(', ')}
+            bajo el mínimo:{' '}
+            {lowStock
+              .slice(0, 3)
+              .map((i) => i.name)
+              .join(', ')}
             {lowStock.length > 3 && ` y ${lowStock.length - 3} más`}.
           </span>
         </Link>
@@ -251,9 +277,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                 <UtensilsCrossedIcon className="size-4" />
                 Propinas
               </span>
-              <span className="tabular-nums font-medium">
-                {formatPrice(summary.totalTips)}
-              </span>
+              <span className="tabular-nums font-medium">{formatPrice(summary.totalTips)}</span>
             </div>
           </CardContent>
         </Card>

@@ -52,6 +52,7 @@
     "@types/react-dom": "^19.1.0",
     "dotenv": "^17.4.2",
     "eslint": "^10.8.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^7.1.1",
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.8.0",

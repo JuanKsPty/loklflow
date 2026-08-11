@@ -11,6 +11,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface Props {
   productId: string;
@@ -113,21 +120,29 @@ export function RecipeEditor({ productId, ingredients, recipe }: Props) {
 
             {available.length > 0 && (
               <div className="flex items-center gap-2">
-                <select
-                  className="h-9 min-w-0 flex-1 rounded-md border border-input bg-transparent px-3 text-sm"
-                  value=""
-                  onChange={(e) => {
-                    if (!e.target.value) return;
-                    setLines((prev) => [...prev, { ingredientId: e.target.value, quantity: 1 }]);
+                {/*
+                  No es un campo de formulario: es un menú de acción que añade una línea y se
+                  vuelve a vaciar. Por eso `value` se queda en `null` en vez de seguir a un
+                  estado — el valor elegido ya vive en la lista de abajo.
+                */}
+                <Select
+                  value={null}
+                  onValueChange={(val) => {
+                    if (!val) return;
+                    setLines((prev) => [...prev, { ingredientId: val, quantity: 1 }]);
                   }}
                 >
-                  <option value="">Añadir ingrediente…</option>
-                  {available.map((i) => (
-                    <option key={i.id} value={i.id}>
-                      {i.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="min-w-0 flex-1">
+                    <SelectValue placeholder="Añadir ingrediente…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {available.map((i) => (
+                      <SelectItem key={i.id} value={i.id}>
+                        {i.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <PlusIcon className="size-4 shrink-0 text-muted-foreground" />
               </div>
             )}

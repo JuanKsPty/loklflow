@@ -5,6 +5,7 @@ import { reportApiFailure } from '@/lib/observability/api-failure';
 import { cn } from '@/lib/utils';
 import { FloorView } from '@/components/waiter/floor-view';
 import type { Order, RestaurantTable, Sector } from '@loklflow/types';
+import { PageHeader } from '@/components/page-header';
 
 interface Props {
   searchParams: Promise<{ view?: string }>;
@@ -18,7 +19,7 @@ const VIEWS = [
 function ViewToggle({ active }: { active: string }) {
   return (
     <div className="mb-4 flex items-center justify-between">
-      <h1 className="text-xl font-semibold">Salón</h1>
+      <PageHeader title="Salón" />
       <div className="flex gap-1 rounded-lg border p-0.5">
         {VIEWS.map((v) => {
           const isActive = active === v.value;
@@ -29,7 +30,9 @@ function ViewToggle({ active }: { active: string }) {
               href={v.href}
               className={cn(
                 'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent',
+                isActive
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-accent',
               )}
             >
               <Icon className="size-4" />

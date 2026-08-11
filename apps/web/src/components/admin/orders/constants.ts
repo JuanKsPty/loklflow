@@ -10,10 +10,10 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 };
 
 export const ORDER_STATUS_BADGE: Record<OrderStatus, string> = {
-  pending: 'border-amber-500/30 bg-amber-500/10 text-amber-600',
+  pending: 'border-warning/30 bg-warning/10 text-warning',
   preparing: 'border-primary/30 bg-primary/10 text-primary',
   ready: 'border-success/30 bg-success/10 text-success',
-  delivered: 'border-teal-500/30 bg-teal-500/10 text-teal-600',
+  delivered: 'border-info/30 bg-info/10 text-info',
   closed: 'border-border bg-muted text-muted-foreground',
   cancelled: 'border-destructive/30 bg-destructive/10 text-destructive',
 };

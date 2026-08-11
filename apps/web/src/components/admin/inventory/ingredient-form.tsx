@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import type { Ingredient } from '@loklflow/types';
@@ -19,6 +19,13 @@ import {
   FieldGroup,
   FieldLabel,
 } from '@/components/ui/field';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface Props {
   ingredient?: Ingredient;
@@ -31,6 +38,7 @@ export function IngredientForm({ ingredient }: Props) {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<IngredientFormValues>({
     resolver: zodResolver(ingredientSchema),
@@ -87,17 +95,27 @@ export function IngredientForm({ ingredient }: Props) {
 
         <Field>
           <FieldLabel htmlFor="unit">Unidad</FieldLabel>
-          <select
-            id="unit"
-            {...register('unit')}
-            className="h-9 w-40 rounded-md border border-input bg-transparent px-3 text-sm"
-          >
-            {INGREDIENT_UNITS.map((u) => (
-              <option key={u} value={u}>
-                {INGREDIENT_UNIT_LABELS[u]}
-              </option>
-            ))}
-          </select>
+          <Controller
+            control={control}
+            name="unit"
+            render={({ field }) => (
+              <Select
+                value={field.value ?? null}
+                onValueChange={(val) => val && field.onChange(val)}
+              >
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Unidad" />
+                </SelectTrigger>
+                <SelectContent>
+                  {INGREDIENT_UNITS.map((u) => (
+                    <SelectItem key={u} value={u}>
+                      {INGREDIENT_UNIT_LABELS[u]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
           <FieldDescription>
             No hay conversión entre unidades: la receta se escribe en esta misma.
           </FieldDescription>

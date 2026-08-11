@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { OrdersView } from '@/components/waiter/orders-view';
 import { ORDER_STATUS_LABELS } from '@/components/admin/orders/constants';
 import type { Order, OrderStatus } from '@loklflow/types';
+import { PageHeader } from '@/components/page-header';
 
 interface Props {
   searchParams: Promise<{ status?: string }>;
@@ -38,12 +39,13 @@ export default async function WaiterOrdersPage({ searchParams }: Props) {
 
   return (
     <div>
-      <h1 className="mb-4 text-xl font-semibold">Órdenes</h1>
+      <PageHeader title="Órdenes" />
 
       <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
         {FILTERS.map((f) => {
           const active = current === f.value;
-          const href = f.value === 'active' ? '/waiter/ordenes' : `/waiter/ordenes?status=${f.value}`;
+          const href =
+            f.value === 'active' ? '/waiter/ordenes' : `/waiter/ordenes?status=${f.value}`;
           return (
             <Link
               key={f.value}

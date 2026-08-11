@@ -1,7 +1,9 @@
 import { serverFetch } from '@/lib/api/server-client';
 import { reportApiFailure } from '@/lib/observability/api-failure';
+import { currentShift } from '@/lib/api/current-shift';
 import { PosAccountsView } from '@/components/pos/pos-accounts-view';
-import type { Order, ShiftSummary } from '@loklflow/types';
+import type { Order } from '@loklflow/types';
+import { PageHeader } from '@/components/page-header';
 
 export default async function PosPage() {
   /**
@@ -12,32 +14,29 @@ export default async function PosPage() {
    * sabemos»— y un fallo de red que se tradujera a «no tienes turno abierto» haría que el
    * cajero intentara abrir uno que ya está abierto.
    */
-  const [ordersResult, shiftResult] = await Promise.allSettled([
+  const [ordersResult, shift] = await Promise.all([
     // `open=true`: el servidor filtra las cuentas vivas. Antes se pedía el listado completo y
     // se filtraba aquí, lo que traía todo el histórico del negocio en cada carga.
-    serverFetch<Order[]>('/orders?open=true'),
-    serverFetch<ShiftSummary | null>('/shifts/current'),
+    serverFetch<Order[]>('/orders?open=true').catch((err: unknown) => {
+      // Se registra igual, pero ya no decide la pantalla: la vista tira de la copia local.
+      reportApiFailure('pos', err);
+      return null;
+    }),
+    // El mismo helper que usa el layout, cacheado por petición: una consulta en vez de dos.
+    // Ya trae dentro su propio manejo de errores, y por eso este `Promise.all` es seguro —
+    // ninguna de las dos promesas puede rechazar y llevarse por delante a la otra.
+    currentShift(),
   ]);
 
-  let orders: Order[] | null = null;
-  if (ordersResult.status === 'fulfilled') orders = ordersResult.value;
-  // Se registra igual, pero ya no decide la pantalla: la vista tira de la copia local.
-  else reportApiFailure('pos', ordersResult.reason);
-
-  let shift: ShiftSummary | null = null;
-  let shiftUnknown = false;
-  if (shiftResult.status === 'fulfilled') shift = shiftResult.value;
-  else {
-    reportApiFailure('pos:shift', shiftResult.reason);
-    shiftUnknown = true;
-  }
+  const orders: Order[] | null = ordersResult;
+  const shiftUnknown = shift === undefined;
 
   return (
     <div>
-      <h1 className="mb-4 text-xl font-semibold">Cuentas por cobrar</h1>
+      <PageHeader title="Cuentas por cobrar" />
       <PosAccountsView
         initialOrders={orders}
-        shiftOpen={shift !== null}
+        shiftOpen={shift != null}
         shiftUnknown={shiftUnknown}
       />
     </div>
