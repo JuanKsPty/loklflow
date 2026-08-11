@@ -7,7 +7,7 @@
     "dev": "next dev --port 3000",
     "start": "next start",
     "lint": "eslint src",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.e2e.json",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "build:e2e": "NEXT_PUBLIC_API_URL=http://127.0.0.1:${E2E_API_PORT:-3101} next build",

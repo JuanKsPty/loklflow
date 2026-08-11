@@ -1,6 +1,6 @@
 import { announceReachability } from './reachability';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+import { API_BASE_URL as BASE_URL } from './base-url';
 
 type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 

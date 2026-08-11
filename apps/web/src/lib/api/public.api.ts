@@ -24,7 +24,7 @@ import { ApiError, OfflineError } from './client';
  * que no» de «no hay red», que es la distinción que el resto de la aplicación ya sabe explicar.
  */
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+import { API_BASE_URL as BASE_URL } from './base-url';
 
 /** La cabecera del pase. Tiene que coincidir con `GUEST_TOKEN_HEADER` del backend. */
 export const GUEST_TOKEN_HEADER = 'x-guest-token';

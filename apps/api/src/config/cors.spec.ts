@@ -8,8 +8,8 @@ describe('orígenes permitidos', () => {
   });
 
   it('acepta uno y varios, con espacios de sobra', () => {
-    expect(parseCorsOrigins('https://loklflow.juank.tech')).toEqual([
-      'https://loklflow.juank.tech',
+    expect(parseCorsOrigins('https://app.ejemplo.test')).toEqual([
+      'https://app.ejemplo.test',
     ]);
     expect(parseCorsOrigins(' http://localhost:3000 , https://x.com ')).toEqual([
       'http://localhost:3000',
@@ -69,7 +69,7 @@ describe('orígenes permitidos', () => {
 
       corsOrigins({
         NODE_ENV: 'production',
-        CORS_ORIGINS: 'https://loklflow.juank.tech',
+        CORS_ORIGINS: 'https://app.ejemplo.test',
       } as NodeJS.ProcessEnv);
 
       expect(warn).not.toHaveBeenCalled();

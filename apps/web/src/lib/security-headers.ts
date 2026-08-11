@@ -6,6 +6,8 @@
  * cosas falla de forma visible en desarrollo.
  */
 
+import { DEFAULT_API_URL } from './api/base-url';
+
 export interface HeaderPair {
   key: string;
   value: string;
@@ -18,11 +20,17 @@ export interface HeaderPair {
  * backend—, así que `connect-src 'self'` bastaría. En desarrollo son puertos distintos, y ahí hay
  * que nombrarlo. Se deriva de la variable en vez de escribirlo, que es lo que hace que el CSP
  * funcione en los dos sitios sin tener dos versiones.
+ *
+ * **Cae al mismo valor por defecto que el cliente** cuando la variable no está. No es una
+ * comodidad: el cliente HTTP usa `http://localhost:3001` si no hay variable, así que un CSP que
+ * no lo incluyera produciría una aplicación donde el navegador bloquea **todas** las llamadas por
+ * política, sin un solo error de red. Con el CSP en modo informe eso era invisible; obligándolo,
+ * es una aplicación muerta. Lo destapó el CI, que construye sin `.env`.
  */
 function apiOrigins(apiUrl: string | undefined): string[] {
-  if (!apiUrl) return [];
+  const url = apiUrl ?? DEFAULT_API_URL;
   try {
-    const { origin, host, protocol } = new URL(apiUrl);
+    const { origin, host, protocol } = new URL(url);
     // El socket abre `ws://` o `wss://` contra el mismo host, y **`connect-src` no deriva un
     // esquema del otro**: sin esta línea el tiempo real deja de funcionar sin un solo error de
     // red, solo una violación de CSP en la consola. Es el fallo más probable de todo el bloque.

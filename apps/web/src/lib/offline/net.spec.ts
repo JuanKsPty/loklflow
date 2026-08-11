@@ -87,7 +87,7 @@ describe('conectividad', () => {
     });
 
     it('usa NEXT_PUBLIC_API_URL cuando está definida', async () => {
-      vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://loklflow.juank.tech');
+      vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://api.ejemplo.test');
       const fetchSpy = vi.fn().mockResolvedValue({ ok: true });
       vi.stubGlobal('fetch', fetchSpy);
       setOnLine(true);
@@ -95,7 +95,7 @@ describe('conectividad', () => {
 
       await probe();
 
-      expect(fetchSpy.mock.calls[0][0]).toBe('https://loklflow.juank.tech/api/health');
+      expect(fetchSpy.mock.calls[0][0]).toBe('https://api.ejemplo.test/api/health');
     });
 
     it('es cierto con un 200 y falso con un 500', async () => {

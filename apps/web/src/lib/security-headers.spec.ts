@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { contentSecurityPolicy, securityHeaders } from './security-headers';
+import { DEFAULT_API_URL } from './api/base-url';
 
-const PROD = { NODE_ENV: 'production', NEXT_PUBLIC_API_URL: 'https://loklflow.juank.tech' };
+const PROD = { NODE_ENV: 'production', NEXT_PUBLIC_API_URL: 'https://api.ejemplo.test' };
 const DEV = { NODE_ENV: 'development', NEXT_PUBLIC_API_URL: 'http://localhost:3001' };
 
 const directive = (csp: string, name: string) =>
@@ -29,17 +30,28 @@ describe('cabeceras de seguridad del front', () => {
      */
     it('deja conectar el socket, no solo el HTTP de la API', () => {
       const prod = directive(contentSecurityPolicy(PROD), 'connect-src')!;
-      expect(prod).toContain('https://loklflow.juank.tech');
-      expect(prod).toContain('wss://loklflow.juank.tech');
+      expect(prod).toContain('https://api.ejemplo.test');
+      expect(prod).toContain('wss://api.ejemplo.test');
 
       const dev = directive(contentSecurityPolicy(DEV), 'connect-src')!;
       expect(dev).toContain('http://localhost:3001');
       expect(dev).toContain('ws://localhost:3001');
     });
 
-    it('sin API configurada no rompe: queda self', () => {
+    /**
+     * **El caso que tumbó el CI.** Sin `NEXT_PUBLIC_API_URL`, el cliente HTTP llama a
+     * `http://localhost:3001`, así que un `connect-src` con solo `'self'` produce una aplicación
+     * donde el navegador bloquea **todas** las llamadas por política, sin un error de red: solo
+     * una línea en la consola. Con el CSP en modo informe era invisible; obligándolo, es una
+     * aplicación muerta. En local no se veía porque el `.env` de la raíz define la variable.
+     */
+    it('sin API configurada, el CSP permite el mismo origen por defecto que usa el cliente', () => {
       const csp = contentSecurityPolicy({ NODE_ENV: 'production' });
-      expect(directive(csp, 'connect-src')).toBe("connect-src 'self'");
+      const connect = directive(csp, 'connect-src')!;
+
+      expect(connect).toContain("'self'");
+      expect(connect).toContain(DEFAULT_API_URL);
+      expect(connect).toContain('ws://localhost:3001');
     });
 
     it('una URL inválida no tumba la configuración', () => {

@@ -38,7 +38,7 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
       desde cero) e `images` (construye las dos imágenes, aplica migraciones y seed desde la
       imagen, y las arranca para comprobar `/api/health` y los assets)
 - [x] Imágenes de Docker de las dos apps, listas para desplegar
-- [x] Deploy en producción — `loklflow.juank.tech` sobre Dokploy, un solo origen tras Traefik
+- [x] Deploy en producción — sobre Dokploy, con un solo origen tras Traefik
       (`/api` y `/socket.io` al backend, el resto al web). Las migraciones y la siembra son un
       paso explícito y manual, no algo que ocurra al arrancar: dos instancias levantando a la vez
       se pelearían por el mismo `ALTER TABLE`
