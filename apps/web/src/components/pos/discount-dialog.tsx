@@ -90,7 +90,7 @@ export function DiscountDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button variant="outline" size="sm" disabled={disabled}>
+          <Button variant="outline" size="touch" disabled={disabled}>
             <PercentIcon />
             Descuento
           </Button>
@@ -112,7 +112,7 @@ export function DiscountDialog({
                 key={t}
                 type="button"
                 variant={type === t ? 'default' : 'outline'}
-                size="sm"
+                size="touch"
                 onClick={() => setType(t)}
                 disabled={busy}
               >
@@ -176,7 +176,7 @@ export function DiscountDialog({
           <DialogClose render={<Button variant="outline" disabled={busy} />}>
             Cancelar
           </DialogClose>
-          <Button onClick={submit} disabled={!canSubmit}>
+          <Button onClick={submit} disabled={!canSubmit} size="touch">
             {busy && <Spinner />}
             {needsApproval ? 'Enviar a aprobación' : 'Aplicar'}
           </Button>

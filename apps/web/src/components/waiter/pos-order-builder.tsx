@@ -224,15 +224,16 @@ export function PosOrderBuilder({ tableId, categories, products, modifiers }: Pr
                       {formatPrice(l.unitTotal * l.quantity)}
                     </span>
                   </div>
+                  {/* 44 px: es el control más pulsado de la comanda, con el dedo y de pie. */}
                   <div className="mt-2 flex items-center gap-2">
-                    <Button type="button" variant="outline" size="icon" className="size-7" onClick={() => setQty(l.key, -1)} aria-label="Menos">
+                    <Button type="button" variant="outline" size="icon-touch" onClick={() => setQty(l.key, -1)} aria-label="Menos">
                       <MinusIcon />
                     </Button>
-                    <span className="w-6 text-center text-sm font-medium tabular-nums">{l.quantity}</span>
-                    <Button type="button" variant="outline" size="icon" className="size-7" onClick={() => setQty(l.key, 1)} aria-label="Más">
+                    <span className="w-8 text-center text-base font-medium tabular-nums">{l.quantity}</span>
+                    <Button type="button" variant="outline" size="icon-touch" onClick={() => setQty(l.key, 1)} aria-label="Más">
                       <PlusIcon />
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" className="ml-auto size-7 text-muted-foreground" onClick={() => removeLine(l.key)} aria-label="Quitar">
+                    <Button type="button" variant="ghost" size="icon-touch" className="ml-auto text-muted-foreground" onClick={() => removeLine(l.key)} aria-label="Quitar">
                       <Trash2Icon />
                     </Button>
                   </div>

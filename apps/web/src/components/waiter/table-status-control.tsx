@@ -51,7 +51,7 @@ export function TableStatusControl({
         <Button
           key={status}
           variant={status === current ? 'default' : 'outline'}
-          size="sm"
+          size="touch"
           className={cn('flex-1', pending && 'pointer-events-none')}
           disabled={pending !== null}
           onClick={() => change(status)}

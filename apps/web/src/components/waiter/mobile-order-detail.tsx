@@ -126,7 +126,7 @@ export function MobileOrderDetail({
           {nextStates.map((s: OrderStatus) => (
             <Button
               key={s}
-              size="lg"
+              size="touch"
               variant={s === 'cancelled' ? 'outline' : 'default'}
               disabled={busy}
               onClick={() =>
@@ -264,7 +264,7 @@ function AddItemDialog({ order, products }: { order: Order; products: Product[] 
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="touch">
             <PlusIcon />
             Agregar
           </Button>
@@ -331,7 +331,7 @@ function CobrarDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button size="lg" className="w-full">
+          <Button size="touch" className="w-full">
             <CreditCardIcon />
             Cobrar
           </Button>

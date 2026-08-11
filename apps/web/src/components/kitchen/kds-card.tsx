@@ -83,9 +83,10 @@ export function KdsCard({ order }: { order: Order }) {
         </ul>
 
         <div className="flex items-center gap-2">
+          {/* Pantalla de pared: se pulsa de pie, de paso y a veces con guante. */}
           {advance && (
             <Button
-              size="sm"
+              size="touch"
               className="flex-1"
               disabled={busy}
               onClick={() => run(advance.next, `Orden ${ORDER_STATUS_LABELS[advance.next].toLowerCase()}`)}
@@ -96,7 +97,7 @@ export function KdsCard({ order }: { order: Order }) {
           )}
           <Button
             variant="ghost"
-            size="sm"
+            size="touch"
             className="text-muted-foreground"
             disabled={busy}
             onClick={() => run('cancelled', 'Orden cancelada')}

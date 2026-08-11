@@ -176,7 +176,7 @@ export function CheckoutPanel({ order, onSettled, maxDiscountPercentage }: Props
                 placeholder="0.00"
               />
             </Field>
-            <Button type="button" variant="outline" size="sm" onClick={applyTip} disabled={busy || settled}>
+            <Button type="button" variant="outline" size="touch" onClick={applyTip} disabled={busy || settled}>
               Aplicar
             </Button>
           </div>
@@ -241,6 +241,7 @@ export function CheckoutPanel({ order, onSettled, maxDiscountPercentage }: Props
                 key={m}
                 type="button"
                 variant={method === m ? 'default' : 'outline'}
+                size="touch"
                 onClick={() => setMethod(m)}
                 disabled={busy}
               >
@@ -252,7 +253,7 @@ export function CheckoutPanel({ order, onSettled, maxDiscountPercentage }: Props
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Dividir:</span>
             {[2, 3, 4].map((n) => (
-              <Button key={n} type="button" variant="ghost" size="sm" onClick={() => splitInto(n)} disabled={busy}>
+              <Button key={n} type="button" variant="ghost" size="touch" onClick={() => splitInto(n)} disabled={busy}>
                 ÷{n}
               </Button>
             ))}
@@ -283,7 +284,7 @@ export function CheckoutPanel({ order, onSettled, maxDiscountPercentage }: Props
             </Field>
           )}
 
-          <Button type="button" size="lg" onClick={addPayment} disabled={busy}>
+          <Button type="button" size="touch" onClick={addPayment} disabled={busy}>
             {busy && <Spinner />}
             Registrar pago
           </Button>

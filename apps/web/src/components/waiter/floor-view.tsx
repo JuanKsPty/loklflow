@@ -92,12 +92,12 @@ export function FloorView({
       {online && !empty && (
         <div className="mb-3 flex justify-end">
           {selecting ? (
-            <Button variant="ghost" size="sm" onClick={exitSelection}>
+            <Button variant="ghost" size="touch" onClick={exitSelection}>
               <XIcon />
               Cancelar
             </Button>
           ) : (
-            <Button variant="outline" size="sm" onClick={() => setSelecting(true)}>
+            <Button variant="outline" size="touch" onClick={() => setSelecting(true)}>
               <CombineIcon />
               Fusionar mesas
             </Button>

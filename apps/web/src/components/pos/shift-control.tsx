@@ -73,7 +73,7 @@ function OpenShiftButton() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="touch">
             <LockOpenIcon />
             Abrir turno
           </Button>
@@ -147,7 +147,7 @@ function CloseShiftButton({ current }: { current: ShiftSummary }) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="touch">
             <LockIcon />
             Turno · {formatPrice(current.totalSales)}
           </Button>
