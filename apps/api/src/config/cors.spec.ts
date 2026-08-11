@@ -1,4 +1,4 @@
-import { CorsConfigError, corsOrigins, parseCorsOrigins } from './cors';
+import { CorsConfigError, corsOrigins, corsWarning, parseCorsOrigins } from './cors';
 
 describe('orígenes permitidos', () => {
   it('sin configurar, cae al localhost de desarrollo', () => {
@@ -54,26 +54,45 @@ describe('orígenes permitidos', () => {
     expect(parseCorsOrigins('https://x.com:443')).toEqual(['https://x.com']);
   });
 
+  /**
+   * El aviso se **devuelve**, no se escribe.
+   *
+   * Iba por `console.warn`, y eso rompía la garantía de que cada línea de la salida de la API es
+   * un JSON con `level` —que el job `images` comprueba sobre el contenedor en marcha, porque es
+   * lo que permite agregar los logs—. Además salía dos veces: lo llamaban `main.ts` y el gateway.
+   */
   describe('aviso de producción', () => {
     it('avisa si en producción se cae al default', () => {
-      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-
-      corsOrigins({ NODE_ENV: 'production' } as NodeJS.ProcessEnv);
-
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining('CORS_ORIGINS'));
-      warn.mockRestore();
+      expect(corsWarning({ NODE_ENV: 'production' } as NodeJS.ProcessEnv)).toContain(
+        'CORS_ORIGINS',
+      );
     });
 
     it('no avisa si está configurada', () => {
-      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      expect(
+        corsWarning({
+          NODE_ENV: 'production',
+          CORS_ORIGINS: 'https://app.ejemplo.test',
+        } as NodeJS.ProcessEnv),
+      ).toBeNull();
+    });
 
-      corsOrigins({
-        NODE_ENV: 'production',
-        CORS_ORIGINS: 'https://app.ejemplo.test',
-      } as NodeJS.ProcessEnv);
+    it('no avisa fuera de producción', () => {
+      expect(corsWarning({ NODE_ENV: 'development' } as NodeJS.ProcessEnv)).toBeNull();
+    });
+
+    it('resolver los orígenes no escribe nada por su cuenta', () => {
+      // La garantía concreta: `corsOrigins()` la llaman dos sitios, uno de ellos dentro de un
+      // decorador, y ninguno puede ensuciar la salida estructurada.
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+
+      corsOrigins({ NODE_ENV: 'production' } as NodeJS.ProcessEnv);
 
       expect(warn).not.toHaveBeenCalled();
+      expect(log).not.toHaveBeenCalled();
       warn.mockRestore();
+      log.mockRestore();
     });
   });
 });

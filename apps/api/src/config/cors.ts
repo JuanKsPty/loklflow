@@ -70,21 +70,32 @@ export function parseCorsOrigins(raw: string | undefined): string[] {
 }
 
 /**
+ * El aviso que merece un despliegue de producción sin `CORS_ORIGINS`, o `null` si no aplica.
+ *
+ * **Devuelve el texto en vez de escribirlo.** Antes iba por `console.warn`, y eso rompía la
+ * garantía de que **cada línea de la salida de la API es un JSON con `level`** —lo comprueba el
+ * job `images` sobre el contenedor en marcha, porque es lo que permite agregar los logs—. Además
+ * salía **dos veces**: `corsOrigins()` lo llaman `main.ts` y el gateway, y este último dentro de
+ * un decorador que se evalúa al cargar el módulo.
+ *
+ * Quien avisa es `main.ts`, con el logger de la aplicación y una sola vez. El gateway no avisa:
+ * es la misma configuración, y repetirla era ruido.
+ */
+export function corsWarning(env: NodeJS.ProcessEnv = process.env): string | null {
+  if (env.NODE_ENV !== 'production' || env.CORS_ORIGINS !== undefined) return null;
+  return (
+    'CORS_ORIGINS no está definida y se usa el default de desarrollo ' +
+    `(${LOCAL_DEFAULT.join(', ')}). Ningún navegador fuera de esta máquina podrá usar la API.`
+  );
+}
+
+/**
  * La lista que usan `main.ts` y el gateway. Lanza si la configuración no vale.
  *
- * Avisa —sin lanzar— cuando en producción se cae al default de localhost: no es un error
- * técnico (la aplicación arranca) pero sí un despliegue que no va a funcionar desde ningún
- * navegador que no sea el de la propia máquina, y merece una línea en el log de arranque.
+ * No escribe nada: un despliegue sin `CORS_ORIGINS` no es un error técnico —la aplicación
+ * arranca— pero sí uno que no funcionará desde ningún navegador que no sea el de la propia
+ * máquina, y de decirlo se encarga `corsWarning()`.
  */
 export function corsOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
-  const origins = parseCorsOrigins(env.CORS_ORIGINS);
-
-  if (env.NODE_ENV === 'production' && env.CORS_ORIGINS === undefined) {
-    console.warn(
-      '[cors] CORS_ORIGINS no está definida y se usa el default de desarrollo ' +
-        `(${LOCAL_DEFAULT.join(', ')}). Ningún navegador fuera de esta máquina podrá usar la API.`,
-    );
-  }
-
-  return origins;
+  return parseCorsOrigins(env.CORS_ORIGINS);
 }

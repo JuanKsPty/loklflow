@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
@@ -8,7 +8,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { createAppLogger } from './common/logging/app-logger';
 import { REQUEST_ID_HEADER } from './common/logging/request-context.middleware';
 import { installProcessHandlers } from './common/logging/process-handlers';
-import { corsOrigins } from './config/cors';
+import { corsOrigins, corsWarning } from './config/cors';
 
 async function bootstrap() {
   // El logger se pasa en las opciones, no con `app.useLogger()` después: así está puesto
@@ -54,6 +54,13 @@ async function bootstrap() {
   );
 
   app.setGlobalPrefix('api');
+
+  // El aviso va por el logger de la aplicación, no por `console.warn`: en producción la salida es
+  // un JSON por línea y una línea suelta de texto plano la vuelve inagregable. Se emite aquí, una
+  // sola vez, porque el gateway también resuelve la misma configuración y lo repetiría.
+  const avisoCors = corsWarning();
+  if (avisoCors) Logger.warn(avisoCors, 'Cors');
+
   app.enableCors({
     origin: corsOrigins(),
     credentials: true,
