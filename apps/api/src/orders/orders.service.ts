@@ -197,6 +197,29 @@ export class OrdersService {
         resourceId: result.id,
       });
     }
+    /**
+     * Un pedido que llega por el QR **no lo sabe nadie del personal**, y ese es justo el caso que
+     * no estaba cubierto.
+     *
+     * Cuando la comanda la toma un mesero, el aviso sobra: quien la creó estaba delante de la
+     * mesa. Un pedido del cliente no tiene a nadie detrás —`waiterId` es `null` por definición—,
+     * así que el único aviso que salía era el de Cocina, y solo si algo se preparaba en cocina.
+     * Una mesa que pedía dos aguas y un postre (estaciones `bar` e `immediate`) no generaba
+     * absolutamente ninguna notificación: el pedido entraba, se quedaba abierto y nadie se
+     * enteraba hasta que alguien miraba el salón por su cuenta.
+     *
+     * Va al rol y no a un usuario porque no hay mesero asignado a quien dirigirlo; es el mismo
+     * reparto que ya usa el aviso de «orden lista» cuando `waiterId` viene vacío.
+     */
+    if (result.source === 'customer_qr') {
+      void this.notifications.notifyRole('Mesero', {
+        type: 'order_new',
+        title: `Pedido desde la mesa #${result.orderNumber}`,
+        body: this.orderLocation(result),
+        resourceType: 'order',
+        resourceId: result.id,
+      });
+    }
     return result;
   }
 

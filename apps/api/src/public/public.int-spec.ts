@@ -241,6 +241,93 @@ describe('menú público por QR', () => {
     });
   });
 
+  /**
+   * Que el pedido llegue a alguien.
+   *
+   * Un pedido por QR **no lo toma nadie del personal**: `waiterId` es `null` por definición, así
+   * que si no se avisa, nadie sabe que existe. El único aviso que salía era el de Cocina, y solo
+   * cuando algo se preparaba en cocina — dos aguas y un postre no generaban ninguna notificación
+   * y la cuenta se quedaba abierta sin que nadie se enterara.
+   */
+  describe('avisar al personal', () => {
+    /**
+     * Los avisos **de una comanda concreta**, no los de la tabla entera.
+     *
+     * El filtro por número de orden no es cosmético: el aviso se escribe con `void` y puede
+     * aterrizar después del `resetOperationalData` del caso siguiente, así que un `SELECT` sin
+     * acotar devuelve el aviso del caso anterior y la afirmación pasa por el motivo equivocado.
+     */
+    const notificacionesDe = (rol: string, orderNumber: number) =>
+      ds.query(
+        `SELECT n.title, n.type
+           FROM notifications n
+           JOIN users u ON u.id = n.user_id
+           JOIN roles r ON r.id = u.role_id
+           JOIN orders o ON o.id = n.resource_id
+          WHERE r.name = $1 AND o.order_number = $2`,
+        [rol, orderNumber],
+      ) as Promise<{ title: string; type: string }[]>;
+
+    /**
+     * El aviso sale con `void`: es best-effort y **no** bloquea la respuesta del pedido, que es lo
+     * correcto —un fallo del sistema de notificaciones no puede tumbar una comanda— pero significa
+     * que el 201 llega antes de que la fila exista. Sondear es la forma honesta de esperarlo;
+     * afirmar justo después del 201 es una carrera que pasa o falla según la máquina.
+     */
+    async function esperaAvisos(rol: string, orderNumber: number, cuantos: number) {
+      for (let intento = 0; intento < 50; intento++) {
+        const filas = await notificacionesDe(rol, orderNumber);
+        if (filas.length >= cuantos) return filas;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      return notificacionesDe(rol, orderNumber);
+    }
+
+    /** Los productos del menú público que se preparan en la estación dada. */
+    async function delMenuConEstacion(estacion: string): Promise<string[]> {
+      const menu = await getMenu().expect(200);
+      const ids = (menu.body.products as { id: string }[]).map((p) => p.id);
+      const filas = (await ds.query(
+        `SELECT id FROM products WHERE id = ANY($1::uuid[]) AND station = $2`,
+        [ids, estacion],
+      )) as { id: string }[];
+      return filas.map((f) => f.id);
+    }
+
+    it('avisa al salón aunque no haya nada que pase por cocina', async () => {
+      const [bebida] = await delMenuConEstacion('bar');
+      expect(bebida).toBeDefined();
+
+      const creada = await order({ items: [{ productId: bebida, quantity: 2 }] }).expect(201);
+      const numero = creada.body.order.orderNumber as number;
+
+      const avisos = await esperaAvisos('Mesero', numero, 1);
+      expect(avisos).toHaveLength(1);
+      expect(avisos[0]).toMatchObject({ type: 'order_new' });
+      expect(avisos[0].title).toContain(String(numero));
+      // Nada de esa comanda pasa por cocina, así que allí no tiene que sonar nada.
+      expect(await notificacionesDe('Cocina', numero)).toHaveLength(0);
+    });
+
+    it('una comanda del personal no genera ese aviso: quien la tomó ya lo sabe', async () => {
+      const [deCocina] = await delMenuConEstacion('kitchen');
+      expect(deCocina).toBeDefined();
+
+      const staff = await sessionAs(app, 'admin@loklflow.com', ['orders:create']);
+      const creada = await http()
+        .post('/api/orders')
+        .set('Cookie', staff)
+        .send({ tableId: table.id, items: [{ productId: deCocina, quantity: 1 }] })
+        .expect(201);
+      const numero = creada.body.orderNumber as number;
+
+      // El aviso a Cocina sí sale, y sirve de ancla: cuando está, el pedido terminó de procesarse
+      // y comprobar que el salón no tiene ninguno ya no es una carrera.
+      await esperaAvisos('Cocina', numero, 1);
+      expect(await notificacionesDe('Mesero', numero)).toHaveLength(0);
+    });
+  });
+
   describe('seguir el pedido', () => {
     it('con el pase devuelve el estado, sin pasar ningún id', async () => {
       const created = await order(oneItem()).expect(201);
