@@ -144,6 +144,57 @@ describe('Empleados', () => {
     });
   });
 
+  /**
+   * El rol viaja **plano**, que es lo que declara `User` en `@loklflow/types`.
+   *
+   * Se afirma en el borde porque el front lee la respuesta con un cast (`serverFetch<User[]>`) y
+   * ahí el compilador no compara nada: la API devolvía la entidad con `role` anidado, `u.roleName`
+   * era `undefined` y la columna «Rol» del listado de empleados salía en blanco sin que fallara
+   * ni un test ni el `typecheck`.
+   */
+  describe('forma de la respuesta', () => {
+    it('el listado trae roleId y roleName planos, no el objeto role', async () => {
+      const user = await newUser();
+
+      const listado = await http().get('/api/users').set('Cookie', admin).expect(200);
+      const fila = (listado.body as Record<string, unknown>[]).find((u) => u.id === user.id);
+
+      expect(fila).toMatchObject({ roleName: 'Mesero' });
+      expect(typeof fila!.roleId).toBe('string');
+      expect(fila).not.toHaveProperty('role');
+    });
+
+    it('leer y editar uno devuelven la misma forma', async () => {
+      const user = await newUser();
+
+      const uno = await http().get(`/api/users/${user.id}`).set('Cookie', admin).expect(200);
+      const editado = await http()
+        .patch(`/api/users/${user.id}`)
+        .set('Cookie', admin)
+        .send({ name: 'Con rol plano' })
+        .expect(200);
+
+      for (const body of [uno.body, editado.body]) {
+        expect(body).toMatchObject({ roleName: 'Mesero', isActive: true });
+        expect(typeof body.roleId).toBe('string');
+        expect(body).not.toHaveProperty('role');
+      }
+    });
+
+    it('un cambio de rol se refleja en roleName sin recargar nada', async () => {
+      const user = await newUser();
+      const cajero = await seededRole(app, 'Cajero');
+
+      const editado = await http()
+        .patch(`/api/users/${user.id}`)
+        .set('Cookie', admin)
+        .send({ roleId: cajero.id })
+        .expect(200);
+
+      expect(editado.body).toMatchObject({ roleId: cajero.id, roleName: 'Cajero' });
+    });
+  });
+
   describe('altas y bajas', () => {
     it('un empleado sin correo ni PIN no puede entrar por ningún lado', async () => {
       const res = await http()
