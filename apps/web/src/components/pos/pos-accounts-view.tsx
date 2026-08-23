@@ -100,7 +100,9 @@ export function PosAccountsView({
           <EmptyDescription>Todo cobrado por ahora.</EmptyDescription>
         </Empty>
       ) : (
-        <div className="flex flex-col gap-3">
+        // Dos columnas a partir de `lg`: el contenedor del POS se ensancha ahí, y una sola
+        // columna de tarjetas de 1100 px de ancho es peor que dos de la mitad.
+        <div className="grid gap-3 lg:grid-cols-2">
           {toCharge.map((order) => {
             const paid = paidOf(order);
             const remaining = Number(Math.max(0, order.total - paid).toFixed(2));

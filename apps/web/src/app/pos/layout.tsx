@@ -20,7 +20,12 @@ export default async function PosLayout({ children }: { children: React.ReactNod
   return (
     <SocketProvider>
       <OfflineProvider>
-        <div className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col bg-background">
+        {/*
+         * `max-w-3xl` era el ancho para todo, y en la tableta apaisada del mostrador —1024 px o
+         * más— dejaba un cuarto de pantalla vacío a cada lado con la caja apretada en el centro.
+         * A partir de `lg` el contenedor se ensancha y la pantalla de cobro pasa a dos columnas.
+         */}
+        <div className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col bg-background lg:max-w-6xl">
           <PosHeader name={user.email ?? user.roleName} roleName={user.roleName} shift={shift} />
           <main className="flex-1 overflow-y-auto p-4">{children}</main>
         </div>

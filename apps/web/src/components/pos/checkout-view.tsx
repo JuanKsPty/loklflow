@@ -66,64 +66,83 @@ export function CheckoutView({
 
   return (
     <>
-      <div>
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold">
-              {order.label || `Cuenta #${order.orderNumber}`}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {order.table ? `Mesa ${order.table.number}` : 'Para llevar'} · #{order.orderNumber} ·{' '}
-              {(order.items ?? []).length} ítem(s)
-            </p>
+      {/*
+       * Dos columnas en cuanto hay sitio: la cuenta a la izquierda y el cobro a la derecha.
+       *
+       * En una sola columna el cajero tenía que desplazarse entre los ítems y el teclado de cobro,
+       * y en la tableta apaisada del mostrador sobraba precisamente el ancho para no hacerlo. El
+       * salto está en `lg` y no antes: partir 768 px en dos deja el panel de cobro —importe,
+       * recibido, cambio— demasiado estrecho para usarlo con el dedo.
+       */}
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold">
+                {order.label || `Cuenta #${order.orderNumber}`}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {order.table ? `Mesa ${order.table.number}` : 'Para llevar'} · #{order.orderNumber}{' '}
+                · {(order.items ?? []).length} ítem(s)
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <Badge variant="outline" className={ORDER_STATUS_BADGE[order.status]}>
+                {ORDER_STATUS_LABELS[order.status]}
+              </Badge>
+              <PendingBadge partition={orderPartition(orderId)} />
+            </div>
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-1">
-            <Badge variant="outline" className={ORDER_STATUS_BADGE[order.status]}>
-              {ORDER_STATUS_LABELS[order.status]}
-            </Badge>
-            <PendingBadge partition={orderPartition(orderId)} />
-          </div>
+
+          <ul className="rounded-xl border text-sm">
+            {(order.items ?? []).map((item) => (
+              <li
+                key={item.id}
+                className="flex justify-between gap-2 border-b px-3 py-2 last:border-0"
+              >
+                <span>
+                  {item.quantity}× {item.product?.name ?? 'Producto'}
+                </span>
+                <span className="tabular-nums text-muted-foreground">
+                  {formatPrice(item.subtotal)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* `lg:sticky`: el cobro queda a la vista aunque la lista de ítems sea larga. El ancestro
+            que desplaza es el `<main>` del layout del POS. */}
+        <div className="flex flex-col gap-4 lg:sticky lg:top-0">
+          {online ? (
+            <>
+              {pending.length > 0 && (
+                <p className="rounded-xl border border-warning/30 bg-warning/10 px-3 py-3 text-sm text-warning">
+                  Esta cuenta tiene cambios sin enviar. Espera a que se sincronicen antes de cobrar:
+                  el total todavía puede cambiar.
+                </p>
+              )}
+              <CheckoutPanel
+                order={order}
+                maxDiscountPercentage={maxDiscountPercentage}
+                onSettled={reload}
+              />
+            </>
+          ) : (
+            <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-4 text-sm">
+              <p className="font-medium text-warning">Sin conexión: no se puede cobrar</p>
+              <p className="mt-1 text-muted-foreground">
+                Un cobro necesita el total real de la cuenta, y puede haber cambiado desde otro
+                dispositivo. El cobro vuelve solo en cuanto se recupere la conexión.
+              </p>
+              <p className="mt-3 flex items-baseline justify-between font-medium">
+                <span>Total de esta cuenta</span>
+                <span className="text-lg tabular-nums">{formatPrice(order.total)}</span>
+              </p>
+            </div>
+          )}
         </div>
       </div>
-
-      <ul className="rounded-xl border text-sm">
-        {(order.items ?? []).map((item) => (
-          <li key={item.id} className="flex justify-between gap-2 border-b px-3 py-2 last:border-0">
-            <span>
-              {item.quantity}× {item.product?.name ?? 'Producto'}
-            </span>
-            <span className="tabular-nums text-muted-foreground">{formatPrice(item.subtotal)}</span>
-          </li>
-        ))}
-      </ul>
-
-      {online ? (
-        <>
-          {pending.length > 0 && (
-            <p className="rounded-xl border border-warning/30 bg-warning/10 px-3 py-3 text-sm text-warning">
-              Esta cuenta tiene cambios sin enviar. Espera a que se sincronicen antes de cobrar:
-              el total todavía puede cambiar.
-            </p>
-          )}
-          <CheckoutPanel
-            order={order}
-            maxDiscountPercentage={maxDiscountPercentage}
-            onSettled={reload}
-          />
-        </>
-      ) : (
-        <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-4 text-sm">
-          <p className="font-medium text-warning">Sin conexión: no se puede cobrar</p>
-          <p className="mt-1 text-muted-foreground">
-            Un cobro necesita el total real de la cuenta, y puede haber cambiado desde otro
-            dispositivo. El cobro vuelve solo en cuanto se recupere la conexión.
-          </p>
-          <p className="mt-3 flex items-baseline justify-between font-medium">
-            <span>Total de esta cuenta</span>
-            <span className="text-lg tabular-nums">{formatPrice(order.total)}</span>
-          </p>
-        </div>
-      )}
 
       <RealtimeInvalidator
         events={['order:changed']}
