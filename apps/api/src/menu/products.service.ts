@@ -7,6 +7,7 @@ import { ProductAvailability } from './entities/product-availability.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { isAvailableNow } from './availability';
+import { ProductStockService } from '../inventory/product-stock.service';
 
 @Injectable()
 export class ProductsService {
@@ -15,6 +16,7 @@ export class ProductsService {
     private productsRepo: Repository<Product>,
     @InjectRepository(Modifier)
     private modifiersRepo: Repository<Modifier>,
+    private readonly productStock: ProductStockService,
   ) {}
 
   /**
@@ -109,6 +111,10 @@ export class ProductsService {
 
   async remove(id: string) {
     const product = await this.findOne(id);
+    // Un producto con existencias tiene su ingrediente espejo apuntándolo con clave ajena
+    // `RESTRICT`, así que el borrado fallaría con un error de base de datos —un 500— en lugar de
+    // decir algo útil. Se comprueba antes para poder explicarlo.
+    await this.productStock.assertNotTracked(id);
     await this.productsRepo.remove(product);
   }
 

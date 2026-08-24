@@ -1,11 +1,12 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, QueryFailedError, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, QueryFailedError, Repository } from 'typeorm';
 import { Ingredient } from './entities/ingredient.entity';
 import { RecipeIngredient } from './entities/recipe-ingredient.entity';
 import { StockMovement } from './entities/stock-movement.entity';
 import { CreateMovementDto } from './dto/create-movement.dto';
-import type { StockMovementType } from './inventory.constants';
+import { stockSetReason, type StockMovementType, type StockSetReason } from './inventory.constants';
+import { aggregateConsumptions, type Consumption } from './consumptions';
 import { NotificationsService } from '../notifications/notifications.service';
 
 /**
@@ -18,12 +19,6 @@ import { NotificationsService } from '../notifications/notifications.service';
  * peor fallo posible en algo cuyo trabajo es avisar.
  */
 const STOCK_ALERT_ROLES = ['Gerente', 'Administrador'];
-
-/** Una línea de consumo ya agregada: cuánto de este ingrediente se va por esta orden. */
-interface Consumption {
-  ingredientId: string;
-  quantity: number;
-}
 
 @Injectable()
 export class StockService {
@@ -76,7 +71,7 @@ export class StockService {
       this.apply(manager, {
         ingredientId: dto.ingredientId,
         type: dto.type,
-        signed,
+        amount: { signed },
         userId,
         reason: dto.reason ?? null,
         supplierId: dto.supplierId ?? null,
@@ -86,6 +81,39 @@ export class StockService {
 
     // Después de confirmar, nunca dentro: una transacción que acabe deshaciéndose habría
     // dejado igualmente el aviso enviado, y sería un aviso sobre algo que no ocurrió.
+    await this.maybeAlert(ingredient, movement.previousStock, movement.newStock);
+    return movement;
+  }
+
+  /**
+   * Fija el stock **absoluto** de un ingrediente: la operación de quien cuenta cajas, no la de
+   * quien lleva un inventario.
+   *
+   * Se escribe como un `adjustment` normal, con su motivo: no aparece un camino nuevo por el que
+   * el stock cambie sin dejar movimiento, y el libro mayor sigue siendo la única explicación del
+   * número que hay hoy. El delta lo calcula `apply` con la fila ya bloqueada; ver allí.
+   *
+   * **Un delta de cero también se escribe.** «Conté y sigue habiendo 12» es un hecho, y el día que
+   * el número no cuadre, saber que alguien lo confirmó a las siete de la tarde vale más que la
+   * fila que se ahorra.
+   */
+  async setLevel(
+    input: { ingredientId: string; toStock: number; reasonCode: StockSetReason; note?: string },
+    userId: string,
+  ): Promise<StockMovement> {
+    const { movement, ingredient } = await this.dataSource.transaction((manager) =>
+      this.apply(manager, {
+        ingredientId: input.ingredientId,
+        type: 'adjustment',
+        amount: { toStock: round3(input.toStock) },
+        userId,
+        reason: stockSetReason(input.reasonCode, input.note),
+        supplierId: null,
+      }),
+    );
+
+    // Fuera de la transacción, igual que en `record`: un aviso sobre algo que luego se deshizo
+    // sería un aviso sobre algo que no ocurrió.
     await this.maybeAlert(ingredient, movement.previousStock, movement.newStock);
     return movement;
   }
@@ -134,7 +162,7 @@ export class StockService {
             this.apply(manager, {
               ingredientId: line.ingredientId,
               type: 'consumption',
-              signed: -line.quantity,
+              amount: { signed: -line.quantity },
               userId,
               reason: null,
               supplierId: null,
@@ -166,32 +194,45 @@ export class StockService {
     }
   }
 
-  /** Suma las recetas de los ítems para saber cuánto sale de cada ingrediente. */
+  /**
+   * Qué sale del inventario por lo que se vendió. Carga los dos caminos y deja que
+   * `aggregateConsumptions` decida; la aritmética y el desempate viven allí, sin base de datos.
+   */
   private async resolveConsumptions(
     items: { productId: string; quantity: number }[],
   ): Promise<Consumption[]> {
     const productIds = [...new Set(items.map((i) => i.productId))];
     if (productIds.length === 0) return [];
 
-    const recipes = await this.recipesRepo.find({
-      where: productIds.map((productId) => ({ productId })),
-    });
-    if (recipes.length === 0) return [];
+    const [mirrors, recipes] = await Promise.all([
+      // Solo los espejos **activos**: dejar de llevar las existencias de un producto tiene que
+      // dejar de moverle el stock de verdad, no seguir hundiéndolo en negativo donde ya nadie
+      // mira. (Las recetas no filtran `is_active`, y esa asimetría es anterior a esto.)
+      this.ingredientsRepo.find({
+        where: { productId: In(productIds), isActive: true },
+        select: { id: true, productId: true },
+      }),
+      this.recipesRepo.find({ where: productIds.map((productId) => ({ productId })) }),
+    ]);
+    if (mirrors.length === 0 && recipes.length === 0) return [];
 
-    const byIngredient = new Map<string, number>();
-    for (const item of items) {
-      for (const line of recipes.filter((r) => r.productId === item.productId)) {
-        const total = (byIngredient.get(line.ingredientId) ?? 0) + line.quantity * item.quantity;
-        byIngredient.set(line.ingredientId, total);
-      }
+    const plan = aggregateConsumptions(
+      items,
+      mirrors.map((m) => ({ ingredientId: m.id, productId: m.productId as string })),
+      recipes.map((r) => ({
+        productId: r.productId,
+        ingredientId: r.ingredientId,
+        quantity: r.quantity,
+      })),
+    );
+
+    for (const productId of plan.conflicts) {
+      // No se lanza: `consumeForOrder` no puede impedir que una cuenta cobrada se cierre. Pero
+      // esto es una invariante rota del inventario y no puede pasar sin dejar rastro.
+      this.logger.error({ event: 'inventory:mirror-and-recipe', productId });
     }
 
-    return [...byIngredient].map(([ingredientId, quantity]) => ({
-      ingredientId,
-      // Tres decimales, los mismos que la columna: sin esto, sumar 0.1 tres veces deja un
-      // 0.30000000000000004 en la base y el historial se llena de ruido.
-      quantity: Number(quantity.toFixed(3)),
-    }));
+    return plan.consumptions;
   }
 
   /**
@@ -207,7 +248,11 @@ export class StockService {
     input: {
       ingredientId: string;
       type: StockMovementType;
-      signed: number;
+      /**
+       * O el delta con signo, o el stock al que hay que llegar. **Exactamente uno de los dos**, y
+       * la unión lo hace inexpresable en lugar de comprobarlo en tiempo de ejecución.
+       */
+      amount: { signed: number } | { toStock: number };
       userId: string;
       reason: string | null;
       supplierId: string | null;
@@ -222,12 +267,26 @@ export class StockService {
     if (!ingredient) throw new NotFoundException(`Ingrediente ${input.ingredientId} no encontrado`);
 
     const previousStock = Number(ingredient.currentStock);
-    const newStock = round3(previousStock + input.signed);
+
+    /**
+     * El delta de un «ahora tengo 12» **solo se puede calcular aquí**, con la fila ya bloqueada.
+     *
+     * Calcularlo en el servicio —leer el stock, restar, mandar el delta— es leer un número,
+     * esperar y escribir un movimiento cuyo `previous_stock` ya no es el de nadie. Con una venta
+     * cerrándose en medio, el ajuste **se traga la venta**: el operario ve 12, el libro mayor dice
+     * que se llegó a 12 desde un número que nunca existió, y el consumo queda contabilizado contra
+     * un stock que solo bajó una vez. Es la misma carrera que el `MAX(order_number) + 1`.
+     */
+    const signed =
+      'signed' in input.amount
+        ? input.amount.signed
+        : round3(input.amount.toStock - previousStock);
+    const newStock = round3(previousStock + signed);
 
     const movement = manager.create(StockMovement, {
       ingredientId: ingredient.id,
       type: input.type,
-      quantity: round3(input.signed),
+      quantity: round3(signed),
       previousStock,
       newStock,
       reason: input.reason,
@@ -242,7 +301,7 @@ export class StockService {
       ingredient.costPerUnit = weightedCost(
         previousStock,
         Number(ingredient.costPerUnit),
-        input.signed,
+        signed,
         input.costPerUnit,
       );
     }

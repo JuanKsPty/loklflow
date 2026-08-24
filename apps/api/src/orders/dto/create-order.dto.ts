@@ -12,7 +12,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { ORDER_SOURCES, type OrderSource } from '../order-status.constants';
+import { CREATABLE_ORDER_SOURCES, type OrderSource } from '../order-status.constants';
 
 export class CreateOrderItemDto {
   /**
@@ -79,7 +79,7 @@ export class CreateOrderDto {
   label?: string;
 
   @IsOptional()
-  @IsIn(ORDER_SOURCES)
+  @IsIn(CREATABLE_ORDER_SOURCES)
   source?: OrderSource;
 
   @IsOptional()

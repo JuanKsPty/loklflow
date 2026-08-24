@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { Ingredient } from './entities/ingredient.entity';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { UpdateIngredientDto } from './dto/update-ingredient.dto';
@@ -13,8 +13,15 @@ export class IngredientsService {
     private readonly stock: StockService,
   ) {}
 
+  /**
+   * El **catálogo de insumos**, sin los espejos de producto.
+   *
+   * Un espejo no es un ingrediente que se pueda meter en una receta ni comprar a un proveedor: es
+   * el contador de un producto vendible y tiene su propia pantalla. Mezclarlos aquí llenaba el
+   * editor de recetas de opciones que crean el doble descuento con dos clics.
+   */
   findAll() {
-    return this.ingredientsRepo.find({ order: { name: 'ASC' } });
+    return this.ingredientsRepo.find({ where: { productId: IsNull() }, order: { name: 'ASC' } });
   }
 
   /**
@@ -27,7 +34,9 @@ export class IngredientsService {
   findLowStock() {
     return this.ingredientsRepo
       .createQueryBuilder('i')
-      .where('i.is_active = true')
+      // Los espejos tienen su propio `?lowStock=true` en la pantalla de existencias.
+      .where('i.product_id IS NULL')
+      .andWhere('i.is_active = true')
       .andWhere('i.minimum_stock > 0')
       .andWhere('i.current_stock <= i.minimum_stock')
       .orderBy('i.name', 'ASC')
@@ -89,6 +98,15 @@ export class IngredientsService {
       );
     }
     const ingredient = await this.findOne(id);
+    // El nombre y la unidad de un espejo los manda el producto: renombrarlo aquí haría que el
+    // libro mayor hablara de algo que ya no existe, y cambiar la unidad haría que la pantalla
+    // dijera «3 kg» de algo que se descuenta de una en una.
+    if (ingredient.productId && (dto.name !== undefined || dto.unit !== undefined)) {
+      throw new BadRequestException(
+        'El nombre y la unidad de un producto con existencias propias se cambian en la ficha ' +
+          'del producto.',
+      );
+    }
     Object.assign(ingredient, dto);
     return this.ingredientsRepo.save(ingredient);
   }

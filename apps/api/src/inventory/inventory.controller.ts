@@ -2,6 +2,7 @@ import { ApiTags } from '@nestjs/swagger';
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -13,12 +14,15 @@ import { SuppliersService } from './suppliers.service';
 import { IngredientsService } from './ingredients.service';
 import { RecipesService } from './recipes.service';
 import { StockService } from './stock.service';
+import { ProductStockService } from './product-stock.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { UpdateIngredientDto } from './dto/update-ingredient.dto';
 import { CreateMovementDto } from './dto/create-movement.dto';
 import { SetRecipeDto } from './dto/set-recipe.dto';
+import { SetStockDto } from './dto/set-stock.dto';
+import { QueryProductStockDto } from './dto/query-product-stock.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
@@ -32,7 +36,41 @@ export class InventoryController {
     private readonly ingredients: IngredientsService,
     private readonly recipes: RecipesService,
     private readonly stock: StockService,
+    private readonly productStock: ProductStockService,
   ) {}
+
+  // ─── Existencias por producto ───────────────────────────────────────────────
+  //
+  // El producto *es* la unidad que se cuenta: una botella, una bolsa. Por debajo son ingredientes
+  // espejo, pero eso no sale nunca de aquí.
+
+  @Get('products')
+  @RequirePermissions('inventory:read')
+  findProductStock(@Query() query: QueryProductStockDto) {
+    return this.productStock.findAll(query);
+  }
+
+  /**
+   * «Ahora tengo N.» `PUT` y no `POST` porque la operación es idempotente por su propia forma:
+   * reenviarla desde una conexión mala deja el mismo número en vez de dos ajustes acumulados.
+   * Crea el espejo la primera vez; no hay paso previo de «activar».
+   */
+  @Put('products/:productId/stock')
+  @RequirePermissions('inventory:update')
+  setProductStock(
+    @Param('productId', ParseUuidPipe) productId: string,
+    @Body() dto: SetStockDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.productStock.setStock(productId, dto, user.sub);
+  }
+
+  // Baja lógica del espejo, no borrado: el libro mayor tiene que sobrevivir.
+  @Delete('products/:productId/stock')
+  @RequirePermissions('inventory:delete')
+  untrackProduct(@Param('productId', ParseUuidPipe) productId: string) {
+    return this.productStock.untrack(productId);
+  }
 
   // ─── Proveedores ────────────────────────────────────────────────────────────
 
@@ -91,6 +129,19 @@ export class InventoryController {
   @RequirePermissions('inventory:update')
   updateIngredient(@Param('id', ParseUuidPipe) id: string, @Body() dto: UpdateIngredientDto) {
     return this.ingredients.update(id, dto);
+  }
+
+  @Put('ingredients/:id/stock')
+  @RequirePermissions('inventory:update')
+  setIngredientStock(
+    @Param('id', ParseUuidPipe) id: string,
+    @Body() dto: SetStockDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.stock.setLevel(
+      { ingredientId: id, toStock: dto.newStock, reasonCode: dto.reasonCode, note: dto.note },
+      user.sub,
+    );
   }
 
   @Patch('ingredients/:id/deactivate')
