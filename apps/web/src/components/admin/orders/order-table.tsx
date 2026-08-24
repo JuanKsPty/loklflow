@@ -31,6 +31,17 @@ function formatTime(value: string): string {
   );
 }
 
+/**
+ * De dónde viene la cuenta, en una línea.
+ *
+ * Una venta de mostrador tampoco tiene mesa, así que sin esto se leía «Para llevar» — que es otra
+ * cosa: un pedido que alguien se lleva, no una venta despachada y cobrada en el acto.
+ */
+function origenDe(o: Order): string {
+  if (o.table) return `Mesa ${o.table.number}`;
+  return o.source === 'counter' ? 'Mostrador' : 'Para llevar';
+}
+
 export function OrderTable({ orders }: Props) {
   if (orders.length === 0) {
     return (
@@ -64,7 +75,7 @@ export function OrderTable({ orders }: Props) {
               <div>
                 <p className="font-medium">#{o.orderNumber}</p>
                 <p className="text-sm text-muted-foreground">
-                  {o.table ? `Mesa ${o.table.number}` : 'Para llevar'} · {o.items?.length ?? 0}{' '}
+                  {origenDe(o)} · {o.items?.length ?? 0}{' '}
                   ítem(s)
                 </p>
               </div>
@@ -108,7 +119,7 @@ export function OrderTable({ orders }: Props) {
               <TableRow key={o.id}>
                 <TableCell className="font-medium">#{o.orderNumber}</TableCell>
                 <TableCell className="text-muted-foreground">
-                  {o.table ? `Mesa ${o.table.number}` : 'Para llevar'}
+                  {origenDe(o)}
                 </TableCell>
                 <TableCell>{o.items?.length ?? 0}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatPrice(o.total)}</TableCell>

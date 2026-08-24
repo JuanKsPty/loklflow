@@ -1,4 +1,5 @@
 import {
+  BanknoteIcon,
   LayoutDashboardIcon,
   LayoutGridIcon,
   PackageIcon,
@@ -34,8 +35,11 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { title: 'Panel', href: '/admin', icon: LayoutDashboardIcon, permission: 'pos:read', bar: 1 },
   { title: 'Inventario', href: '/admin/inventario', icon: PackageIcon, permission: 'inventory:read', bar: 2 },
-  { title: 'Órdenes', href: '/admin/orders', icon: ReceiptTextIcon, permission: 'orders:read', bar: 3 },
-  { title: 'Menú', href: '/admin/menu', icon: UtensilsCrossedIcon, permission: 'menu:read', bar: 4 },
+  // `pos:create` y no `orders:create`: el endpoint exige los dos, y este es el que un mesero no
+  // tiene por sí solo. Enseñar un destino que devuelve 403 es peor que no enseñarlo.
+  { title: 'Venta', href: '/admin/venta', icon: BanknoteIcon, permission: 'pos:create', bar: 3 },
+  { title: 'Órdenes', href: '/admin/orders', icon: ReceiptTextIcon, permission: 'orders:read', bar: 4 },
+  { title: 'Menú', href: '/admin/menu', icon: UtensilsCrossedIcon, permission: 'menu:read' },
   { title: 'Mesas', href: '/admin/tables', icon: LayoutGridIcon, permission: 'tables:read' },
   { title: 'Empleados', href: '/admin/users', icon: UsersIcon, permission: 'users:read' },
   { title: 'Roles', href: '/admin/roles', icon: ShieldIcon, permission: 'roles:read' },

@@ -7,6 +7,8 @@ import type {
   UpdateOrderItemPayload,
   UpdateOrderStatusPayload,
   UpdateOrderItemStatusPayload,
+  QuickSalePayload,
+  QuickSaleResult,
 } from '@loklflow/types';
 
 /**
@@ -59,4 +61,14 @@ export const ordersApi = {
     api.post<Order>(`/orders/${targetId}/merge`, { sourceOrderIds }),
   /** Devuelve una cuenta fusionada a su estado anterior, con sus líneas. */
   unmerge: (id: string) => api.post<Order>(`/orders/${id}/unmerge`),
+
+  /**
+   * Venta de mostrador: crea, cobra y cierra en una petición.
+   *
+   * El `id` se acuña **antes** de llamar y se conserva entre reintentos: es lo único que hace que
+   * un reenvío devuelva la venta en lugar de cobrar dos veces. Por eso lo recibe en vez de
+   * generarlo aquí — quien reintenta tiene que mandar el mismo.
+   */
+  quickSale: (payload: QuickSalePayload) =>
+    api.post<QuickSaleResult>('/orders/quick-sale', payload),
 };
