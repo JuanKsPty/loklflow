@@ -69,6 +69,14 @@ export class ProductsService {
       price: dto.price,
       imageUrl: dto.imageUrl ?? null,
       categoryId: dto.categoryId ?? null,
+      /**
+       * Faltaba, y no era inocuo: todo producto creado por la API se quedaba en `kitchen`
+       * aunque el formulario mandara `bar`, porque el DTO lo declaraba y nadie lo copiaba.
+       * El aviso a Cocina de `OrdersService.create` mira justo esta columna, así que una
+       * botella de agua sonaba en cocina y el KDS pintaba tarjetas que nadie preparaba.
+       * El seed no lo sufría porque escribe por repositorio, no por la API.
+       */
+      station: dto.station ?? 'kitchen',
       isActive: dto.isActive ?? true,
       modifiers: await this.resolveModifiers(dto.modifierIds),
       availabilities: this.buildAvailabilities(dto.availabilities),
@@ -85,6 +93,7 @@ export class ProductsService {
     if (dto.price !== undefined) product.price = dto.price;
     if (dto.imageUrl !== undefined) product.imageUrl = dto.imageUrl ?? null;
     if (dto.categoryId !== undefined) product.categoryId = dto.categoryId ?? null;
+    if (dto.station !== undefined) product.station = dto.station;
     if (dto.isActive !== undefined) product.isActive = dto.isActive;
     if (dto.modifierIds !== undefined) {
       product.modifiers = await this.resolveModifiers(dto.modifierIds);

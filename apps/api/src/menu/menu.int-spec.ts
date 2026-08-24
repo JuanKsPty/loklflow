@@ -242,6 +242,30 @@ describe('Catálogo del menú', () => {
       expect((listado.body as { id: string }[]).some((p) => p.id === prod.id)).toBe(true);
     });
 
+    /**
+     * `station` estaba en el DTO, en la entidad y en la columna, y **el servicio no lo copiaba
+     * ni al crear ni al editar**: todo producto de la API acababa en `kitchen`. El formulario
+     * web sí lo mandaba, así que una bebida sonaba en cocina y el KDS pintaba una tarjeta que
+     * nadie tenía que preparar. Se prueban los dos caminos porque faltaba en los dos.
+     */
+    it('guarda la estación que se eligió, al crear y al editar', async () => {
+      const prod = await newProduct({ station: 'bar' });
+      expect((prod as unknown as { station: string }).station).toBe('bar');
+
+      const editado = await http()
+        .patch(`/api/menu/products/${prod.id}`)
+        .set('Cookie', admin)
+        .send({ station: 'immediate' })
+        .expect(200);
+      expect((editado.body as { station: string }).station).toBe('immediate');
+
+      const leido = await http()
+        .get(`/api/menu/products/${prod.id}`)
+        .set('Cookie', admin)
+        .expect(200);
+      expect((leido.body as { station: string }).station).toBe('immediate');
+    });
+
     it('se borra', async () => {
       const prod = await newProduct();
       await http().delete(`/api/menu/products/${prod.id}`).set('Cookie', admin).expect(204);
