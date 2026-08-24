@@ -45,7 +45,11 @@ export class ShiftsService {
         }),
       );
     } catch (err) {
-      if (err instanceof QueryFailedError && /unique|duplicate/i.test(err.message)) {
+      // Por **código** y no por el texto del mensaje: Postgres lo traduce según `lc_messages`, así
+      // que con la base en español el índice `idx_shifts_one_open_per_user` dejaba de reconocerse
+      // y el doble clic salía como un 500 en vez de como «ya tienes un turno abierto». Es la misma
+      // trampa que documenta `common/write-conflict.ts`.
+      if (err instanceof QueryFailedError && (err as QueryFailedError & { code?: string }).code === '23505') {
         throw new BadRequestException('Ya tienes un turno de caja abierto');
       }
       throw err;

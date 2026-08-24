@@ -1,4 +1,4 @@
-import type { OrderStatus } from './order-status.constants';
+import type { OrderSource, OrderStatus } from './order-status.constants';
 
 /**
  * Las reglas de qué se puede fusionar con qué.
@@ -29,6 +29,7 @@ export interface MergeCandidate {
   id: string;
   orderNumber: number;
   status: OrderStatus;
+  source: OrderSource;
   tableId: string | null;
   mergedIntoOrderId: string | null;
   paidAmount: number;
@@ -44,6 +45,19 @@ const MONEY_EPSILON = 0.001;
 export function canMerge(source: MergeCandidate, target: MergeCandidate): MergeVerdict {
   if (source.id === target.id) {
     return { ok: false, reason: 'Una cuenta no se puede fusionar consigo misma.' };
+  }
+
+  /**
+   * Una venta de mostrador se cobra sola y en el acto, así que la única forma de encontrarse una
+   * abierta es que su cobro fallara. En ese caso lo que toca es reintentar la venta o cobrarla en
+   * el punto de venta — no mudarle las líneas a la cuenta de una mesa, donde el importe aparecería
+   * como consumo de unos clientes que no pidieron eso.
+   */
+  if (source.source === 'counter' || target.source === 'counter') {
+    return {
+      ok: false,
+      reason: 'Una venta de mostrador no se fusiona: cóbrala o cancélala.',
+    };
   }
 
   if (!OPEN_STATUSES.includes(target.status)) {

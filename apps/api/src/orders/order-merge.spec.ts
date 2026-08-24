@@ -4,6 +4,7 @@ const candidate = (over: Partial<MergeCandidate> = {}): MergeCandidate => ({
   id: 'a',
   orderNumber: 1,
   status: 'pending',
+  source: 'staff',
   tableId: 'mesa-1',
   mergedIntoOrderId: null,
   paidAmount: 0,
@@ -111,4 +112,15 @@ describe('reglas de fusión de cuentas', () => {
       ).toEqual({ ok: true });
     });
   });
+
+  it('una venta de mostrador no se fusiona, ni como origen ni como destino', () => {
+    // La única forma de encontrarse una abierta es que su cobro fallara. Mudarle las líneas a la
+    // cuenta de una mesa metería ese importe en el consumo de unos clientes que no pidieron eso.
+    const mostrador = candidate({ id: 'm', orderNumber: 9, source: 'counter', tableId: null });
+    const mesa = candidate({ id: 'b', orderNumber: 2 });
+
+    expect(canMerge(mostrador, mesa)).toMatchObject({ ok: false });
+    expect(canMerge(mesa, mostrador)).toMatchObject({ ok: false });
+  });
+
 });

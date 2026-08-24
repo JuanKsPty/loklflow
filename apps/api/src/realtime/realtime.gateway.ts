@@ -46,6 +46,11 @@ export interface OrderEvent {
   orderNumber?: number;
   tableId?: string | null;
   status?: string;
+  /**
+   * De dónde viene la orden. Lo lee el tablero de cocina para ignorar una venta de mostrador sin
+   * tener que recargar el listado entero para descubrir que no le incumbe.
+   */
+  source?: string;
 }
 
 export interface TableEvent {

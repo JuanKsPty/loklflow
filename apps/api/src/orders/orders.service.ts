@@ -76,6 +76,7 @@ export class OrdersService {
       mergedIntoOrderId: IsNull(),
       ...(filters?.status ? { status: filters.status } : {}),
       ...(filters?.tableId ? { tableId: filters.tableId } : {}),
+      ...(filters?.source ? { source: filters.source } : {}),
       // `open` y `status` son compatibles: si llegan los dos, manda el estado concreto.
       ...(filters?.open && !filters.status ? { status: In(OPEN_STATUSES) } : {}),
       ...(filters?.since ? { updatedAt: MoreThan(new Date(filters.since)) } : {}),
@@ -188,7 +189,11 @@ export class OrdersService {
       }
     }
     // Solo avisar a Cocina si la orden tiene algún ítem que se prepara en cocina.
-    if (result.items.some((i) => i.product?.station === 'kitchen')) {
+    //
+    // Una venta de mostrador nunca: la despacha y la cobra la misma persona, en el acto, y ya está
+    // cerrada cuando cualquier pantalla la ve. Avisar de algo que nadie va a preparar es la forma
+    // más rápida de que dejen de mirar los avisos.
+    if (result.source !== 'counter' && result.items.some((i) => i.product?.station === 'kitchen')) {
       void this.notifications.notifyRole('Cocina', {
         type: 'order_new',
         title: `Nueva orden #${result.orderNumber}`,
@@ -505,6 +510,7 @@ export class OrdersService {
       orderNumber: order.orderNumber,
       tableId: order.tableId,
       status: order.status,
+      source: order.source,
     });
   }
 

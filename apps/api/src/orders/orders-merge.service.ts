@@ -236,6 +236,7 @@ export class OrdersMergeService {
       id: order.id,
       orderNumber: order.orderNumber,
       status: order.status,
+      source: order.source,
       tableId: order.tableId,
       mergedIntoOrderId: order.mergedIntoOrderId,
       paidAmount: (order.payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0),
