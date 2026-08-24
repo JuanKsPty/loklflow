@@ -129,6 +129,31 @@ export class ProductStockService {
   }
 
   /**
+   * Cuánto hay ahora, o `null` si el producto no lleva existencias.
+   *
+   * Consulta directa y no `findOneRow`, que recorre el catálogo entero: esto lo llama la
+   * importación una vez por fila.
+   */
+  async currentStockOf(productId: string): Promise<number | null> {
+    const mirror = await this.ingredientsRepo.findOne({
+      where: { productId },
+      select: { id: true, currentStock: true, isActive: true },
+    });
+    return mirror && mirror.isActive ? Number(mirror.currentStock) : null;
+  }
+
+  /**
+   * El umbral de aviso. No es un movimiento: no cambia cuánto hay, solo a partir de cuándo avisar,
+   * así que no tiene sitio en el libro mayor.
+   */
+  async setMinimum(productId: string, minimumStock: number): Promise<ProductStockRow> {
+    const mirror = await this.ensureMirror(productId);
+    mirror.minimumStock = Number(minimumStock.toFixed(3));
+    await this.ingredientsRepo.save(mirror);
+    return this.findOneRow(productId);
+  }
+
+  /**
    * Deja de llevar las existencias de un producto.
    *
    * Baja lógica y nunca `DELETE`: el libro mayor apunta al espejo con clave ajena `RESTRICT`, y

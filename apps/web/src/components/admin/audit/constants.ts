@@ -33,6 +33,7 @@ export const AUDIT_ACTION_BADGE: Record<AuditAction, string> = {
   // Invalida material impreso: las hojas de QR que estén en las mesas dejan de servir en el
   // instante en que esto ocurre, así que no es rutina.
   'table.qr_rotated': 'border-warning/30 bg-warning/10 text-warning',
+  'menu.imported': 'border-info/30 bg-info/10 text-info',
 
   // Mueve dinero de una cuenta a otra sin cobrar nada: no es destructivo, pero cambia qué se
   // cobra y dónde, así que tiene que verse.

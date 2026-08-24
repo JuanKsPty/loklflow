@@ -30,6 +30,9 @@ export const AUDIT_ACTIONS = [
   'order.unmerged',
   // Mesas
   'table.qr_rotated',
+  // Menú. Una importación cambia el catálogo entero de golpe: es exactamente lo que la bitácora
+  // existe para poder reconstruir después.
+  'menu.imported',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -44,6 +47,7 @@ export const AUDIT_ENTITY_TYPES = [
   'discount',
   'table',
   'session',
+  'product',
 ] as const;
 
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];

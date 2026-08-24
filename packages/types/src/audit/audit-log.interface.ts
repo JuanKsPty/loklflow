@@ -17,7 +17,8 @@ export type AuditAction =
   | 'order.cancelled'
   | 'order.merged'
   | 'order.unmerged'
-  | 'table.qr_rotated';
+  | 'table.qr_rotated'
+  | 'menu.imported';
 
 export const AUDIT_ACTIONS: AuditAction[] = [
   'auth.login',
@@ -39,6 +40,7 @@ export const AUDIT_ACTIONS: AuditAction[] = [
   'order.merged',
   'order.unmerged',
   'table.qr_rotated',
+  'menu.imported',
 ];
 
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
@@ -61,6 +63,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   'order.merged': 'Cuentas fusionadas',
   'order.unmerged': 'Fusión deshecha',
   'table.qr_rotated': 'QR de mesa regenerado',
+  'menu.imported': 'Catálogo importado',
 };
 
 export type AuditEntityType =
@@ -73,6 +76,7 @@ export type AuditEntityType =
   // tipo que este espejo no conocía, así que la etiqueta salía en blanco en `/admin/audit`.
   | 'discount'
   | 'table'
+  | 'product'
   | 'session';
 
 export const AUDIT_ENTITY_LABELS: Record<AuditEntityType, string> = {
@@ -84,6 +88,7 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntityType, string> = {
   discount: 'Descuento',
   table: 'Mesa',
   session: 'Sesión',
+  product: 'Producto',
 };
 
 export interface AuditLog {
