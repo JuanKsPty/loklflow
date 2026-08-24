@@ -3,7 +3,7 @@ import { Controller, Get, Header, Query, StreamableFile } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { DateRangeDto } from './dto/date-range.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
-import { UTF8_BOM, toCsv, type CsvColumn } from './csv';
+import { UTF8_BOM, toCsv, type CsvColumn } from '../common/csv';
 
 /** Columnas del CSV de ventas, en el orden en que se exportan. */
 const SALES_COLUMNS: CsvColumn<Record<string, unknown>>[] = [
