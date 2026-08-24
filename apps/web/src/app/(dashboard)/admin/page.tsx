@@ -86,6 +86,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     byMethod: { cash: 0, card: 0, transfer: 0, digital_wallet: 0 },
     ordersClosed: 0,
     averageTicket: 0,
+    counter: { orders: 0, total: 0, averageTicket: 0 },
     totalDiscounts: 0,
     totalTips: 0,
     openOrders: 0,
@@ -171,12 +172,27 @@ export default async function DashboardPage({ searchParams }: Props) {
           tone="success"
           icon={<BanknoteIcon className="size-4" />}
         />
+        {/*
+          «Ticket promedio» son solo las **cuentas**: mesa y pedido por QR. Una venta de mostrador
+          es otra unidad —una botella frente a una mesa de cuatro—, así que promediarlas juntas da
+          un número que no describe a ninguna y que se mueve cuando cambia la proporción entre
+          ellas aunque el negocio no haya cambiado. Va en su propia tarjeta, y solo aparece cuando
+          hay ventas de mostrador en el rango: en un local que no las usa, sobra.
+        */}
         <StatCard
-          label="Ticket promedio"
+          label="Ticket promedio en mesa"
           value={formatPrice(summary.averageTicket)}
           hint={`${summary.ordersClosed} cuenta(s) cerrada(s)`}
           icon={<ReceiptTextIcon className="size-4" />}
         />
+        {summary.counter.orders > 0 && (
+          <StatCard
+            label="Mostrador"
+            value={formatPrice(summary.counter.total)}
+            hint={`${summary.counter.orders} venta(s) · ${formatPrice(summary.counter.averageTicket)} de promedio`}
+            icon={<BanknoteIcon className="size-4" />}
+          />
+        )}
         <StatCard
           label="Cuentas abiertas"
           value={String(summary.openOrders)}

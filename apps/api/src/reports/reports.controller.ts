@@ -9,6 +9,7 @@ import { UTF8_BOM, toCsv, type CsvColumn } from '../common/csv';
 const SALES_COLUMNS: CsvColumn<Record<string, unknown>>[] = [
   { key: 'processedAt', header: 'Fecha' },
   { key: 'orderNumber', header: 'Cuenta' },
+  { key: 'origen', header: 'Origen' },
   { key: 'method', header: 'Método' },
   { key: 'amount', header: 'Importe' },
   { key: 'reference', header: 'Referencia' },
