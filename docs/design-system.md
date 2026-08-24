@@ -86,16 +86,40 @@ anclar en `md` habría reflujado una tableta. Con `sm`, todo lo que mide ≥640 
 Los controles deliberadamente más altos que el suelo táctil —el teclado del PIN, los CTA de la carta
 pública— llevan su propio `max-sm:h-14` / `max-sm:h-12`: si no, la variante los aplastaría a 44 px.
 
-### Tablas en móvil — decisión aceptada
+### Tablas en móvil — dos renderizados, y por qué se revirtió la decisión anterior
 
-Quince componentes usan `ui/table`, que envuelve en `overflow-x-auto`: **no se rompen**, se
-desplazan dentro de su propio contenedor. Solo dos tienen versión de tarjeta-por-fila —el listado
-de órdenes de `/admin/orders`— porque son las que un dueño abre desde el teléfono.
+Un listado del panel renderiza **dos veces**: una lista de tarjetas, una por fila, y la tabla de
+siempre detrás. Los envoltorios son `CardList` y `TableFrame` de
+[`admin/dual-render.tsx`](../apps/web/src/components/admin/dual-render.tsx), que existen para que el
+escalón —`sm`, 640 px— esté escrito en un sitio y no pueda derivar. El patrón lo fijó
+[`order-table.tsx`](../apps/web/src/components/admin/orders/order-table.tsx) y lo estrenó
+[`product-stock-table.tsx`](../apps/web/src/components/admin/inventory/product-stock-table.tsx).
 
-Las otras trece siguen desplazándose, y es deliberado: quince renderizados duales son una semana
-de trabajo para pantallas que se usan en portátil. Lo que sí se comprueba en cada ejecución es
-que **la página no se desborde a lo ancho** (`e2e/responsive.spec.ts`, proyecto `movil`), que es
-la diferencia entre «esta tabla se desplaza» y «esta pantalla está rota».
+Aquí decía lo contrario: que las trece tablas restantes se desplazaran en horizontal era
+deliberado, porque «quince renderizados duales son una semana de trabajo para pantallas que se usan
+en portátil». **Esa frase era cierta cuando se escribió y ha dejado de serlo.** El usuario principal
+del panel es hoy el dueño, que lo abre desde el teléfono varias veces al día. Una tabla de cinco
+columnas dentro de los 358 px útiles de un Pixel 7 enseña la primera columna y media: para leer el
+precio hay que desplazar a ciegas una franja que no se ve que sea desplazable, y el botón «Editar»
+queda fuera de la pantalla. Eso no es denso, es inservible.
+
+**El renderizado de escritorio y tableta no cambia.** El diff de cada listado es aditivo: se
+envuelve el bloque que ya existía y se añade un hermano. `sm:block` en un `<div>` es su `display` de
+siempre.
+
+`whitespace-nowrap` en `TableHead`/`TableCell` **se queda**: por debajo de `sm` ya no se pinta la
+tabla, así que quitarlo solo serviría para reflujar quince tablas en escritorio. Si una celda debe
+fluir, lleva `className="whitespace-normal"`; no se toca la base. Lo que sí se añadió al contenedor
+es `overscroll-x-contain`: al llegar al final del desplazamiento horizontal se disparaba el gesto de
+«atrás» del navegador y te sacaba de la pantalla.
+
+**Estado de la conversión, para que no se lea como terminada:** hoy la usan `order-table` y
+`product-stock-table`. Los demás listados (`ingredient`, `movement`, `product`, `user`, `supplier`,
+`table`, `sector`, `reservation`, `modifier`, `combo`, `category`, `approvals`, y la tabla de roles
+que aún vive dentro de su página) siguen desplazándose. La excepción permanente es
+[`audit-table.tsx`](../apps/web/src/components/admin/audit/audit-table.tsx): son seis columnas de
+una herramienta forense que se consulta buscando una fila concreta, y una tarjeta por registro
+convierte una pantalla en cuarenta.
 
 ## 5. Dark mode
 
