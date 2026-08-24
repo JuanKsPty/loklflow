@@ -10,6 +10,16 @@
  * *y* `pos:create`, y quiere empezar en el salón, que es donde está de pie.
  */
 const ROUTES: { permission: string; path: string }[] = [
+  /**
+   * El dueño, primero. `business_config:update` lo tiene **solo** el Administrador —el Gerente
+   * tiene `business_config:read` pero no `update`—, así que es el discriminador limpio para «esta
+   * persona gestiona el negocio» sin tocar a quien está de pie.
+   *
+   * Sin esta línea, un administrador que entra por PIN aterrizaba en `/waiter`: tiene
+   * `tables:update` como cualquier mesero, y la primera regla que casa gana. Entrando por correo
+   * iba a `/admin`, así que las dos puertas de la aplicación llevaban a sitios distintos.
+   */
+  { permission: 'business_config:update', path: '/admin' },
   { permission: 'tables:update', path: '/waiter' },
   { permission: 'pos:create', path: '/pos' },
   { permission: 'orders:update', path: '/kitchen' },
