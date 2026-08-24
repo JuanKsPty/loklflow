@@ -15,5 +15,12 @@ interface Props {
  */
 export default async function PublicOrderPage({ params }: Props) {
   const { qrCode } = await params;
-  return <PublicOrderTracker qrCode={qrCode} />;
+  // El layout ensancha en tableta para que quepan dos columnas de carta; el seguimiento es una
+  // lista de estados en vertical y estirarla solo separaría cada paso de su texto. Se queda en la
+  // anchura de siempre, centrada.
+  return (
+    <div className="mx-auto w-full max-w-md">
+      <PublicOrderTracker qrCode={qrCode} />
+    </div>
+  );
 }

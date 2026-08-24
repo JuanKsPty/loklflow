@@ -7,6 +7,7 @@ import { ProductAvailability } from './entities/product-availability.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { isAvailableNow } from './availability';
+import { ProductStockService } from '../inventory/product-stock.service';
 
 @Injectable()
 export class ProductsService {
@@ -15,6 +16,7 @@ export class ProductsService {
     private productsRepo: Repository<Product>,
     @InjectRepository(Modifier)
     private modifiersRepo: Repository<Modifier>,
+    private readonly productStock: ProductStockService,
   ) {}
 
   /**
@@ -69,6 +71,14 @@ export class ProductsService {
       price: dto.price,
       imageUrl: dto.imageUrl ?? null,
       categoryId: dto.categoryId ?? null,
+      /**
+       * Faltaba, y no era inocuo: todo producto creado por la API se quedaba en `kitchen`
+       * aunque el formulario mandara `bar`, porque el DTO lo declaraba y nadie lo copiaba.
+       * El aviso a Cocina de `OrdersService.create` mira justo esta columna, así que una
+       * botella de agua sonaba en cocina y el KDS pintaba tarjetas que nadie preparaba.
+       * El seed no lo sufría porque escribe por repositorio, no por la API.
+       */
+      station: dto.station ?? 'kitchen',
       isActive: dto.isActive ?? true,
       modifiers: await this.resolveModifiers(dto.modifierIds),
       availabilities: this.buildAvailabilities(dto.availabilities),
@@ -85,6 +95,7 @@ export class ProductsService {
     if (dto.price !== undefined) product.price = dto.price;
     if (dto.imageUrl !== undefined) product.imageUrl = dto.imageUrl ?? null;
     if (dto.categoryId !== undefined) product.categoryId = dto.categoryId ?? null;
+    if (dto.station !== undefined) product.station = dto.station;
     if (dto.isActive !== undefined) product.isActive = dto.isActive;
     if (dto.modifierIds !== undefined) {
       product.modifiers = await this.resolveModifiers(dto.modifierIds);
@@ -100,6 +111,10 @@ export class ProductsService {
 
   async remove(id: string) {
     const product = await this.findOne(id);
+    // Un producto con existencias tiene su ingrediente espejo apuntándolo con clave ajena
+    // `RESTRICT`, así que el borrado fallaría con un error de base de datos —un 500— en lugar de
+    // decir algo útil. Se comprueba antes para poder explicarlo.
+    await this.productStock.assertNotTracked(id);
     await this.productsRepo.remove(product);
   }
 

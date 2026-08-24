@@ -2,6 +2,22 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_LANDING, landingFor } from './landing';
 
 describe('landingFor', () => {
+  /**
+   * El caso que motivó la regla del dueño: un administrador tiene `tables:update` como cualquier
+   * mesero, así que sin ella aterrizaba en el salón entrando por PIN —mientras que entrando por
+   * correo iba al panel—. Dos puertas, dos destinos.
+   */
+  it('el dueño empieza en su panel, aunque también pueda atender mesas', () => {
+    expect(
+      landingFor(['business_config:update', 'tables:update', 'pos:create', 'orders:update']),
+    ).toBe('/admin');
+  });
+
+  it('pero un gerente que atiende mesas sigue empezando en el salón', () => {
+    // Tiene `business_config:read`, no `update`: el discriminador distingue gestionar de mandar.
+    expect(landingFor(['business_config:read', 'tables:update', 'pos:create'])).toBe('/waiter');
+  });
+
   it('el mesero empieza en el salón', () => {
     expect(landingFor(['tables:update', 'orders:create'])).toBe('/waiter');
   });

@@ -13,6 +13,7 @@ import {
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { toUserResponse } from './dto/user-response.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -24,10 +25,16 @@ import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  /**
+   * El mapeo a `UserResponse` vive aquí y no en el service a propósito: `findOne` lo consumen
+   * `update`, `remove` y `AuthService.refresh`, y los tres necesitan la **entidad** (mutan el
+   * usuario cargado o leen `user.role.name`). Aplanar en el service obligaría a mantener dos
+   * variantes de cada lectura; el borde HTTP es el único sitio donde la forma tiene que cambiar.
+   */
   @Get()
   @RequirePermissions('users:read')
-  findAll() {
-    return this.usersService.findAll();
+  async findAll() {
+    return (await this.usersService.findAll()).map(toUserResponse);
   }
 
   @Get('operational')
@@ -50,26 +57,26 @@ export class UsersController {
 
   @Get(':id')
   @RequirePermissions('users:read')
-  findOne(@Param('id', ParseUuidPipe) id: string) {
-    return this.usersService.findOne(id);
+  async findOne(@Param('id', ParseUuidPipe) id: string) {
+    return toUserResponse(await this.usersService.findOne(id));
   }
 
   // Auditados dentro del service: el interceptor no vería el estado anterior ni
   // podría distinguir un cambio de rol de una edición cualquiera.
   @Post()
   @RequirePermissions('users:create')
-  create(@Body() dto: CreateUserDto, @CurrentUser() user: JwtPayload) {
-    return this.usersService.create(dto, user);
+  async create(@Body() dto: CreateUserDto, @CurrentUser() user: JwtPayload) {
+    return toUserResponse(await this.usersService.create(dto, user));
   }
 
   @Patch(':id')
   @RequirePermissions('users:update')
-  update(
+  async update(
     @Param('id', ParseUuidPipe) id: string,
     @Body() dto: UpdateUserDto,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.usersService.update(id, dto, user);
+    return toUserResponse(await this.usersService.update(id, dto, user));
   }
 
   @Delete(':id')

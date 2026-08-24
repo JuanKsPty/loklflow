@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { closeTestApp, createTestApp } from '../../test/app';
 import { resetOperationalData } from '../../test/database';
@@ -28,7 +29,12 @@ describe('Reportes', () => {
     app = await createTestApp();
     ds = app.get(DataSource);
     cookie = await sessionAs(app, 'admin@loklflow.com', ['pos:read']);
-    cashier = await sessionAs(app, 'cajero@loklflow.com', ['pos:create', 'pos:read']);
+    cashier = await sessionAs(app, 'cajero@loklflow.com', [
+      'pos:create',
+      'pos:read',
+      // La venta de mostrador exige los dos: `PermissionsGuard` los pide todos.
+      'orders:create',
+    ]);
     waiter = await sessionAs(app, 'mesero@loklflow.com', ['orders:create']);
     product = await firstProduct(app);
   });
@@ -69,6 +75,27 @@ describe('Reportes', () => {
       [order.body.id],
     );
     return { paymentId: row.id, amount };
+  }
+
+  /** Una venta de mostrador: crea, cobra y cierra en una petición. Devuelve su importe. */
+  async function ventaDeMostrador(quantity = 1): Promise<number> {
+    await http()
+      .post('/api/shifts/open')
+      .set('Cookie', cashier)
+      .send({ openingCash: 0 })
+      // 400 si ya está abierto: `idx_shifts_one_open_per_user` haciendo su trabajo.
+      .then(() => undefined, () => undefined);
+
+    const res = await http()
+      .post('/api/orders/quick-sale')
+      .set('Cookie', cashier)
+      .send({
+        id: randomUUID(),
+        items: [{ productId: product.id, quantity }],
+        payment: { method: 'cash' },
+      })
+      .expect(201);
+    return Number(res.body.order.total);
   }
 
   it('la suite corre en una zona desplazada respecto a UTC', () => {
@@ -151,6 +178,47 @@ describe('Reportes', () => {
 
     expect(Number(res.body.ordersClosed)).toBe(1);
     expect(Number(res.body.averageTicket)).toBeCloseTo(amount, 2);
+  });
+
+  /**
+   * El caso que motiva separar el promedio: una venta de mostrador de una unidad y una cuenta de
+   * mesa de varias no son la misma cosa, y promediarlas juntas da un número que no describe a
+   * ninguna de las dos.
+   */
+  it('la venta de mostrador tiene su propio promedio y no arrastra al de las cuentas', async () => {
+    const { amount: cuenta } = await paidOrder(4);
+    const mostrador = await ventaDeMostrador();
+
+    const res = await http()
+      .get('/api/reports/sales-summary')
+      .set('Cookie', cookie)
+      .expect(200);
+
+    // El ticket de mesa es el de la mesa, intacto.
+    expect(Number(res.body.ordersClosed)).toBe(1);
+    expect(Number(res.body.averageTicket)).toBeCloseTo(cuenta, 2);
+
+    // Y el mostrador va aparte, con lo suyo.
+    expect(res.body.counter).toMatchObject({ orders: 1 });
+    expect(Number(res.body.counter.total)).toBeCloseTo(mostrador, 2);
+    expect(Number(res.body.counter.averageTicket)).toBeCloseTo(mostrador, 2);
+
+    // Lo que **no** divide por orden las sigue sumando juntas: ahí mezclar es correcto.
+    expect(Number(res.body.totalSales)).toBeCloseTo(cuenta + mostrador, 2);
+  });
+
+  it('el CSV de ventas distingue el origen de cada cobro', async () => {
+    await paidOrder();
+    await ventaDeMostrador();
+
+    const res = await http()
+      .get('/api/reports/sales.csv')
+      .set('Cookie', cookie)
+      .expect(200);
+
+    expect(res.text).toContain('Origen');
+    expect(res.text).toContain('Mostrador');
+    expect(res.text).toContain('Mesa');
   });
 
   it('lista los productos más vendidos con su cantidad', async () => {

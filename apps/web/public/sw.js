@@ -18,7 +18,7 @@
  * tablet que instala el SW y se queda sin red inmediatamente no tiene cascarón todavía**.
  */
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL = `loklflow-shell-${VERSION}`;
 const ASSETS = `loklflow-assets-${VERSION}`;
 const OFFLINE_URL = '/offline';
@@ -95,11 +95,24 @@ self.addEventListener('fetch', (event) => {
   //    inventar aquí un enrutador propio.
   if (request.mode === 'navigate' && OPERATIONAL.some((re) => re.test(url.pathname))) {
     event.respondWith(networkFirstDocument(request));
+    return;
   }
 
-  // Todo lo demás —`/login`, `/admin`, el recibo— va a la red sin intermediarios. Son
-  // superficies que sin servidor no tienen nada que enseñar, y guardarlas solo serviría para
-  // enseñar una versión vieja.
+  // 5. El resto de navegaciones —`/`, `/login`, `/admin`, el recibo— **no se guardan**, y esa
+  //    decisión no cambia: son superficies que sin servidor no tienen nada que enseñar, y una
+  //    copia vieja del panel enseñaría las ventas de ayer con la misma cara que las de hoy. En un
+  //    panel de gestión eso no es «degradado», es mentira, y el usuario no tiene forma de notarlo.
+  //
+  //    Lo que sí se les da es la página de respaldo cuando la red falla. Hasta ahora caían en el
+  //    error del navegador —el dinosaurio—, que no dice nada y parece que la aplicación murió.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request).catch(async () => {
+        const cache = await caches.open(SHELL);
+        return (await cache.match(OFFLINE_URL)) ?? Response.error();
+      }),
+    );
+  }
 });
 
 async function cacheFirst(request, cacheName) {

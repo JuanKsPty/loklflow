@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { UsersIcon, ShieldIcon, SettingsIcon, ChevronsUpDownIcon, LogOutIcon, UtensilsCrossedIcon, LayoutGridIcon, ReceiptTextIcon, ScrollTextIcon, PercentIcon, LayoutDashboardIcon, PackageIcon } from 'lucide-react';
+import { ChevronsUpDownIcon, LogOutIcon, UtensilsCrossedIcon } from 'lucide-react';
+import { isNavItemActive, navItemsFor } from '@/components/nav-items';
 import { authApi } from '@/lib/api/auth.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -27,26 +28,6 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
 
-interface NavItem {
-  title: string;
-  href: string;
-  icon: typeof UsersIcon;
-  permission: string;
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { title: 'Panel', href: '/admin', icon: LayoutDashboardIcon, permission: 'pos:read' },
-  { title: 'Menú', href: '/admin/menu', icon: UtensilsCrossedIcon, permission: 'menu:read' },
-  { title: 'Mesas', href: '/admin/tables', icon: LayoutGridIcon, permission: 'tables:read' },
-  { title: 'Inventario', href: '/admin/inventario', icon: PackageIcon, permission: 'inventory:read' },
-  { title: 'Órdenes', href: '/admin/orders', icon: ReceiptTextIcon, permission: 'orders:read' },
-  { title: 'Empleados', href: '/admin/users', icon: UsersIcon, permission: 'users:read' },
-  { title: 'Roles', href: '/admin/roles', icon: ShieldIcon, permission: 'roles:read' },
-  { title: 'Aprobaciones', href: '/admin/approvals', icon: PercentIcon, permission: 'pos:approve_discount' },
-  { title: 'Auditoría', href: '/admin/audit', icon: ScrollTextIcon, permission: 'audit:read' },
-  { title: 'Configuración', href: '/admin/settings', icon: SettingsIcon, permission: 'business_config:read' },
-];
-
 interface AppSidebarProps {
   user: { name: string; roleName: string; permissions: string[] };
 }
@@ -56,7 +37,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
   const router = useRouter();
   const clearUser = useAuthStore((s) => s.clearUser);
 
-  const items = NAV_ITEMS.filter((item) => user.permissions.includes(item.permission));
+  const items = navItemsFor(user.permissions);
   const initials = user.name
     .split(' ')
     .map((p) => p.charAt(0))
@@ -98,12 +79,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
           <SidebarGroupLabel>Administración</SidebarGroupLabel>
           <SidebarMenu>
             {items.map((item) => {
-              // '/admin' es prefijo de todas las demás rutas del panel, así que solo
-              // se marca activo en coincidencia exacta.
-              const active =
-                item.href === '/admin'
-                  ? pathname === '/admin'
-                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const active = isNavItemActive(item.href, pathname);
               return (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton isActive={active} tooltip={item.title} render={<Link href={item.href} />}>

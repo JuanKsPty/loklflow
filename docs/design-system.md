@@ -65,22 +65,61 @@ Escala: títulos de página `text-xl font-semibold tracking-tight`; secciones `t
 - **Radio**: `--radius: 0.625rem` con escala derivada (`rounded-md`, `rounded-lg`, `rounded-xl`). Tarjetas y contenedores: `rounded-xl`.
 - **Espaciado**: escala Tailwind estándar. Padding de página `p-4 md:p-6`; gap entre campos `gap-5`; secciones `space-y-6`.
 - **Densidad por superficie**:
-  - **Admin (escritorio)**: controles `size="default"`/`"lg"` (h-8/h-9). Densidad cómoda.
-  - **POS / KDS / mesero (táctil)**: objetivos ≥44px con `size="touch"` (`h-11`) e `size="icon-touch"` (`size-11`), que son 44px exactos en la escala de Tailwind. Los usa todo `components/{pos,kitchen,waiter}`; no queda ahí un solo `Button size="sm"`.
-    Los tamaños táctiles se **añadieron** al sistema, no reemplazaron a los compactos: `/admin` se
-    usa con ratón y agrandarlo todo reflujaría maquetas densas que funcionan. `e2e/responsive.spec.ts`
-    vigila el suelo en las pantallas de servicio y **salta a propósito** en las de administración.
+  - **Admin (escritorio y tableta, `≥sm`)**: controles `size="default"`/`"lg"` (h-8/h-9). Densidad cómoda, exactamente igual que siempre.
+  - **Admin (móvil, `<sm`)**: el panel lo abre a diario el dueño desde el teléfono, así que por debajo de 640 px los controles suben al suelo táctil. **No se hace pantalla por pantalla**: se hace una vez en `ui/button.tsx`, `ui/input.tsx`, `ui/select.tsx` y `ui/dropdown-menu.tsx` con la variante `max-sm:` — `default` es `h-8 max-sm:h-11`, `sm` es `h-7 max-sm:h-10`, `icon-sm` es `size-7 max-sm:size-10`.
+  - **POS / KDS / mesero (táctil)**: objetivos ≥44px con `size="touch"` (`h-11`) e `size="icon-touch"` (`size-11`), que son 44px exactos en la escala de Tailwind. Los usa todo `components/{pos,kitchen,waiter}`; no queda ahí un solo `Button size="sm"`. Son los dos únicos tamaños **sin** variante `max-sm:`: miden 44 px a cualquier ancho porque marcan lo que se pulsa de pie.
 
-### Tablas en móvil — decisión aceptada
+#### La forma de la clase importa, y no es una preferencia de estilo
 
-Quince componentes usan `ui/table`, que envuelve en `overflow-x-auto`: **no se rompen**, se
-desplazan dentro de su propio contenedor. Solo dos tienen versión de tarjeta-por-fila —el listado
-de órdenes de `/admin/orders`— porque son las que un dueño abre desde el teléfono.
+> Toda clase nueva se escribe **`valor-de-hoy max-sm:valor-móvil`**. Si en un diff aparece un valor
+> sin prefijo que hoy no estaba, se ha cambiado el escritorio.
 
-Las otras trece siguen desplazándose, y es deliberado: quince renderizados duales son una semana
-de trabajo para pantallas que se usan en portátil. Lo que sí se comprueba en cada ejecución es
-que **la página no se desborde a lo ancho** (`e2e/responsive.spec.ts`, proyecto `movil`), que es
-la diferencia entre «esta tabla se desplaza» y «esta pantalla está rota».
+`cn(buttonVariants({ size, className }))` pasa por `tailwind-merge`, que **no** ve conflicto entre
+`h-12` y `sm:h-8` —son modificadores distintos— pero sí entre `h-12` y `h-8`. Con la forma
+`h-11 sm:h-8`, un `className="h-12"` del sitio de llamada dejaría `h-12 sm:h-8` y el botón encogería
+a **32 px en escritorio**, que es el modo de romper el panel sin que se note. Con el valor de
+escritorio sin prefijo, un `className` lo pisa igual que siempre. `button.spec.tsx` lo afirma.
+
+Y el breakpoint es **`sm` (640 px), uno solo, no `md`**: un iPad mini en vertical mide 744 px, así que
+anclar en `md` habría reflujado una tableta. Con `sm`, todo lo que mide ≥640 px queda como estaba.
+
+Los controles deliberadamente más altos que el suelo táctil —el teclado del PIN, los CTA de la carta
+pública— llevan su propio `max-sm:h-14` / `max-sm:h-12`: si no, la variante los aplastaría a 44 px.
+
+### Tablas en móvil — dos renderizados, y por qué se revirtió la decisión anterior
+
+Un listado del panel renderiza **dos veces**: una lista de tarjetas, una por fila, y la tabla de
+siempre detrás. Los envoltorios son `CardList` y `TableFrame` de
+[`admin/dual-render.tsx`](../apps/web/src/components/admin/dual-render.tsx), que existen para que el
+escalón —`sm`, 640 px— esté escrito en un sitio y no pueda derivar. El patrón lo fijó
+[`order-table.tsx`](../apps/web/src/components/admin/orders/order-table.tsx) y lo estrenó
+[`product-stock-table.tsx`](../apps/web/src/components/admin/inventory/product-stock-table.tsx).
+
+Aquí decía lo contrario: que las trece tablas restantes se desplazaran en horizontal era
+deliberado, porque «quince renderizados duales son una semana de trabajo para pantallas que se usan
+en portátil». **Esa frase era cierta cuando se escribió y ha dejado de serlo.** El usuario principal
+del panel es hoy el dueño, que lo abre desde el teléfono varias veces al día. Una tabla de cinco
+columnas dentro de los 358 px útiles de un Pixel 7 enseña la primera columna y media: para leer el
+precio hay que desplazar a ciegas una franja que no se ve que sea desplazable, y el botón «Editar»
+queda fuera de la pantalla. Eso no es denso, es inservible.
+
+**El renderizado de escritorio y tableta no cambia.** El diff de cada listado es aditivo: se
+envuelve el bloque que ya existía y se añade un hermano. `sm:block` en un `<div>` es su `display` de
+siempre.
+
+`whitespace-nowrap` en `TableHead`/`TableCell` **se queda**: por debajo de `sm` ya no se pinta la
+tabla, así que quitarlo solo serviría para reflujar quince tablas en escritorio. Si una celda debe
+fluir, lleva `className="whitespace-normal"`; no se toca la base. Lo que sí se añadió al contenedor
+es `overscroll-x-contain`: al llegar al final del desplazamiento horizontal se disparaba el gesto de
+«atrás» del navegador y te sacaba de la pantalla.
+
+**Estado de la conversión, para que no se lea como terminada:** hoy la usan `order-table` y
+`product-stock-table`. Los demás listados (`ingredient`, `movement`, `product`, `user`, `supplier`,
+`table`, `sector`, `reservation`, `modifier`, `combo`, `category`, `approvals`, y la tabla de roles
+que aún vive dentro de su página) siguen desplazándose. La excepción permanente es
+[`audit-table.tsx`](../apps/web/src/components/admin/audit/audit-table.tsx): son seis columnas de
+una herramienta forense que se consulta buscando una fila concreta, y una tarjeta por registro
+convierte una pantalla en cuarenta.
 
 ## 5. Dark mode
 
@@ -145,4 +184,6 @@ Badge con token semántico (ver §2). Mapa de referencia para órdenes:
 - [ ] Dinero/cantidades con `font-mono tabular-nums`.
 - [ ] Encabezados con `PageHeader`; vacíos con `Empty`; carga con `Skeleton`.
 - [ ] Navegación nueva del admin filtrada por permiso en [`app-sidebar.tsx`](../apps/web/src/components/app-sidebar.tsx).
+- [ ] Probado a 390 px: toda fila de campos apila con `sm:flex-row`, y ningún diálogo deja su botón de guardar fuera de la pantalla con el teclado abierto.
+- [ ] Ninguna clase nueva cambia el escritorio: el valor sin prefijo es el de hoy (§4).
 - [ ] Verifica claro y oscuro antes de mergear.

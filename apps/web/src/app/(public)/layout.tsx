@@ -20,7 +20,18 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
     // `min-h-dvh` y no `vh`: en un teléfono la barra del navegador se retrae y `vh` deja un hueco
     // que empuja la barra del carrito fuera de la pantalla.
     <div className="min-h-dvh bg-background">
-      <div className="mx-auto w-full max-w-md">{children}</div>
+      {/*
+       * El ancho crece por tramos en vez de quedarse en `max-w-md`.
+       *
+       * Ese tope fijo son 448 px, que en un teléfono es la pantalla entera y en la tableta que
+       * muchos locales dejan puesta en la mesa era una columna estrecha en mitad de una pantalla
+       * vacía: la carta parecía diminuta y sobraba espacio por los dos lados. El escalón está en
+       * `md` (768 px) porque es justo el ancho de una tableta en vertical.
+       *
+       * No se quita el tope del todo: una línea de texto de 1200 px no se lee, y quien decide
+       * cuántas columnas caben es la propia lista de productos, no este contenedor.
+       */}
+      <div className="mx-auto w-full max-w-md md:max-w-3xl lg:max-w-4xl">{children}</div>
     </div>
   );
 }

@@ -26,6 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { saveBlob } from '@/lib/zip';
 import { qrUrlFor, useQrBaseUrl } from './use-qr-base-url';
 
 /**
@@ -60,9 +61,9 @@ export function QrDialog({
   /**
    * Descarga el SVG serializando el nodo que ya está en el DOM.
    *
-   * Mismo patrón que `downloadFile` en `client.ts`, incluido el `revokeObjectURL`: sin él el blob
-   * se queda en memoria mientras viva la pestaña. Se elige SVG y no PNG porque una imprenta puede
-   * escalarlo a cualquier tamaño sin que el código pierda definición.
+   * Se elige SVG y no PNG porque una imprenta puede escalarlo a cualquier tamaño sin que el
+   * código pierda definición. La descarga en sí va por `saveBlob`, el mismo helper que usa el
+   * ZIP de la hoja completa.
    */
   function downloadSvg() {
     const svg = svgRef.current?.querySelector('svg');
@@ -70,15 +71,7 @@ export function QrDialog({
     const blob = new Blob([new XMLSerializer().serializeToString(svg)], {
       type: 'image/svg+xml;charset=utf-8',
     });
-    const href = URL.createObjectURL(blob);
-    try {
-      const a = document.createElement('a');
-      a.href = href;
-      a.download = `mesa-${mesa.number}-qr.svg`;
-      a.click();
-    } finally {
-      URL.revokeObjectURL(href);
-    }
+    saveBlob(blob, `mesa-${mesa.number}-qr.svg`);
   }
 
   async function rotate() {
@@ -107,13 +100,21 @@ export function QrDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col items-center gap-3">
+          {/* `min-w-0` no es decoración: DialogContent es un grid, y un elemento de grid tiene
+              `min-width: auto`, así que no puede encogerse por debajo del ancho mínimo de su
+              contenido. La URL de abajo es una sola palabra sin espacios, de modo que ese mínimo
+              era la línea entera y el texto se salía por el borde derecho del diálogo. */}
+          <div className="flex min-w-0 flex-col items-center gap-3">
             {/* Fondo blanco fijo: en modo oscuro un QR sobre fondo oscuro no lo lee ningún
                 teléfono. */}
             <div ref={svgRef} className="rounded-md bg-white p-3">
               <QRCodeSVG value={url} size={200} level="M" marginSize={0} />
             </div>
-            <p className="max-w-full truncate font-mono text-xs text-muted-foreground">{url}</p>
+            {/* Parte en varias líneas en vez de recortarse: lo que distingue una URL de mesa de
+                otra es el uuid del final, que es justo lo que se comía la elipsis. */}
+            <p className="w-full text-center font-mono text-xs break-all text-muted-foreground">
+              {url}
+            </p>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">

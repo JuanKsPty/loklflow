@@ -3,6 +3,11 @@ import type { IngredientUnit } from './inventory.constants';
 export interface Ingredient {
   id: string;
   name: string;
+  /**
+   * Con valor, este ingrediente **es** las existencias de ese producto y no un insumo del
+   * catálogo. Las pantallas de insumos y el editor de recetas no lo ven; tiene la suya.
+   */
+  productId: string | null;
   unit: IngredientUnit;
   currentStock: number;
   minimumStock: number;

@@ -1,6 +1,11 @@
 import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsISO8601, IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
-import { ORDER_STATUSES, type OrderStatus } from '../order-status.constants';
+import {
+  ORDER_SOURCES,
+  ORDER_STATUSES,
+  type OrderSource,
+  type OrderStatus,
+} from '../order-status.constants';
 
 /** Tope duro del tamaño de página, para que nadie pueda pedir el histórico entero. */
 export const ORDERS_MAX_TAKE = 200;
@@ -22,6 +27,14 @@ export class QueryOrdersDto {
   @IsOptional()
   @IsUUID()
   tableId?: string;
+
+  /**
+   * De dónde vino la cuenta. Sirve para `/admin/orders?source=counter` y para que el tablero de
+   * cocina pueda pedir explícitamente lo que le toca.
+   */
+  @IsOptional()
+  @IsIn(ORDER_SOURCES)
+  source?: OrderSource;
 
   /**
    * `true` devuelve solo las cuentas vivas (ni cerradas ni canceladas), que es lo que miran el

@@ -3,7 +3,7 @@ import { DataSource } from 'typeorm';
 import request from 'supertest';
 import { closeTestApp, createTestApp } from '../../test/app';
 import { resetOperationalData } from '../../test/database';
-import { firstProduct, firstTable, sessionAs } from '../../test/fixtures';
+import { firstProduct, firstTable, seededUser, sessionAs } from '../../test/fixtures';
 import { StockService } from './stock.service';
 
 /**
@@ -23,6 +23,8 @@ describe('Inventario', () => {
   let cashier: string;
   let product: { id: string; price: number };
   let table: { id: string };
+  /** `stock_movements.created_by` es uuid: los tests que llegan a **escribir** necesitan uno real. */
+  let adminId: string;
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -37,6 +39,7 @@ describe('Inventario', () => {
     cashier = await sessionAs(app, 'cajero@loklflow.com', ['pos:create', 'pos:read', 'orders:read']);
     product = await firstProduct(app);
     table = await firstTable(app);
+    adminId = (await seededUser(app, 'admin@loklflow.com')).id;
   });
 
   beforeEach(async () => {
@@ -107,6 +110,12 @@ describe('Inventario', () => {
     return Number(rows[0].current_stock);
   }
 
+  /** El ingrediente espejo de un producto, para poder mirarle el stock desde el test. */
+  async function espejoDe(productId: string): Promise<string> {
+    const rows = await ds.query(`SELECT id FROM ingredients WHERE product_id = $1`, [productId]);
+    return rows[0].id as string;
+  }
+
   async function movementsOf(id: string): Promise<{ type: string; quantity: number }[]> {
     const rows = await ds.query(
       `SELECT type, quantity FROM stock_movements WHERE ingredient_id = $1 ORDER BY created_at`,
@@ -171,6 +180,102 @@ describe('Inventario', () => {
       expect(
         (await movementsOf(ingredient.id)).filter((m) => m.type === 'consumption'),
       ).toHaveLength(1);
+    });
+
+    /**
+     * El atajo de idempotencia salía si la orden tenía **algún** consumo, y esa era la unidad
+     * equivocada: la que protege el índice es el par (orden, ingrediente). Un cierre que
+     * descontó parte de los ingredientes y murió en medio dejaba el resto sin descontar para
+     * siempre, porque el reenvío veía «ya hay consumos» y se iba.
+     *
+     * El estado de «cierre a medias» se fabrica aquí ampliando la receta después de cerrar,
+     * que produce exactamente la misma forma —una orden con consumos escritos y otro que le
+     * falta— sin tener que matar el proceso a mitad de un bucle.
+     */
+    it('un cierre que solo descontó parte de los ingredientes completa el resto al reenviarse', async () => {
+      const a = await createIngredient({ initialStock: 100 });
+      const b = await createIngredient({ initialStock: 100 });
+      await setRecipe(a.id, 1);
+
+      const order = await sellAndClose(1);
+      expect(await stockOf(a.id)).toBe(99);
+      expect(await stockOf(b.id)).toBe(100);
+
+      await http()
+        .put(`/api/inventory/recipes/${product.id}`)
+        .set('Cookie', admin)
+        .send({
+          lines: [
+            { ingredientId: a.id, quantity: 1 },
+            { ingredientId: b.id, quantity: 3 },
+          ],
+        })
+        .expect(200);
+
+      await app
+        .get(StockService)
+        .consumeForOrder(order.id, [{ productId: product.id, quantity: 1 }], adminId);
+
+      // El que faltaba se descuenta; el que ya estaba escrito no se toca.
+      expect(await stockOf(b.id)).toBe(97);
+      expect(await stockOf(a.id)).toBe(99);
+      expect(
+        (await movementsOf(a.id)).filter((m) => m.type === 'consumption'),
+      ).toHaveLength(1);
+    });
+
+    /**
+     * El camino nuevo: el producto **es** la unidad que se cuenta, sin receta de por medio. Es lo
+     * que hace que quien lleva el negocio desde el teléfono pueda mantener el inventario al día.
+     */
+    it('un producto con existencias propias resta una unidad por unidad vendida', async () => {
+      await http()
+        .put(`/api/inventory/products/${product.id}/stock`)
+        .set('Cookie', admin)
+        .send({ newStock: 20, reasonCode: 'count' })
+        .expect(200);
+      const espejo = await espejoDe(product.id);
+
+      await sellAndClose(3);
+
+      expect(await stockOf(espejo)).toBe(17);
+    });
+
+    it('y un cierre reenviado tampoco vuelve a descontar por ese camino', async () => {
+      await http()
+        .put(`/api/inventory/products/${product.id}/stock`)
+        .set('Cookie', admin)
+        .send({ newStock: 20, reasonCode: 'count' })
+        .expect(200);
+      const espejo = await espejoDe(product.id);
+
+      const order = await sellAndClose(2);
+      await app
+        .get(StockService)
+        .consumeForOrder(order.id, [{ productId: product.id, quantity: 2 }], adminId);
+
+      expect(await stockOf(espejo)).toBe(18);
+      expect((await movementsOf(espejo)).filter((m) => m.type === 'consumption')).toHaveLength(1);
+    });
+
+    it('con espejo y receta a la vez descuenta una sola vez, por el espejo', async () => {
+      // El estado prohibido se fabrica por SQL: las dos guardas del servicio lo impiden, y esa
+      // es justo la razón de que haya que decidir qué pasa si aun así ocurre.
+      const insumo = await createIngredient({ initialStock: 100 });
+      await setRecipe(insumo.id, 5);
+      await ds.query(
+        `INSERT INTO ingredients (name, unit, current_stock, minimum_stock, cost_per_unit, product_id)
+         VALUES ($1, 'units', 30, 0, 0, $2)`,
+        [`Espejo forzado ${Math.random()}`, product.id],
+      );
+      const espejo = await espejoDe(product.id);
+
+      await sellAndClose(2);
+
+      // El espejo baja; la receta se ignora. Restar de menos es recuperable con un ajuste;
+      // restar dos veces no se nota nunca.
+      expect(await stockOf(espejo)).toBe(28);
+      expect(await stockOf(insumo.id)).toBe(100);
     });
 
     it('un producto sin receta no descuenta nada y no rompe el cobro', async () => {

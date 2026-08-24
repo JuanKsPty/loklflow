@@ -76,6 +76,7 @@ export class OrdersService {
       mergedIntoOrderId: IsNull(),
       ...(filters?.status ? { status: filters.status } : {}),
       ...(filters?.tableId ? { tableId: filters.tableId } : {}),
+      ...(filters?.source ? { source: filters.source } : {}),
       // `open` y `status` son compatibles: si llegan los dos, manda el estado concreto.
       ...(filters?.open && !filters.status ? { status: In(OPEN_STATUSES) } : {}),
       ...(filters?.since ? { updatedAt: MoreThan(new Date(filters.since)) } : {}),
@@ -188,10 +189,37 @@ export class OrdersService {
       }
     }
     // Solo avisar a Cocina si la orden tiene algún ítem que se prepara en cocina.
-    if (result.items.some((i) => i.product?.station === 'kitchen')) {
+    //
+    // Una venta de mostrador nunca: la despacha y la cobra la misma persona, en el acto, y ya está
+    // cerrada cuando cualquier pantalla la ve. Avisar de algo que nadie va a preparar es la forma
+    // más rápida de que dejen de mirar los avisos.
+    if (result.source !== 'counter' && result.items.some((i) => i.product?.station === 'kitchen')) {
       void this.notifications.notifyRole('Cocina', {
         type: 'order_new',
         title: `Nueva orden #${result.orderNumber}`,
+        body: this.orderLocation(result),
+        resourceType: 'order',
+        resourceId: result.id,
+      });
+    }
+    /**
+     * Un pedido que llega por el QR **no lo sabe nadie del personal**, y ese es justo el caso que
+     * no estaba cubierto.
+     *
+     * Cuando la comanda la toma un mesero, el aviso sobra: quien la creó estaba delante de la
+     * mesa. Un pedido del cliente no tiene a nadie detrás —`waiterId` es `null` por definición—,
+     * así que el único aviso que salía era el de Cocina, y solo si algo se preparaba en cocina.
+     * Una mesa que pedía dos aguas y un postre (estaciones `bar` e `immediate`) no generaba
+     * absolutamente ninguna notificación: el pedido entraba, se quedaba abierto y nadie se
+     * enteraba hasta que alguien miraba el salón por su cuenta.
+     *
+     * Va al rol y no a un usuario porque no hay mesero asignado a quien dirigirlo; es el mismo
+     * reparto que ya usa el aviso de «orden lista» cuando `waiterId` viene vacío.
+     */
+    if (result.source === 'customer_qr') {
+      void this.notifications.notifyRole('Mesero', {
+        type: 'order_new',
+        title: `Pedido desde la mesa #${result.orderNumber}`,
         body: this.orderLocation(result),
         resourceType: 'order',
         resourceId: result.id,
@@ -482,6 +510,7 @@ export class OrdersService {
       orderNumber: order.orderNumber,
       tableId: order.tableId,
       status: order.status,
+      source: order.source,
     });
   }
 

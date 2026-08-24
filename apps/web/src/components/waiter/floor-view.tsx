@@ -132,7 +132,7 @@ export function FloorView({
         <div className="fixed inset-x-0 bottom-16 z-10 px-4 pb-[env(safe-area-inset-bottom)]">
           <div className="mx-auto w-full max-w-5xl">
             <Button
-              className="h-12 w-full"
+              className="h-12 max-sm:h-12 w-full"
               disabled={mergeableCount < 2}
               onClick={() => setConfirming(true)}
             >

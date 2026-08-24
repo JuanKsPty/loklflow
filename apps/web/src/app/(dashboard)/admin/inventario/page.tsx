@@ -11,11 +11,12 @@ import { MovementTable } from '@/components/admin/inventory/movement-table';
 import { SupplierTable } from '@/components/admin/inventory/supplier-table';
 import { MovementDialog } from '@/components/admin/inventory/movement-dialog';
 import { LowStockFilter } from '@/components/admin/inventory/low-stock-filter';
-import type { Ingredient, StockMovement, Supplier } from '@loklflow/types';
+import { ProductStockTable } from '@/components/admin/inventory/product-stock-table';
+import type { Ingredient, ProductStock, StockMovement, Supplier } from '@loklflow/types';
 
 export const metadata = { title: 'Inventario — LoklFlow' };
 
-const TABS = ['ingredients', 'movements', 'suppliers'] as const;
+const TABS = ['products', 'ingredients', 'movements', 'suppliers'] as const;
 type Tab = (typeof TABS)[number];
 
 interface Props {
@@ -24,9 +25,11 @@ interface Props {
 
 export default async function InventoryPage({ searchParams }: Props) {
   const { tab, lowStock } = await searchParams;
-  const active: Tab = TABS.includes(tab as Tab) ? (tab as Tab) : 'ingredients';
+  // Por defecto, las existencias por producto: es la pantalla del día a día.
+  const active: Tab = TABS.includes(tab as Tab) ? (tab as Tab) : 'products';
   const onlyLow = lowStock === 'true';
 
+  let products: ProductStock[] = [];
   let ingredients: Ingredient[] = [];
   let movements: StockMovement[] = [];
   let suppliers: Supplier[] = [];
@@ -36,7 +39,12 @@ export default async function InventoryPage({ searchParams }: Props) {
   let low: Ingredient[] = [];
   let failure: 'offline' | 'error' | null = null;
   try {
-    [ingredients, movements, suppliers, low] = await Promise.all([
+    [products, ingredients, movements, suppliers, low] = await Promise.all([
+      // Aquí sí se trae la lista entera y el filtro se aplica abajo, al revés que con los insumos.
+      // El motivo es que la fila **ya trae calculado** `lowStock` —la comparación la hizo el
+      // servidor—, así que pedirla dos veces solo serviría para contar el chip. Una carta son
+      // decenas de productos, no un histórico.
+      serverFetch<ProductStock[]>('/inventory/products'),
       serverFetch<Ingredient[]>('/inventory/ingredients'),
       serverFetch<StockMovement[]>('/inventory/movements'),
       serverFetch<Supplier[]>('/inventory/suppliers'),
@@ -45,6 +53,8 @@ export default async function InventoryPage({ searchParams }: Props) {
   } catch (err) {
     failure = reportApiFailure('admin/inventario', err);
   }
+
+  const lowProducts = products.filter((p) => p.lowStock);
 
   if (failure) {
     return (
@@ -59,25 +69,34 @@ export default async function InventoryPage({ searchParams }: Props) {
     <div>
       <PageHeader
         title="Inventario"
-        description="Existencias, movimientos y proveedores. El stock se descuenta solo al cobrar."
+        description="Lo que hay de cada producto. El stock baja solo al cobrar."
       />
 
       <InventoryTabs
         initial={active}
+        products={
+          <>
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <LowStockFilter active={onlyLow} lowCount={lowProducts.length} tab="products" />
+            </div>
+            <ProductStockTable products={onlyLow ? lowProducts : products} />
+          </>
+        }
         ingredients={
           <>
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <LowStockFilter active={onlyLow} lowCount={low.length} />
-              <div className="flex justify-end gap-2">
-              <MovementDialog ingredients={ingredients} suppliers={suppliers} />
-              <Button
-                variant="outline"
-                nativeButton={false}
-                render={<Link href="/admin/inventario/ingredientes/new" />}
-              >
-                <PlusIcon />
-                Nuevo ingrediente
-              </Button>
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <MovementDialog ingredients={ingredients} suppliers={suppliers} />
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  nativeButton={false}
+                  render={<Link href="/admin/inventario/ingredientes/new" />}
+                >
+                  <PlusIcon />
+                  Nuevo ingrediente
+                </Button>
               </div>
             </div>
             <IngredientTable ingredients={onlyLow ? low : ingredients} />
@@ -86,8 +105,9 @@ export default async function InventoryPage({ searchParams }: Props) {
         movements={<MovementTable movements={movements} />}
         suppliers={
           <>
-            <div className="mb-3 flex justify-end">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
               <Button
+                className="w-full sm:w-auto"
                 nativeButton={false}
                 render={<Link href="/admin/inventario/proveedores/new" />}
               >

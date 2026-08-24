@@ -34,9 +34,13 @@ interface Line {
  * `/login`. Un cliente acabaría en el formulario de acceso del personal. Aquí todo pasa por
  * `publicApi`.
  *
- * La forma es de teléfono, en una sola columna: chips de categoría que se desplazan, tarjetas
- * grandes de producto, y una barra fija abajo que resume el carrito. Nada de tabla ni de rejilla de
- * cuatro columnas: esto se usa de pie, con una mano y a contraluz.
+ * La forma es de teléfono: chips de categoría que se desplazan, tarjetas grandes de producto, y una
+ * barra fija abajo que resume el carrito. Se usa de pie, con una mano y a contraluz, así que los
+ * objetivos táctiles no bajan de 44 px por mucho sitio que sobre.
+ *
+ * En una tableta —que es lo que muchos locales dejan puesto en la mesa— pasa a **dos** columnas.
+ * Dos, no cuatro: lo que se gana es carta visible sin encoger la tarjeta, y a partir de ahí cada
+ * columna más haría el texto ilegible y el objetivo táctil pequeño.
  */
 export function PublicMenu({ qrCode, menu }: { qrCode: string; menu: Menu }) {
   const router = useRouter();
@@ -192,15 +196,26 @@ export function PublicMenu({ qrCode, menu }: { qrCode: string; menu: Menu }) {
         </nav>
       )}
 
-      {/* `pb-28` deja hueco para la barra fija del carrito. */}
-      <ul className="flex flex-col gap-2 px-4 pb-28">
+      {/*
+       * Una columna en el teléfono y dos a partir de `md`.
+       *
+       * En una tableta la columna única no se «arreglaba» sola al ensanchar el contenedor: cada
+       * tarjeta se estiraba hasta dejar el nombre pegado a la izquierda y el precio perdido a
+       * setecientos píxeles, con el ojo teniendo que cruzar la pantalla para emparejarlos. Dos
+       * columnas mantienen la tarjeta del tamaño para el que está pensada y llenan el hueco con
+       * más carta visible, que es lo que interesa cuando alguien está eligiendo.
+       *
+       * `items-stretch` para que dos tarjetas de la misma fila midan igual aunque una tenga
+       * descripción y la otra no. `pb-28` deja hueco para la barra fija del carrito.
+       */}
+      <ul className="grid grid-cols-1 items-stretch gap-2 px-4 pb-28 md:grid-cols-2">
         {visible.map((product) => (
-          <li key={product.id}>
+          <li key={product.id} className="h-full">
             <button
               type="button"
               disabled={!menu.table.acceptsOrders}
               onClick={() => onProductTap(product)}
-              className="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors active:bg-accent disabled:opacity-60"
+              className="flex h-full w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors active:bg-accent disabled:opacity-60"
             >
               <div className="min-w-0 flex-1">
                 <p className="font-medium">{product.name}</p>
@@ -222,8 +237,11 @@ export function PublicMenu({ qrCode, menu }: { qrCode: string; menu: Menu }) {
         // `env(safe-area-inset-bottom)` para que la barra no quede debajo del indicador de inicio
         // de un teléfono sin botón físico.
         <div className="fixed inset-x-0 bottom-0 border-t bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
-          <div className="mx-auto w-full max-w-md">
-            <Button className="h-14 w-full text-base" onClick={() => setCartOpen(true)}>
+          {/* Los mismos tramos que el contenedor del layout: la barra es fija y ocupa todo el
+              ancho de la ventana, así que sin esto el botón quedaba centrado y desalineado con
+              las tarjetas de arriba. */}
+          <div className="mx-auto w-full max-w-md md:max-w-3xl lg:max-w-4xl">
+            <Button className="h-14 max-sm:h-14 w-full text-base" onClick={() => setCartOpen(true)}>
               <ShoppingBagIcon />
               Ver pedido ({count}) · {formatPrice(total)}
             </Button>
@@ -294,7 +312,7 @@ export function PublicMenu({ qrCode, menu }: { qrCode: string; menu: Menu }) {
                 onChange={(e) => setName(e.target.value)}
                 maxLength={40}
                 placeholder="Para que sepan a quién traerlo"
-                className="h-12"
+                className="h-12 max-sm:h-12"
               />
             </Field>
 
@@ -304,7 +322,7 @@ export function PublicMenu({ qrCode, menu }: { qrCode: string; menu: Menu }) {
             </div>
 
             <Button
-              className="h-14 w-full text-base"
+              className="h-14 max-sm:h-14 w-full text-base"
               onClick={send}
               disabled={sending || !menu.table.acceptsOrders}
             >

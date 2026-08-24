@@ -125,27 +125,38 @@ export function Pagination({
             </span>
           )}
 
-          {paginationRange(current, totalPages).map((item, i) =>
-            item === 'ellipsis' ? (
-              <span
-                key={`ellipsis-${i}`}
-                aria-hidden
-                className="text-muted-foreground px-1"
-              >
-                …
-              </span>
-            ) : (
-              <Link
-                key={item}
-                href={pageHref(basePath, params, item)}
-                aria-label={`Página ${item}`}
-                aria-current={item === current ? 'page' : undefined}
-                className={linkClass(item === current)}
-              >
-                {item}
-              </Link>
-            ),
-          )}
+          {/*
+            En el teléfono, la posición en texto en lugar de la lista de números.
+            Las flechas suben solas al suelo táctil con el resto de `icon-sm`, pero diez
+            enlaces de 40 px no caben en 358: o se apilan en tres filas o desbordan.
+          */}
+          <span className="px-2 text-sm text-muted-foreground tabular-nums sm:hidden">
+            {current} / {totalPages}
+          </span>
+
+          <div className="hidden items-center gap-1 sm:flex">
+            {paginationRange(current, totalPages).map((item, i) =>
+              item === 'ellipsis' ? (
+                <span
+                  key={`ellipsis-${i}`}
+                  aria-hidden
+                  className="text-muted-foreground px-1"
+                >
+                  …
+                </span>
+              ) : (
+                <Link
+                  key={item}
+                  href={pageHref(basePath, params, item)}
+                  aria-label={`Página ${item}`}
+                  aria-current={item === current ? 'page' : undefined}
+                  className={linkClass(item === current)}
+                >
+                  {item}
+                </Link>
+              ),
+            )}
+          </div>
 
           {current < totalPages ? (
             <Link

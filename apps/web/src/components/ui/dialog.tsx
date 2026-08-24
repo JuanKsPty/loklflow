@@ -54,6 +54,15 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          // Un diálogo sin tope de alto ni scroll propio es un diálogo del que no se puede
+          // salir: el de movimientos de inventario tiene seis campos, y con el teclado abierto
+          // el botón de guardar queda fuera de la pantalla sin forma de llegar a él.
+          // `overscroll-contain` para que el gesto no se propague y desplace la página de detrás.
+          "max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain",
+          // En el teléfono, hoja anclada abajo y a lo ancho en vez de caja centrada: es donde
+          // llega el pulgar, y deja los primeros campos por encima del teclado en lugar de
+          // repartidos a los dos lados de él. El hueco de abajo respeta el indicador de inicio.
+          "max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:left-0 max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:max-h-[88dvh] max-sm:rounded-b-none max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]",
           className
         )}
         {...props}
@@ -65,7 +74,10 @@ function DialogContent({
             render={
               <Button
                 variant="ghost"
-                className="absolute top-2 right-2"
+                // `sticky` y no `absolute`: ahora el popup tiene scroll propio, y dentro de un
+                // contenedor desplazable un `absolute` se va con el contenido — la equis
+                // desaparecería justo cuando hace falta, al final de un formulario largo.
+                className="sticky top-0 z-10 -mt-2 -mr-2 ml-auto sm:absolute sm:top-2 sm:right-2 sm:m-0"
                 size="icon-sm"
               />
             }

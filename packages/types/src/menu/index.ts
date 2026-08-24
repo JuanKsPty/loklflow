@@ -3,3 +3,4 @@ export * from './modifier.interface';
 export * from './product.interface';
 export * from './combo.interface';
 export * from './preparation-station';
+export * from './product-import.interface';

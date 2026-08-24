@@ -15,6 +15,13 @@ const SOLD_STATUSES = ['closed'];
 /** Estados que cuentan como cuenta viva. */
 const OPEN_STATUSES = ['pending', 'preparing', 'ready', 'delivered'];
 
+/** Un corte de las ventas consumadas: cuántas, cuánto y a cómo salió cada una. */
+export interface SalesSlice {
+  orders: number;
+  total: number;
+  averageTicket: number;
+}
+
 export interface SalesSummary {
   from: string;
   to: string;
@@ -22,10 +29,23 @@ export interface SalesSummary {
   totalSales: number;
   paymentsCount: number;
   byMethod: Record<PaymentMethod, number>;
-  /** Órdenes cerradas en el rango. */
+  /**
+   * **Cuentas** cerradas en el rango: mesa y pedido por QR. No incluye el mostrador.
+   *
+   * La separación no es un capricho de presentación. `averageTicket` divide un total entre un
+   * número de órdenes, y una cuenta de mesa —una familia consumiendo durante una hora— y una venta
+   * de mostrador —una botella— no son la misma unidad. Promediarlas produce un número que no
+   * describe a ninguna de las dos, y que además se mueve cuando cambia la proporción entre ellas
+   * aunque no haya cambiado nada del negocio.
+   *
+   * Los agregados que **no** dividen por orden —`totalSales`, los productos más vendidos, las
+   * ventas por día— sí las siguen sumando juntas, y ahí mezclar es correcto: son dinero e ítems.
+   */
   ordersClosed: number;
-  /** Ticket promedio de las órdenes cerradas. */
+  /** Ticket promedio de esas cuentas. */
   averageTicket: number;
+  /** Las ventas de mostrador, aparte y con su propio promedio. */
+  counter: SalesSlice;
   totalDiscounts: number;
   totalTips: number;
   openOrders: number;
@@ -103,16 +123,37 @@ export class ReportsService {
       byMethod[row.method] = this.money(row.total);
     }
 
-    const closedRow = await this.ordersRepo
+    // Agrupado por origen en una sola consulta: los descuentos y las propinas se suman después
+    // sobre todas las filas, que es lo correcto —son dinero—, y el reparto entre cuenta y
+    // mostrador solo se usa para lo que divide por orden.
+    const closedRows = await this.ordersRepo
       .createQueryBuilder('o')
-      .select('COUNT(o.id)', 'count')
+      .select('o.source', 'source')
+      .addSelect('COUNT(o.id)', 'count')
       .addSelect('COALESCE(SUM(o.total), 0)', 'total')
       .addSelect('COALESCE(SUM(o.discountAmount), 0)', 'discounts')
       .addSelect('COALESCE(SUM(o.tipAmount), 0)', 'tips')
       .where('o.createdAt BETWEEN :from AND :to', { from, to })
       .andWhere('o.status IN (:...statuses)', { statuses: SOLD_STATUSES })
       .andWhere(NOT_MERGED_SQL)
-      .getRawOne<{ count: string; total: string; discounts: string; tips: string }>();
+      .groupBy('o.source')
+      .getRawMany<{
+        source: string;
+        count: string;
+        total: string;
+        discounts: string;
+        tips: string;
+      }>();
+
+    const slice = (predicado: (source: string) => boolean): SalesSlice => {
+      const filas = closedRows.filter((r) => predicado(r.source));
+      const orders = filas.reduce((sum, r) => sum + Number(r.count), 0);
+      const total = this.money(filas.reduce((sum, r) => sum + Number(r.total), 0));
+      return { orders, total, averageTicket: orders > 0 ? this.money(total / orders) : 0 };
+    };
+
+    const cuentas = slice((source) => source !== 'counter');
+    const mostrador = slice((source) => source === 'counter');
 
     const openRow = await this.ordersRepo
       .createQueryBuilder('o')
@@ -122,19 +163,17 @@ export class ReportsService {
       .andWhere(NOT_MERGED_SQL)
       .getRawOne<{ count: string; total: string }>();
 
-    const ordersClosed = Number(closedRow?.count ?? 0);
-    const closedTotal = this.money(closedRow?.total);
-
     return {
       from,
       to,
       totalSales: this.money(paymentsRow?.total),
       paymentsCount: Number(paymentsRow?.count ?? 0),
       byMethod,
-      ordersClosed,
-      averageTicket: ordersClosed > 0 ? this.money(closedTotal / ordersClosed) : 0,
-      totalDiscounts: this.money(closedRow?.discounts),
-      totalTips: this.money(closedRow?.tips),
+      ordersClosed: cuentas.orders,
+      averageTicket: cuentas.averageTicket,
+      counter: mostrador,
+      totalDiscounts: this.money(closedRows.reduce((sum, r) => sum + Number(r.discounts), 0)),
+      totalTips: this.money(closedRows.reduce((sum, r) => sum + Number(r.tips), 0)),
       openOrders: Number(openRow?.count ?? 0),
       openOrdersValue: this.money(openRow?.total),
     };
@@ -257,6 +296,12 @@ export class ReportsService {
       .innerJoin('orders', 'o', 'o.id = p.order_id')
       .select('p.processedAt', 'processedAt')
       .addSelect('o.order_number', 'orderNumber')
+      // El origen, para poder separar mesa de mostrador en Excel sin depender de lo que el panel
+      // decida enseñar. Se traduce aquí y no en el controlador porque el CSV lo lee una persona.
+      .addSelect(
+        `CASE o.source WHEN 'counter' THEN 'Mostrador' WHEN 'customer_qr' THEN 'QR del cliente' ELSE 'Mesa' END`,
+        'origen',
+      )
       .addSelect('p.method', 'method')
       .addSelect('p.amount', 'amount')
       .addSelect('p.reference', 'reference')

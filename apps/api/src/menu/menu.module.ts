@@ -15,6 +15,8 @@ import { CategoriesService } from './categories.service';
 import { ProductsService } from './products.service';
 import { ModifiersService } from './modifiers.service';
 import { CombosService } from './combos.service';
+import { ProductsImportService } from './products-import.service';
+import { InventoryModule } from '../inventory/inventory.module';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { CombosService } from './combos.service';
       Combo,
       ComboItem,
     ]),
+    // Va en un solo sentido: `InventoryModule` registra la **entidad** `Product`, no este módulo.
+    InventoryModule,
   ],
   controllers: [
     CategoriesController,
@@ -34,7 +38,13 @@ import { CombosService } from './combos.service';
     ModifiersController,
     CombosController,
   ],
-  providers: [CategoriesService, ProductsService, ModifiersService, CombosService],
+  providers: [
+    CategoriesService,
+    ProductsService,
+    ModifiersService,
+    CombosService,
+    ProductsImportService,
+  ],
   exports: [CategoriesService, ProductsService, ModifiersService, CombosService],
 })
 export class MenuModule {}

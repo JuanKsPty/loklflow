@@ -134,7 +134,7 @@ export function PublicModifierDialog({
 
         <DialogFooter>
           <Button
-            className="h-12 w-full"
+            className="h-12 max-sm:h-12 w-full"
             disabled={invalid.length > 0}
             onClick={() => {
               onConfirm(Object.values(current).flat());

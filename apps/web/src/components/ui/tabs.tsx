@@ -24,7 +24,14 @@ function Tabs({
 }
 
 const tabsListVariants = cva(
-  "group/tabs-list inline-flex w-fit items-center justify-center rounded-lg p-[3px] text-muted-foreground group-data-horizontal/tabs:h-8 group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col data-[variant=line]:rounded-none",
+  // `max-w-full` es la pieza: `w-fit` sin tope no se comprime —los triggers son
+  // `whitespace-nowrap` y su `min-width` es `auto`—, así que la lista crecía y **arrastraba a
+  // la página entera**. Con cinco pestañas, `/admin/tables` medía ~386 px dentro de los 358
+  // útiles de un teléfono, y `/admin/menu` ~379. Se desbordaban de verdad, y no saltaba porque
+  // `responsive.spec.ts` no visitaba ninguna de las dos.
+  //
+  // La barra de desplazamiento se oculta porque en `h-8` se come el alto; el gesto sigue.
+  "group/tabs-list inline-flex w-fit max-w-full items-center justify-center overflow-x-auto overscroll-x-contain rounded-lg p-[3px] text-muted-foreground [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group-data-horizontal/tabs:h-8 max-sm:group-data-horizontal/tabs:h-11 group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col data-[variant=line]:rounded-none",
   {
     variants: {
       variant: {

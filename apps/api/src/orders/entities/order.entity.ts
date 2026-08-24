@@ -62,7 +62,7 @@ export class Order {
   @Column({ name: 'shift_id', type: 'uuid', nullable: true })
   shiftId!: string | null;
 
-  @Column({ type: 'enum', enum: ['staff', 'customer_qr'], default: 'staff' })
+  @Column({ type: 'enum', enum: ['staff', 'customer_qr', 'counter'], default: 'staff' })
   source!: OrderSource;
 
   @Column({

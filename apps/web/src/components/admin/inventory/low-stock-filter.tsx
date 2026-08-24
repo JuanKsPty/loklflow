@@ -15,13 +15,22 @@ import { Badge } from '@/components/ui/badge';
  * por mensaje y abrir cada mañana, y el filtrado lo sigue haciendo el servidor —que es quien puede
  * comparar dos columnas— en vez de traerse todo para descartar en el navegador.
  */
-export function LowStockFilter({ active, lowCount }: { active: boolean; lowCount: number }) {
+export function LowStockFilter({
+  active,
+  lowCount,
+  tab = 'ingredients',
+}: {
+  active: boolean;
+  lowCount: number;
+  /** La pestaña a la que vuelve el enlace. Sin esto, filtrar en productos saltaba a insumos. */
+  tab?: 'products' | 'ingredients';
+}) {
   return (
     <div className="flex gap-2">
-      <Chip href="/admin/inventario?tab=ingredients" active={!active}>
+      <Chip href={`/admin/inventario?tab=${tab}`} active={!active}>
         Todos
       </Chip>
-      <Chip href="/admin/inventario?tab=ingredients&lowStock=true" active={active}>
+      <Chip href={`/admin/inventario?tab=${tab}&lowStock=true`} active={active}>
         Bajo mínimo
         {lowCount > 0 && (
           <Badge variant={active ? 'secondary' : 'destructive'} className="ml-1.5">
