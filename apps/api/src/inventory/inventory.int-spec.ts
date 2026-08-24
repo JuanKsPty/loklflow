@@ -3,7 +3,7 @@ import { DataSource } from 'typeorm';
 import request from 'supertest';
 import { closeTestApp, createTestApp } from '../../test/app';
 import { resetOperationalData } from '../../test/database';
-import { firstProduct, firstTable, sessionAs } from '../../test/fixtures';
+import { firstProduct, firstTable, seededUser, sessionAs } from '../../test/fixtures';
 import { StockService } from './stock.service';
 
 /**
@@ -23,6 +23,8 @@ describe('Inventario', () => {
   let cashier: string;
   let product: { id: string; price: number };
   let table: { id: string };
+  /** `stock_movements.created_by` es uuid: los tests que llegan a **escribir** necesitan uno real. */
+  let adminId: string;
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -37,6 +39,7 @@ describe('Inventario', () => {
     cashier = await sessionAs(app, 'cajero@loklflow.com', ['pos:create', 'pos:read', 'orders:read']);
     product = await firstProduct(app);
     table = await firstTable(app);
+    adminId = (await seededUser(app, 'admin@loklflow.com')).id;
   });
 
   beforeEach(async () => {
@@ -170,6 +173,48 @@ describe('Inventario', () => {
       expect(await stockOf(ingredient.id)).toBe(49);
       expect(
         (await movementsOf(ingredient.id)).filter((m) => m.type === 'consumption'),
+      ).toHaveLength(1);
+    });
+
+    /**
+     * El atajo de idempotencia salía si la orden tenía **algún** consumo, y esa era la unidad
+     * equivocada: la que protege el índice es el par (orden, ingrediente). Un cierre que
+     * descontó parte de los ingredientes y murió en medio dejaba el resto sin descontar para
+     * siempre, porque el reenvío veía «ya hay consumos» y se iba.
+     *
+     * El estado de «cierre a medias» se fabrica aquí ampliando la receta después de cerrar,
+     * que produce exactamente la misma forma —una orden con consumos escritos y otro que le
+     * falta— sin tener que matar el proceso a mitad de un bucle.
+     */
+    it('un cierre que solo descontó parte de los ingredientes completa el resto al reenviarse', async () => {
+      const a = await createIngredient({ initialStock: 100 });
+      const b = await createIngredient({ initialStock: 100 });
+      await setRecipe(a.id, 1);
+
+      const order = await sellAndClose(1);
+      expect(await stockOf(a.id)).toBe(99);
+      expect(await stockOf(b.id)).toBe(100);
+
+      await http()
+        .put(`/api/inventory/recipes/${product.id}`)
+        .set('Cookie', admin)
+        .send({
+          lines: [
+            { ingredientId: a.id, quantity: 1 },
+            { ingredientId: b.id, quantity: 3 },
+          ],
+        })
+        .expect(200);
+
+      await app
+        .get(StockService)
+        .consumeForOrder(order.id, [{ productId: product.id, quantity: 1 }], adminId);
+
+      // El que faltaba se descuenta; el que ya estaba escrito no se toca.
+      expect(await stockOf(b.id)).toBe(97);
+      expect(await stockOf(a.id)).toBe(99);
+      expect(
+        (await movementsOf(a.id)).filter((m) => m.type === 'consumption'),
       ).toHaveLength(1);
     });
 

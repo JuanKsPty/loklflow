@@ -107,16 +107,28 @@ export class StockService {
     userId: string,
   ): Promise<void> {
     try {
-      // Atajo para el caso normal de un reenvío: si la orden ya tiene consumos, no hay nada
-      // que hacer. El índice sigue siendo quien decide —entre esta consulta y la escritura
+      // Atajo para el caso normal de un reenvío: lo que esta orden ya consumió no se vuelve a
+      // escribir. El índice único sigue siendo quien decide —entre esta consulta y la escritura
       // cabe otro cierre—, pero así el camino habitual no son N transacciones que fallan.
-      const already = await this.movementsRepo.countBy({ orderId, type: 'consumption' });
-      if (already > 0) return;
+      //
+      // Se comprueba **por ingrediente**, que es la unidad que el índice protege. Antes bastaba
+      // con que la orden tuviera *algún* consumo para salirse: un cierre que descontó dos de tres
+      // ingredientes y murió en medio dejaba el tercero sin descontar **para siempre**, porque el
+      // reenvío veía «ya hay consumos» y se iba. Un descuadre permanente y sin una sola señal.
+      const done = new Set(
+        (
+          await this.movementsRepo.find({
+            where: { orderId, type: 'consumption' },
+            select: { ingredientId: true },
+          })
+        ).map((m) => m.ingredientId),
+      );
 
       const consumptions = await this.resolveConsumptions(items);
       if (consumptions.length === 0) return;
 
       for (const line of consumptions) {
+        if (done.has(line.ingredientId)) continue;
         const applied = await this.dataSource
           .transaction((manager) =>
             this.apply(manager, {
@@ -133,7 +145,7 @@ export class StockService {
             // El índice único parcial rebota el segundo intento sobre el mismo par
             // (orden, ingrediente). Eso no es un fallo: es la orden cerrándose dos veces,
             // que es exactamente lo que el índice existe para absorber.
-            if (isUniqueViolation(err)) return null;
+            if (isDuplicateConsumption(err)) return null;
             throw err;
           });
 
@@ -297,6 +309,20 @@ function weightedCost(
   return Number(weighted.toFixed(4));
 }
 
-function isUniqueViolation(err: unknown): boolean {
-  return err instanceof QueryFailedError && /unique|duplicate/i.test(err.message);
+/**
+ * ¿Es este error el índice único parcial rebotando un consumo que ya estaba escrito?
+ *
+ * Se compara el **código del driver**, no el texto del mensaje. Comparar el texto es lo que
+ * `common/write-conflict.ts` documenta como roto: Postgres traduce sus mensajes según
+ * `lc_messages`, así que con la base hablando español ni «unique» ni «duplicate» aparecen, el
+ * reenvío dejaba de reconocerse como tal, subía al `catch` de `consumeForOrder` y **se
+ * descartaba el consumo entero de la orden** dejando solo una línea de log.
+ *
+ * No se reutiliza `isConcurrentWriteConflict`: ese trata también un interbloqueo como «ya está
+ * hecho», y aquí un interbloqueo significa justo lo contrario — que este consumo **no** se
+ * escribió y hay que dejar que el error suba.
+ */
+function isDuplicateConsumption(err: unknown): boolean {
+  if (!(err instanceof QueryFailedError)) return false;
+  return (err as QueryFailedError & { code?: string }).code === '23505';
 }
