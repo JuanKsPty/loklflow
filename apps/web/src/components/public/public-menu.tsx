@@ -241,7 +241,7 @@ export function PublicMenu({ qrCode, menu }: { qrCode: string; menu: Menu }) {
               ancho de la ventana, así que sin esto el botón quedaba centrado y desalineado con
               las tarjetas de arriba. */}
           <div className="mx-auto w-full max-w-md md:max-w-3xl lg:max-w-4xl">
-            <Button className="h-14 w-full text-base" onClick={() => setCartOpen(true)}>
+            <Button className="h-14 max-sm:h-14 w-full text-base" onClick={() => setCartOpen(true)}>
               <ShoppingBagIcon />
               Ver pedido ({count}) · {formatPrice(total)}
             </Button>
@@ -312,7 +312,7 @@ export function PublicMenu({ qrCode, menu }: { qrCode: string; menu: Menu }) {
                 onChange={(e) => setName(e.target.value)}
                 maxLength={40}
                 placeholder="Para que sepan a quién traerlo"
-                className="h-12"
+                className="h-12 max-sm:h-12"
               />
             </Field>
 
@@ -322,7 +322,7 @@ export function PublicMenu({ qrCode, menu }: { qrCode: string; menu: Menu }) {
             </div>
 
             <Button
-              className="h-14 w-full text-base"
+              className="h-14 max-sm:h-14 w-full text-base"
               onClick={send}
               disabled={sending || !menu.table.acceptsOrders}
             >

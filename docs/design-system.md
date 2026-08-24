@@ -65,11 +65,26 @@ Escala: títulos de página `text-xl font-semibold tracking-tight`; secciones `t
 - **Radio**: `--radius: 0.625rem` con escala derivada (`rounded-md`, `rounded-lg`, `rounded-xl`). Tarjetas y contenedores: `rounded-xl`.
 - **Espaciado**: escala Tailwind estándar. Padding de página `p-4 md:p-6`; gap entre campos `gap-5`; secciones `space-y-6`.
 - **Densidad por superficie**:
-  - **Admin (escritorio)**: controles `size="default"`/`"lg"` (h-8/h-9). Densidad cómoda.
-  - **POS / KDS / mesero (táctil)**: objetivos ≥44px con `size="touch"` (`h-11`) e `size="icon-touch"` (`size-11`), que son 44px exactos en la escala de Tailwind. Los usa todo `components/{pos,kitchen,waiter}`; no queda ahí un solo `Button size="sm"`.
-    Los tamaños táctiles se **añadieron** al sistema, no reemplazaron a los compactos: `/admin` se
-    usa con ratón y agrandarlo todo reflujaría maquetas densas que funcionan. `e2e/responsive.spec.ts`
-    vigila el suelo en las pantallas de servicio y **salta a propósito** en las de administración.
+  - **Admin (escritorio y tableta, `≥sm`)**: controles `size="default"`/`"lg"` (h-8/h-9). Densidad cómoda, exactamente igual que siempre.
+  - **Admin (móvil, `<sm`)**: el panel lo abre a diario el dueño desde el teléfono, así que por debajo de 640 px los controles suben al suelo táctil. **No se hace pantalla por pantalla**: se hace una vez en `ui/button.tsx`, `ui/input.tsx`, `ui/select.tsx` y `ui/dropdown-menu.tsx` con la variante `max-sm:` — `default` es `h-8 max-sm:h-11`, `sm` es `h-7 max-sm:h-10`, `icon-sm` es `size-7 max-sm:size-10`.
+  - **POS / KDS / mesero (táctil)**: objetivos ≥44px con `size="touch"` (`h-11`) e `size="icon-touch"` (`size-11`), que son 44px exactos en la escala de Tailwind. Los usa todo `components/{pos,kitchen,waiter}`; no queda ahí un solo `Button size="sm"`. Son los dos únicos tamaños **sin** variante `max-sm:`: miden 44 px a cualquier ancho porque marcan lo que se pulsa de pie.
+
+#### La forma de la clase importa, y no es una preferencia de estilo
+
+> Toda clase nueva se escribe **`valor-de-hoy max-sm:valor-móvil`**. Si en un diff aparece un valor
+> sin prefijo que hoy no estaba, se ha cambiado el escritorio.
+
+`cn(buttonVariants({ size, className }))` pasa por `tailwind-merge`, que **no** ve conflicto entre
+`h-12` y `sm:h-8` —son modificadores distintos— pero sí entre `h-12` y `h-8`. Con la forma
+`h-11 sm:h-8`, un `className="h-12"` del sitio de llamada dejaría `h-12 sm:h-8` y el botón encogería
+a **32 px en escritorio**, que es el modo de romper el panel sin que se note. Con el valor de
+escritorio sin prefijo, un `className` lo pisa igual que siempre. `button.spec.tsx` lo afirma.
+
+Y el breakpoint es **`sm` (640 px), uno solo, no `md`**: un iPad mini en vertical mide 744 px, así que
+anclar en `md` habría reflujado una tableta. Con `sm`, todo lo que mide ≥640 px queda como estaba.
+
+Los controles deliberadamente más altos que el suelo táctil —el teclado del PIN, los CTA de la carta
+pública— llevan su propio `max-sm:h-14` / `max-sm:h-12`: si no, la variante los aplastaría a 44 px.
 
 ### Tablas en móvil — decisión aceptada
 
@@ -145,4 +160,6 @@ Badge con token semántico (ver §2). Mapa de referencia para órdenes:
 - [ ] Dinero/cantidades con `font-mono tabular-nums`.
 - [ ] Encabezados con `PageHeader`; vacíos con `Empty`; carga con `Skeleton`.
 - [ ] Navegación nueva del admin filtrada por permiso en [`app-sidebar.tsx`](../apps/web/src/components/app-sidebar.tsx).
+- [ ] Probado a 390 px: toda fila de campos apila con `sm:flex-row`, y ningún diálogo deja su botón de guardar fuera de la pantalla con el teclado abierto.
+- [ ] Ninguna clase nueva cambia el escritorio: el valor sin prefijo es el de hoy (§4).
 - [ ] Verifica claro y oscuro antes de mergear.

@@ -118,7 +118,7 @@ export function PublicOrderTracker({ qrCode }: { qrCode: string }) {
             ? 'Por seguridad el seguimiento dura unas horas. Tu pedido sigue en la cocina: pregunta a un mesero.'
             : 'Haz un pedido desde la carta y podrás seguirlo desde aquí.'}
         </EmptyDescription>
-        <Button className="mt-2 h-12" nativeButton={false} render={<Link href={`/m/${qrCode}`} />}>
+        <Button className="mt-2 h-12 max-sm:h-12" nativeButton={false} render={<Link href={`/m/${qrCode}`} />}>
           Ver la carta
         </Button>
       </Empty>
@@ -205,7 +205,7 @@ export function PublicOrderTracker({ qrCode }: { qrCode: string }) {
 
       <Button
         variant="outline"
-        className="h-12"
+        className="h-12 max-sm:h-12"
         nativeButton={false}
         render={<Link href={`/m/${qrCode}`} />}
       >

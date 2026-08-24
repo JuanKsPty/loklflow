@@ -8,7 +8,10 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      className=// `overscroll-x-contain`: al llegar al final del desplazamiento horizontal, el gesto
+      // se propagaba y disparaba el «atrás» del navegador — te sacaba de la pantalla justo
+      // cuando estabas leyendo la última columna.
+      "relative w-full overflow-x-auto overscroll-x-contain"
     >
       <table
         data-slot="table"

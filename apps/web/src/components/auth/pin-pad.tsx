@@ -89,7 +89,7 @@ export function PinPad({ userId, userName }: PinPadProps) {
               type="button"
               variant="outline"
               size="lg"
-              className="h-14 text-lg font-semibold"
+              className="h-14 max-sm:h-14 text-lg font-semibold"
               disabled={loading}
               onClick={() => append(k)}
             >
@@ -100,7 +100,7 @@ export function PinPad({ userId, userName }: PinPadProps) {
             type="button"
             variant="ghost"
             size="lg"
-            className="h-14"
+            className="h-14 max-sm:h-14"
             disabled={loading}
             onClick={backspace}
             aria-label="Borrar"
@@ -111,7 +111,7 @@ export function PinPad({ userId, userName }: PinPadProps) {
             type="button"
             variant="outline"
             size="lg"
-            className="h-14 text-lg font-semibold"
+            className="h-14 max-sm:h-14 text-lg font-semibold"
             disabled={loading}
             onClick={() => append('0')}
           >
@@ -120,7 +120,7 @@ export function PinPad({ userId, userName }: PinPadProps) {
           <Button
             type="button"
             size="lg"
-            className="h-14"
+            className="h-14 max-sm:h-14"
             disabled={loading}
             onClick={submit}
             aria-label="Confirmar"

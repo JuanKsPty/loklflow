@@ -199,7 +199,15 @@ function Sidebar({
             <SheetTitle>Sidebar</SheetTitle>
             <SheetDescription>Displays the mobile sidebar.</SheetDescription>
           </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
+          {/*
+            El hueco del indicador de inicio va aquí y no en `sheet.tsx`: esta hoja pasa
+            `p-0`, y `tailwind-merge` borra cualquier `pb-*` de la base porque `p-0` es su
+            superconjunto y llega después. Sin esto, el último ítem del menú queda debajo
+            de la barra del sistema.
+          */}
+          <div className="flex h-full w-full flex-col pb-[env(safe-area-inset-bottom)]">
+            {children}
+          </div>
         </SheetContent>
       </Sheet>
     )
