@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import type {
   Ingredient,
+  ProductStock,
   PrepTimeMetric,
   SalesByDay,
   SalesSummary,
@@ -91,7 +92,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     openOrdersValue: 0,
   };
 
-  const [summary, topProducts, prep, byDay, lowStock] = await Promise.all([
+  const [summary, topProducts, prep, byDay, lowStock, lowProducts] = await Promise.all([
     serverFetch<SalesSummary>(`/reports/sales-summary${q}`).catch(() => empty),
     serverFetch<TopProduct[]>(`/reports/top-products${q}`).catch(() => [] as TopProduct[]),
     serverFetch<PrepTimeMetric>(`/reports/prep-times${q}`).catch(() => ({
@@ -105,6 +106,12 @@ export default async function DashboardPage({ searchParams }: Props) {
     // cuando de verdad puede hacer algo al respecto: pedir.
     serverFetch<Ingredient[]>('/inventory/ingredients?lowStock=true').catch(
       () => [] as Ingredient[],
+    ),
+    // Y los **productos** bajo mínimo, que son los que él cuenta. Sin esta segunda lista, un
+    // producto agotado no aparecería en la primera pantalla que abre, que es justo donde tiene
+    // que aparecer.
+    serverFetch<ProductStock[]>('/inventory/products?lowStock=true').catch(
+      () => [] as ProductStock[],
     ),
   ]);
 
@@ -135,26 +142,25 @@ export default async function DashboardPage({ searchParams }: Props) {
         ))}
       </div>
 
+      {/*
+        Dos avisos, uno por lista, y no uno mezclado: llevan a filtros distintos y se resuelven de
+        formas distintas —un producto se repone contando, un insumo se compra—.
+      */}
+      {lowProducts.length > 0 && (
+        <LowStockNotice
+          href="/admin/inventario?tab=products&lowStock=true"
+          nombres={lowProducts.map((p) => p.name)}
+          singular="producto"
+          plural="productos"
+        />
+      )}
       {lowStock.length > 0 && (
-        // Enlaza al filtro, así que el aviso lleva directamente a la lista de lo que hay que
-        // pedir en vez de dejar al dueño buscándolo.
-        <Link
+        <LowStockNotice
           href="/admin/inventario?tab=ingredients&lowStock=true"
-          className="mb-3 flex items-center gap-2 rounded-xl border border-warning/30 bg-warning/10 px-3 py-3 text-sm text-warning transition-colors hover:bg-warning/15"
-        >
-          <PackageIcon className="size-4 shrink-0" />
-          <span>
-            <strong>
-              {lowStock.length} {lowStock.length === 1 ? 'ingrediente' : 'ingredientes'}
-            </strong>{' '}
-            bajo el mínimo:{' '}
-            {lowStock
-              .slice(0, 3)
-              .map((i) => i.name)
-              .join(', ')}
-            {lowStock.length > 3 && ` y ${lowStock.length - 3} más`}.
-          </span>
-        </Link>
+          nombres={lowStock.map((i) => i.name)}
+          singular="ingrediente"
+          plural="ingredientes"
+        />
       )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -286,5 +292,39 @@ export default async function DashboardPage({ searchParams }: Props) {
       {/* Cerrar una cuenta en el POS repinta los KPIs sin recargar. */}
       <RealtimeRefresher events={['order:changed', 'shift:changed']} />
     </div>
+  );
+}
+
+/**
+ * El aviso de stock bajo del panel.
+ *
+ * Enlaza al filtro, así que lleva directamente a la lista de lo que hay que reponer en vez de
+ * dejar al dueño buscándola.
+ */
+function LowStockNotice({
+  href,
+  nombres,
+  singular,
+  plural,
+}: {
+  href: string;
+  nombres: string[];
+  singular: string;
+  plural: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-2 rounded-xl border border-warning/30 bg-warning/10 px-3 py-3 text-sm text-warning transition-colors hover:bg-warning/15"
+    >
+      <PackageIcon className="size-4 shrink-0" />
+      <span>
+        <strong>
+          {nombres.length} {nombres.length === 1 ? singular : plural}
+        </strong>{' '}
+        bajo el mínimo: {nombres.slice(0, 3).join(', ')}
+        {nombres.length > 3 && ` y ${nombres.length - 3} más`}.
+      </span>
+    </Link>
   );
 }

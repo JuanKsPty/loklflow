@@ -1,6 +1,8 @@
 import { api } from './client';
 import type {
   CreateIngredientPayload,
+  ProductStock,
+  SetStockPayload,
   CreateMovementPayload,
   CreateSupplierPayload,
   Ingredient,
@@ -13,6 +15,20 @@ import type {
 } from '@loklflow/types';
 
 export const inventoryApi = {
+  /**
+   * Existencias por producto. Por debajo son ingredientes espejo, pero eso no sale de la API:
+   * aquí el producto **es** la unidad que se cuenta.
+   */
+  productStock: {
+    list: (query = '') => api.get<ProductStock[]>(`/inventory/products${query}`),
+    // PUT: «el stock ahora es N» es idempotente por su propia forma, así que reenviarlo desde una
+    // conexión mala deja el mismo número en vez de dos ajustes acumulados.
+    set: (productId: string, payload: SetStockPayload) =>
+      api.put<ProductStock>(`/inventory/products/${productId}/stock`, payload),
+    untrack: (productId: string) =>
+      api.delete<ProductStock>(`/inventory/products/${productId}/stock`),
+  },
+
   suppliers: {
     list: () => api.get<Supplier[]>('/inventory/suppliers'),
     get: (id: string) => api.get<Supplier>(`/inventory/suppliers/${id}`),
