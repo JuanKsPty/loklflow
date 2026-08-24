@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { PlusIcon } from 'lucide-react';
+import { PlusIcon, UploadIcon } from 'lucide-react';
 import { serverFetch } from '@/lib/api/server-client';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
@@ -19,10 +19,20 @@ interface Props {
   searchParams: Promise<{ tab?: string }>;
 }
 
-function TabAction({ href, label }: { href: string; label: string }) {
+function TabAction({
+  href,
+  label,
+  children,
+}: {
+  href: string;
+  label: string;
+  /** Acciones secundarias, a la izquierda de la primaria. */
+  children?: React.ReactNode;
+}) {
   return (
-    <div className="mb-3 flex justify-end">
-      <Button nativeButton={false} render={<Link href={href} />}>
+    <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
+      {children}
+      <Button className="w-full sm:w-auto" nativeButton={false} render={<Link href={href} />}>
         <PlusIcon />
         {label}
       </Button>
@@ -57,7 +67,17 @@ export default async function MenuPage({ searchParams }: Props) {
         initial={active}
         products={
           <>
-            <TabAction href="/admin/menu/products/new" label="Nuevo producto" />
+            <TabAction href="/admin/menu/products/new" label="Nuevo producto">
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto"
+                nativeButton={false}
+                render={<Link href="/admin/menu/import" />}
+              >
+                <UploadIcon />
+                Importar CSV
+              </Button>
+            </TabAction>
             <ProductTable products={products} />
           </>
         }

@@ -12,6 +12,8 @@ import type {
   Combo,
   CreateComboPayload,
   UpdateComboPayload,
+  ImportProductsPayload,
+  ImportProductsResult,
 } from '@loklflow/types';
 
 export const categoriesApi = {
@@ -30,6 +32,13 @@ export const productsApi = {
   update: (id: string, payload: UpdateProductPayload) =>
     api.patch<Product>(`/menu/products/${id}`, payload),
   remove: (id: string) => api.delete<void>(`/menu/products/${id}`),
+
+  /** Una tanda del CSV. El corte por bytes lo hace `lib/csv/chunk.ts`. */
+  import: (payload: ImportProductsPayload) =>
+    api.post<ImportProductsResult>('/menu/products/import', payload),
+  // Rutas para `downloadFile`, que es el único camino de descarga del repo.
+  importTemplatePath: () => '/menu/products/import-template.csv',
+  exportPath: () => '/menu/products/export.csv',
 };
 
 export const modifiersApi = {

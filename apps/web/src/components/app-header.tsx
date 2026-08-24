@@ -42,6 +42,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   ingredientes: 'Ingredientes',
   proveedores: 'Proveedores',
   venta: 'Venta rápida',
+  import: 'Importar',
   orders: 'Órdenes',
   settings: 'Configuración',
   new: 'Nuevo',
