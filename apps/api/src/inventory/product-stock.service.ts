@@ -8,6 +8,7 @@ import { StockService } from './stock.service';
 import { SetStockDto } from './dto/set-stock.dto';
 import { AddStockEntryDto } from './dto/add-stock-entry.dto';
 import { QueryProductStockDto } from './dto/query-product-stock.dto';
+import { unaccentedEquals, unaccentedLike } from '../common/search';
 import { isConcurrentWriteConflict } from '../common/write-conflict';
 import { stockSetReason, type IngredientUnit } from './inventory.constants';
 import type { PreparationStation } from '../menu/preparation-station.constants';
@@ -102,12 +103,21 @@ export class ProductStockService {
     if (filters.lowStock) qb.andWhere(LOW_STOCK_SQL);
     else if (filters.tracked === true) qb.andWhere('i.id IS NOT NULL');
     else if (filters.tracked === false) qb.andWhere('i.id IS NULL');
+    if (filters.q) qb.andWhere(unaccentedLike('p.name'), { q: filters.q });
+    // `c.name` y no `p.category_id`: lo que se comparte en un mensaje es «?categoria=Bebidas».
+    if (filters.category) {
+      qb.andWhere(unaccentedEquals('c.name', 'categoryTerm'), { categoryTerm: filters.category });
+    }
 
     const rows = await qb.getRawMany<RawRow>();
     return rows.map((r) => this.toRow(r));
   }
 
   async findOneRow(productId: string): Promise<ProductStockRow> {
+    // Sin filtros y con los inactivos dentro, a propósito: esto lo llaman `setStock`, `addEntry`,
+    // `setMinimum` y `untrack` para devolver la fila recién tocada. Si heredara el filtro de la
+    // pantalla, guardar «ahora tengo 12» en un producto fuera de la búsqueda daría 404 después de
+    // haber escrito bien el movimiento.
     const rows = await this.findAll({ includeInactive: true });
     const row = rows.find((r) => r.productId === productId);
     if (!row) throw new NotFoundException(`Producto ${productId} no encontrado`);
