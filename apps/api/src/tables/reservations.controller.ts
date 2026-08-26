@@ -9,11 +9,13 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ReservationsService } from './reservations.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
+import { QueryReservationsDto } from './dto/query-reservations.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
@@ -25,8 +27,8 @@ export class ReservationsController {
 
   @Get()
   @RequirePermissions('tables:read')
-  findAll() {
-    return this.reservationsService.findAll();
+  findAll(@Query() query: QueryReservationsDto) {
+    return this.reservationsService.findAll(query.q);
   }
 
   @Get(':id')

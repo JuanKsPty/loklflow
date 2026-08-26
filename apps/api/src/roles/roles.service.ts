@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { matchesText } from '../common/search';
 import { Role } from './entities/role.entity';
 import { Permission } from './entities/permission.entity';
 import { RolePermission } from './entities/role-permission.entity';
@@ -38,8 +39,11 @@ export class RolesService {
     private readonly tokenVersions: TokenVersionCache,
   ) {}
 
-  findAll() {
-    return this.rolesRepo.find({ where: { isActive: true } });
+  findAll(q?: string) {
+    return this.rolesRepo.find({
+      where: { isActive: true, ...(q ? { name: matchesText(q) } : {}) },
+      order: { name: 'ASC' },
+    });
   }
 
   findAllPermissions() {

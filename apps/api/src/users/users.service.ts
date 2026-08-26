@@ -4,7 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, type FindOptionsWhere } from 'typeorm';
+import { matchesText } from '../common/search';
 import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity';
 import { RolesService } from '../roles/roles.service';
@@ -25,8 +26,26 @@ export class UsersService {
     private readonly tokenVersions: TokenVersionCache,
   ) {}
 
-  findAll() {
-    return this.usersRepo.find({ where: { isActive: true } });
+  findAll(filters: { q?: string; roleId?: string } = {}) {
+    // `role: { id }` y no `roleId`: la entidad no expone la columna, solo la relación con su
+    // `@JoinColumn`. Un `where` sobre `roleId` compila —`FindOptionsWhere` lo acepta— y revienta
+    // en tiempo de ejecución con un 500.
+    const base: FindOptionsWhere<User> = {
+      isActive: true,
+      ...(filters.roleId ? { role: { id: filters.roleId } } : {}),
+    };
+    // Un array de `where` es un OR: se busca por nombre **o** por correo, porque las dos cosas
+    // identifican a un empleado y quien escribe «ana» no distingue cuál está tecleando. Los dos
+    // `matchesText` comparten nombre de parámetro a propósito: mismo término, mismo valor.
+    return this.usersRepo.find({
+      where: filters.q
+        ? [
+            { ...base, name: matchesText(filters.q) },
+            { ...base, email: matchesText(filters.q) },
+          ]
+        : base,
+      order: { name: 'ASC' },
+    });
   }
 
   async findOne(id: string) {

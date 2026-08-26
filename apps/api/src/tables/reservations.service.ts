@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, In, Not, Repository } from 'typeorm';
+import { matchesText } from '../common/search';
 import { Reservation } from './entities/reservation.entity';
 import { RestaurantTable } from './entities/table.entity';
 import { CreateReservationDto } from './dto/create-reservation.dto';
@@ -25,8 +26,9 @@ export class ReservationsService {
     private tablesRepo: Repository<RestaurantTable>,
   ) {}
 
-  findAll() {
+  findAll(q?: string) {
     return this.reservationsRepo.find({
+      where: q ? { customerName: matchesText(q) } : {},
       relations: { table: true },
       order: { reservedAt: 'DESC' },
     });

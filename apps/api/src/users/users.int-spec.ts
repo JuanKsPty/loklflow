@@ -95,10 +95,7 @@ describe('Empleados', () => {
 
       expect(credencialesEn(res.body)).toEqual([]);
       // Y sí se guardaron, hasheadas: si no, este test pasaría con un servicio que las tira.
-      const rows = await ds.query(
-        `SELECT password, pin FROM users WHERE id = $1`,
-        [res.body.id],
-      );
+      const rows = await ds.query(`SELECT password, pin FROM users WHERE id = $1`, [res.body.id]);
       expect(rows[0].password).toMatch(/^\$2[aby]\$/);
       expect(rows[0].pin).toMatch(/^\$2[aby]\$/);
     });
@@ -347,6 +344,51 @@ describe('Empleados', () => {
       expect(inexistente.status).toBe(404);
       expect(sinPinRes.status).toBe(404);
       expect(sinPinRes.body.message).toBe(inexistente.body.message);
+    });
+  });
+  /**
+   * Ningún listado del panel se podía filtrar por nombre; el de empleados tampoco. Se busca por
+   * nombre **o** por correo porque las dos cosas identifican a una persona y quien escribe «ana»
+   * no está pensando en cuál de las dos está tecleando.
+   */
+  describe('filtros del listado', () => {
+    const listar = async (query = '') => {
+      const res = await http().get(`/api/users${query}`).set('Cookie', admin).expect(200);
+      return res.body as { id: string; name: string; email: string | null }[];
+    };
+
+    it('busca por un trozo del nombre, sin distinguir mayúsculas', async () => {
+      const todos = await listar();
+      const alguien = todos[0];
+      const trozo = alguien.name.slice(0, 4).toUpperCase();
+      expect(
+        (await listar(`?q=${encodeURIComponent(trozo)}`)).some((u) => u.id === alguien.id),
+      ).toBe(true);
+    });
+
+    it('también encuentra por el correo', async () => {
+      const conCorreo = (await listar()).find((u) => u.email);
+      if (!conCorreo?.email) return;
+      const filas = await listar(`?q=${encodeURIComponent(conCorreo.email.split('@')[0])}`);
+      expect(filas.some((u) => u.id === conCorreo.id)).toBe(true);
+    });
+
+    it('la cadena vacía no filtra', async () => {
+      expect(await listar('?q=')).toHaveLength((await listar()).length);
+    });
+
+    it('filtra por rol', async () => {
+      const rol = await seededRole(app, 'Administrador');
+      const filas = await listar(`?roleId=${rol.id}`);
+      expect(filas.length).toBeGreaterThan(0);
+    });
+
+    it('un rol que no es un uuid da 400, no un 500 de Postgres', async () => {
+      await http().get('/api/users?roleId=no-soy-un-uuid').set('Cookie', admin).expect(400);
+    });
+
+    it('un parámetro no declarado da 400', async () => {
+      await http().get('/api/users?foo=bar').set('Cookie', admin).expect(400);
     });
   });
 });

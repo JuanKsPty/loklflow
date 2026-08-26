@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, QueryFailedError, Repository } from 'typeorm';
+import { matchesNumberText } from '../common/search';
 import type { TableStatus } from './status.constants';
 import { RestaurantTable } from './entities/table.entity';
 import { CreateTableDto } from './dto/create-table.dto';
@@ -18,8 +19,14 @@ export class TablesService {
     private readonly realtime: RealtimeGateway,
   ) {}
 
-  findAll() {
+  findAll(filters: { q?: string; sectorId?: string } = {}) {
     return this.tablesRepo.find({
+      where: {
+        ...(filters.sectorId ? { sectorId: filters.sectorId } : {}),
+        // Una mesa no tiene nombre: lo que se busca es su número, y como texto, para que
+        // teclear «1» ofrezca la 1, la 10 y la 12 mientras se decide.
+        ...(filters.q ? { number: matchesNumberText(filters.q) } : {}),
+      },
       relations: { sector: true },
       order: { number: 'ASC' },
     });

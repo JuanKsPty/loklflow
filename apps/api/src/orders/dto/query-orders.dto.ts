@@ -1,5 +1,9 @@
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsISO8601, IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { SEARCH_MAX_LENGTH, toSearchTerm } from '../../common/search';
+import { IsBoolean, IsISO8601, IsIn, IsInt, IsOptional, IsUUID, Max, Min,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 import {
   ORDER_SOURCES,
   ORDER_STATUSES,
@@ -62,4 +66,14 @@ export class QueryOrdersDto {
   @IsInt()
   @Min(0)
   skip?: number;
+
+  /**
+   * El número de orden, como texto y con un «contiene»: teclear «10» ofrece la 10, la 105 y la
+   * 210 mientras se decide. Es lo único que identifica una orden a ojo — el uuid no se teclea.
+   */
+  @IsOptional()
+  @Transform(toSearchTerm)
+  @IsString()
+  @MaxLength(SEARCH_MAX_LENGTH)
+  q?: string;
 }

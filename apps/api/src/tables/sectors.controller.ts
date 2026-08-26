@@ -9,11 +9,13 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { SectorsService } from './sectors.service';
 import { CreateSectorDto } from './dto/create-sector.dto';
 import { UpdateSectorDto } from './dto/update-sector.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
+import { QuerySectorsDto } from './dto/query-sectors.dto';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
 
 @ApiTags('tables')
@@ -23,8 +25,8 @@ export class SectorsController {
 
   @Get()
   @RequirePermissions('tables:read')
-  findAll() {
-    return this.sectorsService.findAll();
+  findAll(@Query() query: QuerySectorsDto) {
+    return this.sectorsService.findAll(query.q);
   }
 
   @Get(':id')
