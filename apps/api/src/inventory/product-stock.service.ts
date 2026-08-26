@@ -6,9 +6,10 @@ import { RecipeIngredient } from './entities/recipe-ingredient.entity';
 import { Product } from '../menu/entities/product.entity';
 import { StockService } from './stock.service';
 import { SetStockDto } from './dto/set-stock.dto';
+import { AddStockEntryDto } from './dto/add-stock-entry.dto';
 import { QueryProductStockDto } from './dto/query-product-stock.dto';
 import { isConcurrentWriteConflict } from '../common/write-conflict';
-import type { IngredientUnit } from './inventory.constants';
+import { stockSetReason, type IngredientUnit } from './inventory.constants';
 import type { PreparationStation } from '../menu/preparation-station.constants';
 
 /** Una fila de la pantalla de existencias. Trae lo justo para pintarla de una sola petición. */
@@ -122,6 +123,38 @@ export class ProductStockService {
         toStock: dto.newStock,
         reasonCode: dto.reasonCode,
         note: dto.note,
+      },
+      userId,
+    );
+    return this.findOneRow(productId);
+  }
+
+  /**
+   * «Llegó mercancía.» **Suma** lo que llegó a lo que haya en ese instante.
+   *
+   * No es lo mismo que fijar el stock con motivo «Compra», que es lo que hacía la pantalla antes.
+   * Un `PUT` manda el total, y el total se leyó cuando se abrió el diálogo: si la barra vendió dos
+   * cervezas mientras alguien tecleaba, esas dos ventas **desaparecían** al guardar. Aquí viaja el
+   * delta y quien lo aplica es `apply`, con la fila ya bloqueada, así que las dos cosas caben.
+   *
+   * Se escribe como `entry` de verdad y no como un ajuste: es el único tipo que admite proveedor y
+   * costo —de ahí sale el promedio ponderado— y el único que un reporte de compras podría filtrar
+   * sin leer el texto del motivo.
+   */
+  async addEntry(
+    productId: string,
+    dto: AddStockEntryDto,
+    userId: string,
+  ): Promise<ProductStockRow> {
+    const mirror = await this.ensureMirror(productId);
+    await this.stock.record(
+      {
+        ingredientId: mirror.id,
+        type: 'entry',
+        quantity: dto.quantity,
+        // Misma etiqueta que el motivo «Compra» de la pantalla de recuento, para que el libro
+        // mayor se lea igual venga de donde venga.
+        reason: stockSetReason('purchase', dto.note),
       },
       userId,
     );

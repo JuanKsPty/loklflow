@@ -1,5 +1,6 @@
 import { api } from './client';
 import type {
+  AddStockEntryPayload,
   CreateIngredientPayload,
   ProductStock,
   SetStockPayload,
@@ -25,6 +26,10 @@ export const inventoryApi = {
     // conexión mala deja el mismo número en vez de dos ajustes acumulados.
     set: (productId: string, payload: SetStockPayload) =>
       api.put<ProductStock>(`/inventory/products/${productId}/stock`, payload),
+    // POST y no PUT: «llegaron 6 cajas» **suma** sobre lo que haya en ese instante, así que no es
+    // idempotente. A cambio, una venta que se cierre mientras se teclea no se pierde.
+    addEntry: (productId: string, payload: AddStockEntryPayload) =>
+      api.post<ProductStock>(`/inventory/products/${productId}/stock/entry`, payload),
     untrack: (productId: string) =>
       api.delete<ProductStock>(`/inventory/products/${productId}/stock`),
   },
