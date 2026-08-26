@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { matchesText } from '../common/search';
 import { Supplier } from './entities/supplier.entity';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
@@ -11,8 +12,11 @@ export class SuppliersService {
     @InjectRepository(Supplier) private readonly suppliersRepo: Repository<Supplier>,
   ) {}
 
-  findAll() {
-    return this.suppliersRepo.find({ order: { name: 'ASC' } });
+  findAll(q?: string) {
+    return this.suppliersRepo.find({
+      where: q ? { name: matchesText(q) } : {},
+      order: { name: 'ASC' },
+    });
   }
 
   async findOne(id: string) {

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { matchesText } from '../common/search';
 import { Sector } from './entities/sector.entity';
 import { CreateSectorDto } from './dto/create-sector.dto';
 import { UpdateSectorDto } from './dto/update-sector.dto';
@@ -12,8 +13,11 @@ export class SectorsService {
     private sectorsRepo: Repository<Sector>,
   ) {}
 
-  findAll() {
-    return this.sectorsRepo.find({ order: { name: 'ASC' } });
+  findAll(q?: string) {
+    return this.sectorsRepo.find({
+      where: q ? { name: matchesText(q) } : {},
+      order: { name: 'ASC' },
+    });
   }
 
   async findOne(id: string) {

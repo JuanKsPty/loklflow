@@ -9,7 +9,10 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
 
 - [x] Documento de Visión (RUP)
 - [x] Definición de alcance y módulos
-- [x] Arquitectura de infraestructura (local + nube + offline)
+- [x] Arquitectura de infraestructura — la decidida en esta fase era «local + nube + offline»,
+      y **cambió**: lo que se construyó es una sola aplicación tras un origen único, con la
+      resiliencia puesta en el cliente y sin capa de sincronización con una nube. El diagrama
+      real está en el README
 - [x] Modelo de base de datos (31 tablas — `docs/DATA_MODEL.md`)
 - [x] README profesional con arquitectura
 - [x] Setup del repositorio y estructura de carpetas
@@ -44,8 +47,9 @@ El proyecto se construye en 6 fases. Cada fase tiene un entregable funcional que
       se pelearían por el mismo `ALTER TABLE`
 
 > La nota original decía que el deploy quedaba aplazado porque no había piloto ni demo agendada
-> y la arquitectura pone el servidor dentro del establecimiento. Sigue siendo cierto para el
-> producto; el entorno vivo existe para poder enseñarlo.
+> y la arquitectura ponía el servidor dentro del establecimiento. Lo segundo dejó de ser cierto:
+> el sistema se sirve desde un solo origen y quien aguanta la caída de la red es el dispositivo,
+> así que el entorno vivo no es una maqueta para enseñar, es el despliegue.
 
 **Entregable:** Sistema de auth con RBAC verificado automáticamente y empaquetado.
 

@@ -24,6 +24,9 @@ import { SetRecipeDto } from './dto/set-recipe.dto';
 import { SetStockDto } from './dto/set-stock.dto';
 import { AddStockEntryDto } from './dto/add-stock-entry.dto';
 import { QueryProductStockDto } from './dto/query-product-stock.dto';
+import { QueryIngredientsDto } from './dto/query-ingredients.dto';
+import { QueryMovementsDto } from './dto/query-movements.dto';
+import { SearchQueryDto } from '../common/dto/search-query.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
@@ -95,8 +98,8 @@ export class InventoryController {
 
   @Get('suppliers')
   @RequirePermissions('inventory:read')
-  findSuppliers() {
-    return this.suppliers.findAll();
+  findSuppliers(@Query() query: SearchQueryDto) {
+    return this.suppliers.findAll(query.q);
   }
 
   @Get('suppliers/:id')
@@ -128,8 +131,10 @@ export class InventoryController {
 
   @Get('ingredients')
   @RequirePermissions('inventory:read')
-  findIngredients(@Query('lowStock') lowStock?: string) {
-    return lowStock === 'true' ? this.ingredients.findLowStock() : this.ingredients.findAll();
+  findIngredients(@Query() query: QueryIngredientsDto) {
+    return query.lowStock
+      ? this.ingredients.findLowStock(query.q)
+      : this.ingredients.findAll(query.q);
   }
 
   @Get('ingredients/:id')
@@ -188,11 +193,8 @@ export class InventoryController {
 
   @Get('movements')
   @RequirePermissions('inventory:read')
-  findMovements(@Query('ingredientId') ingredientId?: string, @Query('take') take?: string) {
-    return this.stock.findMovements({
-      ingredientId,
-      take: take ? Number(take) : undefined,
-    });
+  findMovements(@Query() query: QueryMovementsDto) {
+    return this.stock.findMovements(query);
   }
 
   /**

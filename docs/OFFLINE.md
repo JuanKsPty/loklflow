@@ -3,10 +3,12 @@
 Cómo LoklFlow sigue funcionando cuando se cae el WiFi, qué deja de funcionar a propósito, y
 por qué.
 
-El sistema está pensado para un servidor **dentro** del establecimiento, así que «sin
-conexión» casi nunca significa «internet caído»: significa una tablet que se aleja del punto de
-acceso, un switch reiniciado, un router encendido con la línea muerta. Cortes de segundos o
-minutos, en medio de un servicio, con gente esperando.
+El servidor **no** vive dentro del establecimiento: la aplicación se sirve desde un solo origen y
+se llega a ella por internet. Así que «sin conexión» abarca las dos cosas —el enlace que se cae y
+la tablet que se aleja del punto de acceso, el switch reiniciado, el router encendido con la línea
+muerta—, y para quien está trabajando son la misma: cortes de segundos o minutos, en medio de un
+servicio, con gente esperando. Lo que sostiene la operación mientras tanto es el propio
+dispositivo, no una máquina en la trastienda.
 
 ---
 

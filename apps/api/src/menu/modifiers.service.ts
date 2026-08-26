@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { matchesText } from '../common/search';
 import { Modifier } from './entities/modifier.entity';
 import { ModifierOption } from './entities/modifier-option.entity';
 import { CreateModifierDto } from './dto/create-modifier.dto';
@@ -13,8 +14,9 @@ export class ModifiersService {
     private modifiersRepo: Repository<Modifier>,
   ) {}
 
-  findAll() {
+  findAll(q?: string) {
     return this.modifiersRepo.find({
+      where: q ? { name: matchesText(q) } : {},
       relations: { options: true },
       order: { name: 'ASC' },
     });

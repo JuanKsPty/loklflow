@@ -10,12 +10,14 @@ import {
   Patch,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { AssignPermissionsDto } from './dto/assign-permissions.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
+import { SearchQueryDto } from '../common/dto/search-query.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
@@ -27,8 +29,8 @@ export class RolesController {
 
   @Get()
   @RequirePermissions('roles:read')
-  findAll() {
-    return this.rolesService.findAll();
+  findAll(@Query() query: SearchQueryDto) {
+    return this.rolesService.findAll(query.q);
   }
 
   @Get('permissions')

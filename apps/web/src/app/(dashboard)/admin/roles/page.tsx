@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { PlusIcon, ShieldIcon } from 'lucide-react';
 import { serverFetch } from '@/lib/api/server-client';
+import { hasAnyFilter } from '@/lib/url';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,14 +14,28 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
+import { FilterBar } from '@/components/admin/filters/filter-bar';
+import { NoMatches } from '@/components/admin/filters/no-matches';
+import { SearchField } from '@/components/admin/filters/search-field';
 import type { Role } from '@loklflow/types';
 
 export const metadata = { title: 'Roles — LoklFlow' };
 
-export default async function RolesPage() {
+const BASE_PATH = '/admin/roles';
+
+interface Props {
+  searchParams: Promise<{ q?: string }>;
+}
+
+export default async function RolesPage({ searchParams }: Props) {
+  const { q: crudo } = await searchParams;
+  const q = crudo?.trim() || undefined;
+  const params = { q };
+  const hayFiltros = hasAnyFilter(params);
+
   let roles: Role[] = [];
   try {
-    roles = await serverFetch<Role[]>('/roles');
+    roles = await serverFetch<Role[]>(`/roles${q ? `?q=${encodeURIComponent(q)}` : ''}`);
   } catch {
     // muestra tabla vacía si la API no está disponible
   }
@@ -38,7 +53,19 @@ export default async function RolesPage() {
         }
       />
 
-      {roles.length === 0 ? (
+      <FilterBar basePath={BASE_PATH}>
+        <SearchField
+          basePath={BASE_PATH}
+          params={params}
+          defaultValue={q ?? ''}
+          placeholder="Buscar un rol"
+          label="Buscar un rol por su nombre"
+        />
+      </FilterBar>
+
+      {hayFiltros && roles.length === 0 ? (
+        <NoMatches basePath={BASE_PATH} what="roles" />
+      ) : roles.length === 0 ? (
         <Empty className="border">
           <EmptyHeader>
             <EmptyMedia variant="icon">

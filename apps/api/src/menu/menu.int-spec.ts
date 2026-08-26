@@ -107,10 +107,7 @@ describe('Catálogo del menú', () => {
     });
 
     it('una que no existe da 404', async () => {
-      await http()
-        .get(`/api/menu/categories/${UUID_INEXISTENTE}`)
-        .set('Cookie', admin)
-        .expect(404);
+      await http().get(`/api/menu/categories/${UUID_INEXISTENTE}`).set('Cookie', admin).expect(404);
     });
   });
 
@@ -299,10 +296,7 @@ describe('Catálogo del menú', () => {
       const b = await newProduct();
 
       const combo = await newCombo({
-        items: [
-          { productId: a.id, quantity: 2 },
-          { productId: b.id },
-        ],
+        items: [{ productId: a.id, quantity: 2 }, { productId: b.id }],
       });
 
       const leido = await http()
@@ -381,6 +375,185 @@ describe('Catálogo del menú', () => {
       const combo = await newCombo();
       await http().delete(`/api/menu/combos/${combo.id}`).set('Cookie', admin).expect(204);
       await http().get(`/api/menu/combos/${combo.id}`).set('Cookie', admin).expect(404);
+    });
+  });
+  /**
+   * El filtrado del catálogo. Lo que se prueba aquí no es «devuelve algo»: son las cuatro
+   * decisiones que se pueden romper sin que nadie lo note —los acentos, las mayúsculas, la
+   * cadena vacía y los comodines— más que un parámetro inventado siga dando 400.
+   */
+  describe('Filtros del catálogo', () => {
+    let cafe: { id: string };
+    let bebidas: { id: string; name: string };
+
+    beforeAll(async () => {
+      const cat = await http()
+        .post('/api/menu/categories')
+        .set('Cookie', admin)
+        .send({ name: `Bebidas frías ${++seq}` })
+        .expect(201);
+      categorias.push(cat.body.id);
+      bebidas = cat.body;
+
+      const prod = await http()
+        .post('/api/menu/products')
+        .set('Cookie', admin)
+        .send({ name: `Café con leche ${seq}`, price: 25, categoryId: bebidas.id })
+        .expect(201);
+      productos.push(prod.body.id);
+      cafe = prod.body;
+    });
+
+    const buscar = async (query: string) => {
+      const res = await http().get(`/api/menu/products${query}`).set('Cookie', admin).expect(200);
+      return res.body as { id: string; name: string }[];
+    };
+    const contiene = (filas: { id: string }[], p: { id: string }) =>
+      filas.some((f) => f.id === p.id);
+
+    it('encuentra por un trozo del nombre', async () => {
+      expect(contiene(await buscar('?q=con%20leche'), cafe)).toBe(true);
+    });
+
+    it('no distingue mayúsculas', async () => {
+      expect(contiene(await buscar('?q=CAFE'), cafe)).toBe(true);
+    });
+
+    /**
+     * El caso que justifica la extensión `unaccent`. Antes de ella, un `ILIKE '%cafe%'` devolvía
+     * **cero** filas teniendo «Café con leche» en la tabla: la comparación es carácter a carácter
+     * y `e` no es `é`. Quien busca de pie delante del estante no pone los acentos.
+     */
+    it('encuentra «Café» buscando «cafe», sin acento', async () => {
+      expect(contiene(await buscar('?q=cafe'), cafe)).toBe(true);
+    });
+
+    it('y al revés: encuentra buscando con acento de más', async () => {
+      const otro = await http()
+        .post('/api/menu/products')
+        .set('Cookie', admin)
+        .send({ name: `Panaderia sin tilde ${seq}`, price: 10 })
+        .expect(201);
+      productos.push(otro.body.id);
+      expect(contiene(await buscar('?q=panadería'), otro.body)).toBe(true);
+    });
+
+    /**
+     * `?q=` es lo que manda un formulario cuando se borra la caja y se pulsa Enter. Tiene que
+     * significar «sin filtro», no «buscar la cadena vacía».
+     */
+    it('la cadena vacía no filtra', async () => {
+      const todos = await buscar('');
+      const conVacio = await buscar('?q=');
+      expect(conVacio).toHaveLength(todos.length);
+    });
+
+    /**
+     * Sin escapar, «%» buscaría «cualquier cosa» y devolvería el catálogo entero. Es la diferencia
+     * entre un buscador y un comodín accidental.
+     */
+    it('un % no actúa de comodín', async () => {
+      const todos = await buscar('');
+      const conPorcentaje = await buscar('?q=%25');
+      expect(conPorcentaje.length).toBeLessThan(todos.length);
+      expect(conPorcentaje.every((p) => p.name.includes('%'))).toBe(true);
+    });
+
+    /**
+     * La regresión que este bloque existe para atrapar. Escapar los comodines en TypeScript no
+     * basta: `unaccent` corre después y **fabrica** comodines nuevos —`unaccent('％')` es `%`—,
+     * así que buscar el porcentaje ancho devolvía el catálogo entero en vez de nada.
+     */
+    it('un comodín disfrazado de carácter ancho tampoco actúa de comodín', async () => {
+      const todos = await buscar('');
+      expect(await buscar(`?q=${encodeURIComponent('％')}`)).toHaveLength(0);
+      expect(await buscar(`?q=${encodeURIComponent('＿')}`)).toHaveLength(0);
+      expect(todos.length).toBeGreaterThan(0);
+    });
+
+    /**
+     * La categoría se elige de un desplegable, así que se compara por **igualdad** tolerante a
+     * acentos y no con un «contiene»: elegir «Bebidas» no puede arrastrar «Bebidas calientes».
+     */
+    it('la categoría es igualdad, no «contiene»', async () => {
+      const larga = await http()
+        .post('/api/menu/categories')
+        .set('Cookie', admin)
+        .send({ name: `${bebidas.name} y calientes` })
+        .expect(201);
+      categorias.push(larga.body.id);
+      const suyo = await http()
+        .post('/api/menu/products')
+        .set('Cookie', admin)
+        .send({ name: `Producto de la larga ${seq}`, price: 1, categoryId: larga.body.id })
+        .expect(201);
+      productos.push(suyo.body.id);
+
+      // El nombre de `bebidas` es un prefijo del de la categoría larga: con un «contiene»
+      // saldrían los dos productos.
+      // El nombre de `bebidas` es un prefijo del de la larga: con un «contiene», pedir la
+      // corta arrastraría también el producto de la larga.
+      const filas = await buscar(`?category=${encodeURIComponent(bebidas.name)}`);
+      expect(filas.some((p) => p.id === cafe.id)).toBe(true);
+      expect(filas.some((p) => p.id === suyo.body.id)).toBe(false);
+    });
+
+    it('filtra por el nombre de la categoría, no por su uuid', async () => {
+      // Escrito sin acentos y en minúsculas: la igualdad es tolerante, no literal.
+      const mal = bebidas.name.toLowerCase().replace(/í/g, 'i');
+      const filas = await buscar(`?category=${encodeURIComponent(mal)}`);
+      expect(contiene(filas, cafe)).toBe(true);
+    });
+
+    it('el filtro de categoría no se traga los productos sin categoría', async () => {
+      const huerfano = await http()
+        .post('/api/menu/products')
+        .set('Cookie', admin)
+        .send({ name: `Sin categoría ${seq}`, price: 5 })
+        .expect(201);
+      productos.push(huerfano.body.id);
+      // Sin filtro de categoría el LEFT JOIN tiene que seguir siendo LEFT.
+      expect(contiene(await buscar(''), huerfano.body)).toBe(true);
+    });
+
+    it('el tri-estado de activo: sin él salen todos', async () => {
+      const baja = await http()
+        .post('/api/menu/products')
+        .set('Cookie', admin)
+        .send({ name: `De baja ${seq}`, price: 5, isActive: false })
+        .expect(201);
+      productos.push(baja.body.id);
+
+      expect(contiene(await buscar(''), baja.body)).toBe(true);
+      expect(contiene(await buscar('?active=true'), baja.body)).toBe(false);
+      expect(contiene(await buscar('?active=false'), baja.body)).toBe(true);
+    });
+
+    it('un término larguísimo se rechaza en vez de poner a la base a masticar', async () => {
+      await http()
+        .get(`/api/menu/products?q=${'a'.repeat(200)}`)
+        .set('Cookie', admin)
+        .expect(400);
+    });
+
+    // `forbidNonWhitelisted` sigue en pie: añadir un DTO no puede abrir la puerta a cualquier cosa.
+    it('un parámetro no declarado sigue dando 400', async () => {
+      await http().get('/api/menu/products?foo=bar').set('Cookie', admin).expect(400);
+    });
+
+    it('categorías, modificadores y combos se filtran igual', async () => {
+      const cats = await http()
+        .get(`/api/menu/categories?q=${encodeURIComponent('bebidas frias')}`)
+        .set('Cookie', admin)
+        .expect(200);
+      expect((cats.body as { id: string }[]).some((c) => c.id === bebidas.id)).toBe(true);
+
+      const mod = await newModifier({ name: `Guarnición ${++seq}` });
+      const mods = await http()
+        .get('/api/menu/modifiers?q=guarnicion')
+        .set('Cookie', admin)
+        .expect(200);
+      expect((mods.body as { id: string }[]).some((m) => m.id === mod.id)).toBe(true);
     });
   });
 });

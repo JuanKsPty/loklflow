@@ -86,10 +86,7 @@ describe('Mesas, sectores y reservas', () => {
     });
 
     it('uno que no existe da 404, no 500', async () => {
-      await http()
-        .get(`/api/tables/sectors/${UUID_INEXISTENTE}`)
-        .set('Cookie', admin)
-        .expect(404);
+      await http().get(`/api/tables/sectors/${UUID_INEXISTENTE}`).set('Cookie', admin).expect(404);
     });
 
     it('un id que no es uuid da 400 antes de tocar la base', async () => {
@@ -265,10 +262,7 @@ describe('Mesas, sectores y reservas', () => {
         .send({ tableId: mesa.id, customerName: 'Ana', partySize: 4, reservedAt: enHoras(3) })
         .expect(201);
 
-      const listado = await http()
-        .get('/api/tables/reservations')
-        .set('Cookie', admin)
-        .expect(200);
+      const listado = await http().get('/api/tables/reservations').set('Cookie', admin).expect(200);
       expect((listado.body as { id: string }[]).some((r) => r.id === creada.body.id)).toBe(true);
 
       const editada = await http()
@@ -430,6 +424,49 @@ describe('Mesas, sectores y reservas', () => {
         .get(`/api/tables/reservations/${creada.body.id}`)
         .set('Cookie', admin)
         .expect(404);
+    });
+  });
+  /**
+   * Una mesa no tiene nombre: lo que se busca es su número, y como texto para que teclear «1»
+   * ofrezca la 1, la 10 y la 12 mientras se decide.
+   */
+  describe('filtros de los listados', () => {
+    const listarMesas = async (query = '') => {
+      const res = await http().get(`/api/tables${query}`).set('Cookie', admin).expect(200);
+      return res.body as { id: string; number: number; sectorId: string }[];
+    };
+
+    it('busca la mesa por su número, con un «contiene»', async () => {
+      const todas = await listarMesas();
+      const una = todas[0];
+      const filas = await listarMesas(`?q=${una.number}`);
+      expect(filas.some((m) => m.id === una.id)).toBe(true);
+      expect(filas.every((m) => String(m.number).includes(String(una.number)))).toBe(true);
+    });
+
+    it('filtra por sector', async () => {
+      const una = (await listarMesas())[0];
+      const filas = await listarMesas(`?sectorId=${una.sectorId}`);
+      expect(filas.length).toBeGreaterThan(0);
+      expect(filas.every((m) => m.sectorId === una.sectorId)).toBe(true);
+    });
+
+    it('la cadena vacía no filtra', async () => {
+      expect(await listarMesas('?q=')).toHaveLength((await listarMesas()).length);
+    });
+
+    it('los sectores se buscan por nombre', async () => {
+      const res = await http().get('/api/tables/sectors').set('Cookie', admin).expect(200);
+      const sector = (res.body as { id: string; name: string }[])[0];
+      const filtrados = await http()
+        .get(`/api/tables/sectors?q=${encodeURIComponent(sector.name.slice(0, 3))}`)
+        .set('Cookie', admin)
+        .expect(200);
+      expect((filtrados.body as { id: string }[]).some((s) => s.id === sector.id)).toBe(true);
+    });
+
+    it('un parámetro no declarado da 400', async () => {
+      await http().get('/api/tables?foo=bar').set('Cookie', admin).expect(400);
     });
   });
 });

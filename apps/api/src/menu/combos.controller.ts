@@ -9,12 +9,14 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { CombosService } from './combos.service';
 import { CreateComboDto } from './dto/create-combo.dto';
 import { UpdateComboDto } from './dto/update-combo.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
+import { QueryCombosDto } from './dto/query-combos.dto';
 
 @ApiTags('menu')
 @Controller('menu/combos')
@@ -23,8 +25,8 @@ export class CombosController {
 
   @Get()
   @RequirePermissions('menu:read')
-  findAll() {
-    return this.combosService.findAll();
+  findAll(@Query() query: QueryCombosDto) {
+    return this.combosService.findAll(query.q);
   }
 
   @Get(':id')

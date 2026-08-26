@@ -9,6 +9,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { TablesService } from './tables.service';
 import { CreateTableDto } from './dto/create-table.dto';
@@ -17,6 +18,7 @@ import { UpdateTableStatusDto } from './dto/update-table-status.dto';
 import { UpdateLayoutDto } from './dto/update-layout.dto';
 import { BulkCreateTableDto } from './dto/bulk-create-table.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
+import { QueryTablesDto } from './dto/query-tables.dto';
 import { Audit } from '../common/decorators/audit.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
 import { saneOccurredAt } from '../common/occurred-at';
@@ -28,8 +30,8 @@ export class TablesController {
 
   @Get()
   @RequirePermissions('tables:read')
-  findAll() {
-    return this.tablesService.findAll();
+  findAll(@Query() query: QueryTablesDto) {
+    return this.tablesService.findAll(query);
   }
 
   @Get(':id')

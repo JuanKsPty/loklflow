@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, QueryFailedError, Repository } from 'typeorm';
+import { MOVEMENTS_DEFAULT_TAKE, MOVEMENTS_MAX_TAKE } from './dto/query-movements.dto';
 import { Ingredient } from './entities/ingredient.entity';
 import { RecipeIngredient } from './entities/recipe-ingredient.entity';
 import { StockMovement } from './entities/stock-movement.entity';
@@ -38,7 +39,7 @@ export class StockService {
       where: filters.ingredientId ? { ingredientId: filters.ingredientId } : {},
       relations: { ingredient: true, supplier: true },
       order: { createdAt: 'DESC' },
-      take: Math.min(filters.take ?? 100, 500),
+      take: Math.min(filters.take ?? MOVEMENTS_DEFAULT_TAKE, MOVEMENTS_MAX_TAKE),
     });
   }
 

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
+import { matchesText, unaccentedLike } from '../common/search';
 import { Ingredient } from './entities/ingredient.entity';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { UpdateIngredientDto } from './dto/update-ingredient.dto';
@@ -20,8 +21,11 @@ export class IngredientsService {
    * el contador de un producto vendible y tiene su propia pantalla. Mezclarlos aquí llenaba el
    * editor de recetas de opciones que crean el doble descuento con dos clics.
    */
-  findAll() {
-    return this.ingredientsRepo.find({ where: { productId: IsNull() }, order: { name: 'ASC' } });
+  findAll(q?: string) {
+    return this.ingredientsRepo.find({
+      where: { productId: IsNull(), ...(q ? { name: matchesText(q) } : {}) },
+      order: { name: 'ASC' },
+    });
   }
 
   /**
@@ -31,16 +35,21 @@ export class IngredientsService {
    * objeto: TypeORM no compara columna contra columna sin `QueryBuilder`. Un mínimo en cero
    * queda fuera porque significa «no me avises de este», no «siempre bajo».
    */
-  findLowStock() {
-    return this.ingredientsRepo
+  findLowStock(q?: string) {
+    const qb = this.ingredientsRepo
       .createQueryBuilder('i')
       // Los espejos tienen su propio `?lowStock=true` en la pantalla de existencias.
       .where('i.product_id IS NULL')
       .andWhere('i.is_active = true')
       .andWhere('i.minimum_stock > 0')
       .andWhere('i.current_stock <= i.minimum_stock')
-      .orderBy('i.name', 'ASC')
-      .getMany();
+      .orderBy('i.name', 'ASC');
+
+    // El buscador vale también estando en «bajo mínimo»: si no, escribir en la caja te sacaba de
+    // la vista de compras, que es justo donde hace falta encontrar algo rápido.
+    if (q) qb.andWhere(unaccentedLike('i.name'), { q });
+
+    return qb.getMany();
   }
 
   async findOne(id: string) {

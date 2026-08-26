@@ -9,12 +9,14 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
+import { QueryCategoriesDto } from './dto/query-categories.dto';
 
 @ApiTags('menu')
 @Controller('menu/categories')
@@ -23,8 +25,8 @@ export class CategoriesController {
 
   @Get()
   @RequirePermissions('menu:read')
-  findAll() {
-    return this.categoriesService.findAll();
+  findAll(@Query() query: QueryCategoriesDto) {
+    return this.categoriesService.findAll(query.q);
   }
 
   @Get(':id')

@@ -3,6 +3,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
+import { buildHref } from '@/lib/url'
 
 /**
  * Paginación para Server Components: navega con <Link> sobre los searchParams, sin
@@ -10,20 +11,19 @@ import { buttonVariants } from '@/components/ui/button'
  * sobreviven al cambiar de página.
  */
 
-/** Construye el href de una página conservando los demás parámetros. */
+/**
+ * Construye el href de una página conservando los demás parámetros.
+ *
+ * La parte genérica vive en `lib/url.ts` desde que los filtros del panel la necesitan también;
+ * aquí solo queda lo propio de paginar, que es omitir `?page=1` para que la URL canónica de la
+ * primera página quede limpia.
+ */
 function pageHref(
   basePath: string,
   params: Record<string, string | undefined>,
   page: number,
 ): string {
-  const search = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== '' && key !== 'page') search.set(key, value)
-  }
-  // La primera página no lleva ?page=1, para que la URL canónica quede limpia.
-  if (page > 1) search.set('page', String(page))
-  const qs = search.toString()
-  return qs ? `${basePath}?${qs}` : basePath
+  return buildHref(basePath, { ...params, page: page > 1 ? page : undefined })
 }
 
 /**

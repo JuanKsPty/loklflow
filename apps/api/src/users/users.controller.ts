@@ -9,12 +9,14 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { toUserResponse } from './dto/user-response.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
+import { QueryUsersDto } from './dto/query-users.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
@@ -33,8 +35,8 @@ export class UsersController {
    */
   @Get()
   @RequirePermissions('users:read')
-  async findAll() {
-    return (await this.usersService.findAll()).map(toUserResponse);
+  async findAll(@Query() query: QueryUsersDto) {
+    return (await this.usersService.findAll(query)).map(toUserResponse);
   }
 
   @Get('operational')

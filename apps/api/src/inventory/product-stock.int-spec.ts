@@ -70,6 +70,7 @@ describe('Existencias por producto', () => {
     productId: string;
     name: string;
     price: number;
+    categoryName: string | null;
     tracked: boolean;
     currentStock: number | null;
     minimumStock: number | null;
@@ -118,13 +119,15 @@ describe('Existencias por producto', () => {
          FROM stock_movements WHERE ingredient_id = $1 ORDER BY created_at, id`,
       [ingredientId],
     );
-    return rows.map((r: Record<string, string>): Movimiento => ({
-      type: r.type,
-      quantity: Number(r.quantity),
-      previousStock: Number(r.previous_stock),
-      newStock: Number(r.new_stock),
-      reason: r.reason,
-    }));
+    return rows.map(
+      (r: Record<string, string>): Movimiento => ({
+        type: r.type,
+        quantity: Number(r.quantity),
+        previousStock: Number(r.previous_stock),
+        newStock: Number(r.new_stock),
+        reason: r.reason,
+      }),
+    );
   }
 
   describe('fijar el stock', () => {
@@ -274,7 +277,10 @@ describe('Existencias por producto', () => {
     it('el espejo no aparece entre los ingredientes', async () => {
       const row = (await setStock(4).expect(200)).body as Row;
 
-      const insumos = await http().get('/api/inventory/ingredients').set('Cookie', admin).expect(200);
+      const insumos = await http()
+        .get('/api/inventory/ingredients')
+        .set('Cookie', admin)
+        .expect(200);
       expect((insumos.body as { id: string }[]).some((i) => i.id === row.ingredientId)).toBe(false);
     });
 
@@ -394,6 +400,40 @@ describe('Existencias por producto', () => {
       await setStock(-5).expect(200);
       const bajos = await list('?lowStock=true');
       expect(bajos.some((r) => r.productId === product.id)).toBe(true);
+    });
+
+    it('`?q=` encuentra por un trozo del nombre, sin acentos ni mayúsculas', async () => {
+      const fila = rowOf(await list(), product.id);
+      // Un trozo del medio, en mayúsculas: prueba el «contiene» y la insensibilidad a la caja.
+      const trozo = fila.name.slice(1, 6).toUpperCase();
+      const filas = await list(`?q=${encodeURIComponent(trozo)}`);
+      expect(filas.some((r) => r.productId === product.id)).toBe(true);
+    });
+
+    it('`?q=` vacío no filtra', async () => {
+      expect(await list('?q=')).toHaveLength((await list()).length);
+    });
+
+    // Sin escapar, un `%` devolvería el catálogo entero y el buscador sería un comodín.
+    it('un % en el término no actúa de comodín', async () => {
+      expect((await list('?q=%25')).length).toBeLessThan((await list()).length);
+    });
+
+    /**
+     * `c.name` llevaba tiempo seleccionada para pintar la columna «Categoría» y no se podía
+     * filtrar por ella. Se busca por **nombre**, no por uuid: es lo que hace que la vista
+     * filtrada sea una URL que se pueda mandar por mensaje.
+     */
+    it('`?category=` filtra por el nombre de la categoría', async () => {
+      const conCategoria = (await list()).find((r) => r.categoryName);
+      if (!conCategoria?.categoryName) return;
+      const filas = await list(`?category=${encodeURIComponent(conCategoria.categoryName)}`);
+      expect(filas.length).toBeGreaterThan(0);
+      expect(filas.every((r) => r.categoryName === conCategoria.categoryName)).toBe(true);
+    });
+
+    it('un parámetro no declarado sigue dando 400', async () => {
+      await http().get('/api/inventory/products?foo=bar').set('Cookie', admin).expect(400);
     });
 
     it('`?tracked=false` devuelve justo los que aún no llevan stock', async () => {
@@ -541,10 +581,9 @@ describe('Existencias por producto', () => {
         servicio.setStock(product.id, { newStock: 5, reasonCode: 'count' }, adminId),
       ]);
 
-      const espejos = await ds.query(
-        `SELECT id FROM ingredients WHERE product_id = $1`,
-        [product.id],
-      );
+      const espejos = await ds.query(`SELECT id FROM ingredients WHERE product_id = $1`, [
+        product.id,
+      ]);
       expect(espejos).toHaveLength(1);
     });
   });

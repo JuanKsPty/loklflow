@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
+import { matchesNumberText } from '../common/search';
 import { Product } from '../menu/entities/product.entity';
 import { ModifierOption } from '../menu/entities/modifier-option.entity';
 import { Order } from './entities/order.entity';
@@ -80,6 +81,7 @@ export class OrdersService {
       // `open` y `status` son compatibles: si llegan los dos, manda el estado concreto.
       ...(filters?.open && !filters.status ? { status: In(OPEN_STATUSES) } : {}),
       ...(filters?.since ? { updatedAt: MoreThan(new Date(filters.since)) } : {}),
+      ...(filters?.q ? { orderNumber: matchesNumberText(filters.q) } : {}),
     };
 
     return this.ordersRepo.find({
