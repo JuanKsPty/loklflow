@@ -10,19 +10,23 @@
 export function ResultCount({
   shown,
   total,
-  noun = 'resultados',
+  one,
+  many,
   capped = false,
 }: {
   shown: number;
   /** Sin filtros, el total. Si no se conoce, se omite y solo se dice cuántos se ven. */
   total?: number;
-  noun?: string;
+  /** Singular y plural por separado: «1 productos» se lee como un error de la aplicación. */
+  one: string;
+  many: string;
   capped?: boolean;
 }) {
-  const filtrado = total !== undefined && shown !== total;
+  const sustantivo = shown === 1 ? one : many;
+  const parcial = total !== undefined && shown !== total;
   return (
     <p className="text-sm text-muted-foreground tabular-nums" aria-live="polite" role="status">
-      {filtrado ? `${shown} de ${total} ${noun}` : `${shown} ${noun}`}
+      {parcial ? `${shown} de ${total} ${many}` : `${shown} ${sustantivo}`}
       {capped && ' · mostrando los más recientes'}
     </p>
   );

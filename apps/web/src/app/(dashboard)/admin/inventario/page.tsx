@@ -207,7 +207,8 @@ export default async function InventoryPage({ searchParams }: Props) {
                 <ResultCount
                   shown={visibleProducts.length}
                   total={products.length}
-                  noun="productos"
+                  one="producto"
+                  many="productos"
                 />
               </>
             )}
@@ -284,7 +285,8 @@ export default async function InventoryPage({ searchParams }: Props) {
                 <MovementTable movements={movements} />
                 <ResultCount
                   shown={movements.length}
-                  noun="movimientos"
+                  one="movimiento"
+                  many="movimientos"
                   capped={movements.length >= MOVIMIENTOS_TAKE}
                 />
               </>
