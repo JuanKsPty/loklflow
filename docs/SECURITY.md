@@ -3,10 +3,13 @@
 Revisión sobre el OWASP Top 10 (2021): qué hace el código hoy, el archivo que lo demuestra, y el
 **riesgo residual** con la decisión que hay detrás.
 
-El contexto importa para leer las decisiones: el servidor vive **dentro del establecimiento**, hay
-**una sola instancia**, los usuarios son empleados con tablets compartidas, y el sistema es una caja
-registradora — **dejar a todo el salón fuera a mitad de servicio es un fallo peor que casi
-cualquier otro**. Varias decisiones de abajo se explican solo con eso.
+El contexto importa para leer las decisiones: la aplicación está **expuesta a internet**, tras un
+proxy inverso y en un solo origen —no dentro de la red del local, como decía la versión anterior de
+este documento—, hay **una sola instancia**, los usuarios son empleados con tablets compartidas, y
+el sistema es una caja registradora — **dejar a todo el salón fuera a mitad de servicio es un fallo
+peor que casi cualquier otro**. Varias decisiones de abajo se explican solo con eso, con un límite
+que el cambio de arquitectura vuelve explícito: **ninguna puede apoyarse en «desde fuera no se
+llega»**.
 
 ---
 

@@ -8,7 +8,7 @@
 
 ![Status](https://img.shields.io/badge/estado-en%20desarrollo-yellow?style=flat-square)
 ![License](https://img.shields.io/badge/licencia-MIT-blue?style=flat-square)
-![Phase](https://img.shields.io/badge/fase%20actual-4%20%E2%80%94%20Offline%20y%20Resiliencia-blue?style=flat-square)
+![Phase](https://img.shields.io/badge/fases-6%2F6%20completadas-success?style=flat-square)
 ![Stack](https://img.shields.io/badge/stack-NestJS%20%7C%20Next.js%20%7C%20PostgreSQL-informational?style=flat-square)
 ![Monorepo](https://img.shields.io/badge/monorepo-Turborepo-EF4444?style=flat-square&logo=turborepo)
 
@@ -18,9 +18,11 @@
 
 ## ¿Qué es LoklFlow?
 
-LoklFlow es una plataforma web de gestión operativa para establecimientos de alimentos y bebidas, con **servidor local e idempotente por diseño**. Centraliza en un solo sistema todo lo que necesita un negocio para operar: órdenes, menú, inventario, caja, roles de personal y reportes.
+LoklFlow es una plataforma web de gestión operativa para establecimientos de alimentos y bebidas, **idempotente por diseño**. Centraliza en un solo sistema todo lo que necesita un negocio para operar: órdenes, menú, inventario, caja, roles de personal y reportes.
 
-El servidor corre dentro del establecimiento y no en la nube, así que **una caída del enlace a internet no interrumpe la operación**. Aguantar que se caiga la propia red interna es otra cosa, y está a medias a propósito: el contrato del servidor está construido y probado —el uuid que genera el dispositivo es la clave primaria de la orden, los pagos aceptan `clientRequestId`, `order_number` sale de una secuencia—, pero **el runtime sin conexión del cliente todavía no existe**. Eso es la fase 4 y está al 15 %.
+Que la operación no se detenga cuando se cae la red **ya no depende de dónde esté el servidor: depende del dispositivo**. Cada tablet guarda el cascarón de la aplicación en un Service Worker y una copia del salón en IndexedDB, encola lo que no pudo enviar y lo reenvía sola cuando vuelve el camino. El servidor acepta esos reenvíos sin duplicar nada —el uuid lo acuña el dispositivo y es la clave primaria de la comanda, los pagos llevan `clientRequestId`, `order_number` sale de una secuencia de Postgres—, así que reintentar es seguro por construcción y no por suerte.
+
+Lo que mueve dinero —cobrar, abrir o cerrar turno, aprobar un descuento— **exige red a propósito**, y cuando no la hay la pantalla enseña el motivo en lugar de un «Error». El porqué de cada caso está escrito en [`docs/OFFLINE.md`](./docs/OFFLINE.md).
 
 ---
 
@@ -28,42 +30,70 @@ El servidor corre dentro del establecimiento y no en la nube, así que **una ca�
 
 | Capa | Tecnología |
 |------|-----------|
-| **Monorepo** | Turborepo |
-| **Backend** | NestJS · TypeScript · PostgreSQL · Redis |
-| **Frontend** | Next.js · TypeScript · Tailwind CSS |
-| **Infra** | Docker Compose (PostgreSQL + Redis) |
-| **Calidad** | ESLint 10 (flat config) · TypeScript strict · Jest (unitarios + integración) |
-| **CI** | GitHub Actions · imágenes de Docker de las dos apps |
+| **Monorepo** | Turborepo · pnpm workspaces |
+| **Backend** | NestJS 11 · TypeScript · TypeORM · PostgreSQL 16 · Socket.io |
+| **Frontend** | Next.js 16 (App Router) · React 19 · Tailwind CSS 4 · Dexie (IndexedDB) · Service Worker escrito a mano |
+| **Infra** | Docker Compose en desarrollo · una imagen por app, construidas desde la raíz del monorepo |
+| **Calidad** | ESLint 10 (flat config) · TypeScript strict · Jest (unitarias + integración) · Vitest · Playwright (e2e, a11y y móvil) |
+| **CI** | GitHub Actions · tres jobs, incluidas las dos imágenes de Docker arrancadas de verdad |
+
+> Redis está declarado (`ioredis`, `config/redis.config.ts`) y levantado por el `docker-compose` de
+> desarrollo, pero **nadie conecta a él**: es la pieza que hará falta el día que haya más de una
+> instancia de la API —el adaptador de Socket.io y el almacén del throttler—. Hoy ni el CI ni un
+> despliegue lo necesitan, y decirlo aquí evita que alguien lo dé por usado.
 
 ---
 
 ## Arquitectura
 
 ```
-                    ☁️  NUBE
-                 (Dashboard remoto
-                  + Menú QR público
-                  + Backup automático)
-                        │
-              sync cuando hay internet
-                        │
-          ┌─────────────▼────────────┐
-          │    SERVIDOR LOCAL         │
-          │   NestJS + PostgreSQL     │  ← Corre en el establecimiento
-          │   Redis + Socket.io       │  ← Con UPS de respaldo
-          └─────────────┬────────────┘
-                        │
-                  Red WiFi interna
-                        │
-        ┌───────┬────────┴───────┬──────────┐
-        │       │                │          │
-      POS    Mesero           Cocina     Cliente
-    (caja)  (móvil)        (pantalla)    (QR)
+       POS (caja)     Mesero (móvil)     Cocina (KDS)     Cliente (QR)
+            │                │                 │                │
+            └────────────────┴────────┬────────┴────────────────┘
+                                      │
+                                      │  un solo origen — HTTP y WebSocket
+                                      ▼
+                      ┌──────────────────────────────────────┐
+                      │  Proxy inverso                       │
+                      │    /api  ·  /socket.io   →  NestJS   │
+                      │    todo lo demás         →  Next.js  │
+                      └───────────────┬──────────────────────┘
+                                      │
+                ┌─────────────────────┴─────────────────────┐
+                │                                           │
+        ┌───────▼────────────────┐              ┌───────────▼────────────┐
+        │  Next.js               │              │  NestJS                │
+        │  cascarón de las       │─────────────▶│  API REST + Socket.io  │──▶  PostgreSQL
+        │  vistas, con la sesión │   la cookie  │  guards por permiso    │
+        └────────────────────────┘              └────────────────────────┘
 ```
 
-El sistema opera **sin depender de internet**: servidor, base de datos y clientes viven en la misma red interna, y la nube sólo hace falta para el tablero remoto y el respaldo.
+Es **una** aplicación: una base de datos, dos procesos y un solo origen. El menú por QR no es un
+servicio aparte, sino la superficie pública de la misma API (`src/public/`), con DTOs propios para
+no filtrar lo que las entidades llevan dentro.
 
-Lo que **todavía no** hace, y conviene decirlo aquí y no en la letra chica: si se cae la red interna o el servidor, los clientes no siguen trabajando. Las 42 pantallas son Server Components que piden datos sin caché, así que hoy no renderizan sin servidor, y no hay Service Worker ni base de datos en el cliente ni cola de sincronización. Lo que sí está hecho es la mitad del servidor, que es la que no se puede añadir después: reenviar una operación devuelve el estado en lugar de duplicar el cobro, y eso está afirmado por pruebas de integración contra un PostgreSQL real.
+El origen único no es una preferencia de infraestructura, es un requisito del código: la cookie de
+sesión se emite `sameSite: 'strict'` y **sin atributo `domain`**, y quien la lee es el servidor de
+Next —el middleware de `proxy.ts` y `server-client.ts`—. Con la API en otro subdominio esa cookie
+sería host-only del suyo, el middleware no la vería nunca y toda ruta protegida rebotaría a
+`/login`. Hay además un salto que el diagrama no dibuja: para pintar el HTML, el servidor de Next
+llama a la API con la cookie de esa misma petición; el navegador, en paralelo, habla directo con
+`/api` para todo lo que muta.
+
+Dónde vive el conjunto es una decisión de despliegue y no de código: son las mismas dos imágenes
+de Docker sobre un VPS o sobre una máquina dentro del propio local, y lo único que cambia es quién
+resuelve el dominio. Hoy corre sobre Dokploy tras Traefik ([Despliegue](#despliegue)).
+
+**Sin red, las tres superficies operativas siguen en pie.** `/waiter`, `/kitchen` y `/pos` son
+cascarón de servidor más vista de cliente sobre la copia local, así que renderizan sin servidor y
+lo que el operario toca se encola con su clave de idempotencia ya acuñada. El resto del panel
+—altas, edición, reportes, métricas— no: pide datos al servidor y lo dice con palabras cuando no
+puede, distinguiendo «la API no contesta» de «la API contestó mal», que llevan a acciones
+distintas.
+
+Lo que **no** existe, y conviene decirlo aquí y no en la letra chica: no hay capa de sincronización
+con una nube, ni tablero remoto aparte, ni respaldo automático, ni multi-sucursal. El respaldo es
+el de la base de datos y es responsabilidad del entorno donde esté desplegada.
 
 ---
 
@@ -94,7 +124,7 @@ Detalle completo en [docs/ROADMAP.md](./docs/ROADMAP.md).
 
 ```
 Fase 0 ████████████████████ 100%  — Completada
-Fase 1 ████████████████████ 100%  — Completada (desplegado en producción)
+Fase 1 ████████████████████ 100%  — Completada (auth, RBAC, CI y despliegue)
 Fase 2 ████████████████████ 100%  — Completada (incluida la fusión de mesas)
 Fase 3 ████████████████████ 100%  — Completada
 Fase 4 ████████████████████ 100%  — Completada (offline y sincronización)
@@ -103,7 +133,8 @@ Fase 6 ████████████████████ 100%  — Co
 ```
 
 Diferidos a conciencia, no olvidados: envío del recibo por correo y exportación a PDF/Excel
-(Fase 3). El resto del alcance está entregado.
+(Fase 3). El resto del alcance está entregado, y lo que entra ahora es trabajo de producto sobre
+esa base.
 
 ### El sistema en marcha
 
@@ -122,7 +153,7 @@ Diferidos a conciencia, no olvidados: envío del recibo por correo y exportació
 
 | Módulo | Descripción |
 |--------|-------------|
-| **Auth + RBAC** | Login email/PIN, JWT + refresh, roles y permisos granulares, panel admin, auditoría |
+| **Auth + RBAC** | Login email/PIN, JWT + refresh, roles y permisos granulares, panel admin, auditoría. Cambiar un rol o desactivar a alguien invalida sus sesiones vivas por versión de token |
 | **Menú** | Categorías, productos, modificadores, combos y disponibilidad por horario |
 | **Mesas y Sectores** | Sectores, mesas (número único global, estados), reservas y **editor visual de distribución** (drag-and-drop, zonas, formas, creación masiva) |
 | **Órdenes** | Órdenes con ítems y modificadores, cálculo de totales, flujo de estados con historial de transiciones |
@@ -131,17 +162,22 @@ Diferidos a conciencia, no olvidados: envío del recibo por correo y exportació
 | **KDS de cocina** | Pantalla dedicada (`/kitchen`, login por PIN): tablero por columnas (pendientes/en preparación/listas) con tiempo transcurrido, avance por orden en vivo |
 | **Notificaciones** | Avisos persistidos entre roles (campana con no leídas + bandeja): cocina recibe órdenes nuevas, el mesero recibe "orden lista"; push por WebSocket y persistencia en BD |
 | **Caja / POS** | Cobro de cuentas (`/pos` del cajero y desde la cuenta del mesero): múltiples métodos, split en pagos parciales, propina; cierra la cuenta y libera la mesa automáticamente |
+| **Venta de mostrador** | `/admin/venta`: despachar y cobrar en el mismo gesto, sin mesa ni comanda. El catálogo llega con sus existencias en una sola petición y toda la venta viaja en una sola llamada; exige turno abierto, igual que cualquier otro cobro |
 | **Turnos de caja** | Apertura/cierre de turno por cobrador con fondo inicial; cada pago se sella al turno y el cobro exige turno abierto; al cerrar, arqueo automático (ventas por método, efectivo esperado vs. contado y diferencia) |
 | **Descuentos** | Umbral por rol: si el descuento cabe en el límite se aplica al instante, si lo excede queda pendiente y le llega un aviso al gerente, que lo resuelve en `/admin/approvals`. Motivo obligatorio y todo el flujo auditado. Se rechaza si dejaría el total por debajo de lo ya cobrado |
 | **Recibo** | Vista de 80 mm en `/recibo/[id]` con los datos fiscales del negocio, desglose del IVA contenido en el precio y los pagos registrados; impresión directa del navegador, sin librerías |
 | **Panel de métricas** | `/admin` con ventas cobradas, ticket promedio, cuentas abiertas, tiempo medio de preparación, top de productos y reparto por método de pago; se actualiza en vivo al cerrar una cuenta |
 | **Reportes** | Exportación de ventas a CSV por rango de fechas (con BOM y CRLF para Excel) |
-| **Auditoría** | 18 acciones críticas con actor, IP y valor anterior; consulta paginada y filtrable en `/admin/audit`. Las credenciales se redactan antes de persistir |
-| **Idempotencia** | Preparación del modo sin conexión: el uuid que genera el dispositivo es la clave primaria de la orden y de sus ítems, y los pagos aceptan `clientRequestId`. Reenviar una operación devuelve el estado en lugar de duplicar la cuenta o el cobro. `order_number` sale de una secuencia de Postgres |
+| **Auditoría** | Las acciones críticas con actor, IP y valor anterior; consulta paginada y filtrable en `/admin/audit`. Las credenciales se redactan antes de persistir |
+| **Idempotencia** | El uuid que genera el dispositivo es la clave primaria de la orden y de sus ítems, y los pagos aceptan `clientRequestId`. Reenviar una operación devuelve el estado en lugar de duplicar la cuenta o el cobro. `order_number` sale de una secuencia de Postgres |
 | **Inventario** | Ingredientes con unidad y mínimo, proveedores, recetas por producto y movimientos de stock (entrada, merma, ajuste). El cierre de cuenta descuenta el consumo de forma idempotente, así que un cobro reenviado no resta dos veces |
+| **Existencias por producto** | Stock del producto terminado —lo que se vende en barra— sin montar un segundo motor de stock. La mercancía **entra por cajas** («6 cajas × 24») y una entrada **suma** sobre la fila bloqueada en vez de fijar el total: una venta que se cierre en ese mismo instante no se pierde |
+| **Catálogo por CSV** | Importación con previsualización y plantilla descargable, y exportación en ese mismo formato. El lector de CSV está escrito a mano, así que el navegador no carga una librería para leer un archivo de texto |
+| **Búsqueda y filtrado** | Todos los listados del panel aceptan `?q=`, más los filtros propios de cada uno (categoría, sector, estado…). La comparación vive en un solo sitio (`common/search.ts`) y **ignora acentos y mayúsculas** con la extensión `unaccent`. Los filtros viven **en la URL**: una vista filtrada es un enlace que se guarda y se manda |
 | **Modo sin conexión** | Cola de operaciones en IndexedDB con orden por cuenta, reintentos con espera creciente y cerrojo entre pestañas; las tres superficies operativas leen del dispositivo y siguen funcionando con la API caída. Cobrar y abrir turno siguen exigiendo red **a propósito**. Documentado en [`docs/OFFLINE.md`](./docs/OFFLINE.md) |
 | **Menú QR** | Código por mesa con rotación e impresión en hoja; el cliente abre `/m/[código]`, ve el menú filtrado por disponibilidad horaria y pide desde su teléfono sin instalar nada ni tener cuenta. Seguimiento del pedido con un token de invitado que caduca |
 | **Fusión de cuentas** | Juntar varias cuentas en una antes de cobrar, con deshacer exacto. Las cuentas fusionadas quedan fuera de los listados y de los reportes, que si no contarían las ventas dos veces |
+| **Observabilidad** | Un JSON por línea, id de petición que viaja en la cabecera y en el cuerpo del error, `/api/health` que no toca la base y `/api/ready` que sí. El CI lo comprueba sobre la imagen en marcha |
 | **CI/CD** | Tres jobs en GitHub Actions: lint, tipos, pruebas unitarias, build y dos suites de e2e en un navegador de verdad · integración contra un Postgres real, con las migraciones aplicadas desde cero y umbral de cobertura · construcción de las dos imágenes de Docker, que se arrancan para comprobar salud, cabeceras, formato del log y estáticos |
 
 > **API documentada** con Swagger en `/api/docs`. Solo fuera de producción.
@@ -179,40 +215,47 @@ loklflow/
 │   │       ├── auth/           # JWT + refresh, login por email y por PIN
 │   │       ├── users/
 │   │       ├── roles/          # RBAC granular por módulo:acción
+│   │       ├── token-version/  # invalida sesiones vivas al cambiar un rol
 │   │       ├── business-config/
 │   │       ├── audit/
-│   │       ├── menu/           # categorías, productos, modificadores, combos
-│   │       ├── tables/         # sectores, mesas, reservas
-│   │       ├── orders/
+│   │       ├── menu/           # categorías, productos, combos, import/export CSV
+│   │       ├── tables/         # sectores, mesas, reservas, QR
+│   │       ├── orders/         # comandas y fusión de cuentas
 │   │       ├── payments/       # cobro, split, propina
 │   │       ├── shifts/         # turnos de caja y arqueo
 │   │       ├── notifications/
 │   │       ├── discounts/      # umbral por rol y aprobaciones
-│   │       ├── inventory/      # ingredientes, proveedores, recetas y stock
+│   │       ├── inventory/      # ingredientes, proveedores, recetas y existencias
 │   │       ├── reports/        # agregados y exportación a CSV
 │   │       ├── public/         # menú QR: la única superficie anónima
 │   │       ├── realtime/       # gateway de Socket.io
-│   │       ├── common/         # guards, decoradores, filtros, pipes
+│   │       ├── common/         # guards, filtros, pipes, búsqueda (search.ts) y CSV
+│   │       ├── config/         # entorno: base de datos, JWT, redis
 │   │       └── database/       # migraciones y seeds
 │   └── web/                    # Frontend Next.js
 │       ├── Dockerfile          # salida standalone
+│       ├── e2e/                # Playwright: núcleo sin conexión, servicio, a11y y móvil
+│       ├── public/             # Service Worker, manifiesto e iconos
 │       └── src/
+│           ├── proxy.ts        # middleware: rutas protegidas y públicas
 │           ├── app/
 │           │   ├── (auth)/     # login y login por PIN
-│           │   ├── (dashboard)/admin/   # panel de administración
+│           │   ├── (dashboard)/admin/   # panel: menú, mesas, inventario, venta, roles…
 │           │   ├── (print)/    # recibo de 80 mm, sin barra ni cabecera
+│           │   ├── (public)/m/ # menú QR, sin sesión
 │           │   ├── pos/        # vista del cajero
 │           │   ├── waiter/     # vista del mesero (móvil)
-│           │   └── kitchen/    # KDS de cocina
-│           │   └── (public)/m/ # menú QR, sin sesión
-│           ├── components/     # incluye ui/ (shadcn) por app
+│           │   ├── kitchen/    # KDS de cocina
+│           │   └── offline/    # respaldo que sirve el Service Worker
+│           ├── components/     # incluye ui/ (shadcn) y admin/filters/
 │           ├── hooks/
+│           ├── stores/
 │           └── lib/
-│               ├── offline/    # cola, caché local y superposición de pendientes
-│               ├── api/
+│               ├── offline/    # cola, copia local y superposición de pendientes
+│               ├── api/        # cliente del navegador y del servidor de Next
+│               ├── csv/        # lector y escritor propios
+│               ├── url.ts      # los filtros del panel viven en la URL
 │               └── observability/
-│       ├── e2e/                # Playwright: núcleo sin conexión y servicio completo
-│       └── public/             # Service Worker, manifiesto e iconos
 ├── packages/
 │   ├── types/                  # tipos TypeScript compartidos
 │   └── config/                 # ESLint flat config y TSConfig base
@@ -257,6 +300,15 @@ pnpm dev
 pnpm dev --filter=api
 pnpm dev --filter=web
 ```
+
+En desarrollo el esquema se sincroniza solo (`synchronize: true` cuando
+`NODE_ENV=development`). Fuera de desarrollo se aplica **solo** con migraciones — nunca con
+`synchronize`.
+
+> Correr `migration:run` **también en desarrollo** no es opcional aunque `synchronize` ya haya
+> creado las tablas: `synchronize` construye el esquema pero no ejecuta migraciones, y la
+> extensión `unaccent` llega en una de ellas. Sin ella toda búsqueda del panel revienta con
+> `function unaccent(text) does not exist`.
 
 ### Calidad
 
@@ -310,11 +362,7 @@ optimizaciones que hizo la Fase 6 fueron tres, y las tres tienen un motivo concr
 - `/pos` pedía el turno de caja **dos veces** en cada carga: el layout y la página. Ahora
   comparten un helper envuelto en `cache()` de React.
 - Diez `loading.tsx` cubren las rutas que hacen entre dos y seis peticiones antes de pintar. No
-  las 26 pantallas de alta y edición: un esqueleto para cuarenta milisegundos es un parpadeo.
-
-En desarrollo el esquema se sincroniza solo (`synchronize: true` cuando
-`NODE_ENV=development`). Fuera de desarrollo el esquema se aplica **solo** con
-migraciones — nunca con `synchronize`.
+  las pantallas de alta y edición: un esqueleto para cuarenta milisegundos es un parpadeo.
 
 ---
 
