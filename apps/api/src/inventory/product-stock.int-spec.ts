@@ -96,6 +96,14 @@ describe('Existencias por producto', () => {
       .send({ newStock, reasonCode, ...(note ? { note } : {}) });
   }
 
+  // Sin `async`, igual que `setStock`: devuelve la cadena de supertest.
+  function entrada(quantity: number, note?: string, cookie = admin) {
+    return http()
+      .post(`/api/inventory/products/${product.id}/stock/entry`)
+      .set('Cookie', cookie)
+      .send({ quantity, ...(note ? { note } : {}) });
+  }
+
   interface Movimiento {
     type: string;
     quantity: number;
@@ -170,6 +178,95 @@ describe('Existencias por producto', () => {
 
     it('un motivo que no es de los tres se rechaza', async () => {
       await setStock(1, 'porque sí').expect(400);
+    });
+  });
+
+  describe('entrada de mercancía', () => {
+    it('sobre un producto sin seguimiento crea el espejo y lo deja en 144', async () => {
+      const row = (await entrada(144).expect(201)).body as Row;
+
+      expect(row.tracked).toBe(true);
+      expect(row.currentStock).toBe(144);
+      // `entry` y no `adjustment`: es el único tipo que admite proveedor y costo, y el único que
+      // un reporte de compras podría filtrar sin leer el texto del motivo.
+      expect(await movements(row.ingredientId!)).toEqual([
+        { type: 'entry', quantity: 144, previousStock: 0, newStock: 144, reason: 'Compra' },
+      ]);
+    });
+
+    it('la segunda entrada **suma**, no reemplaza', async () => {
+      await entrada(144).expect(201);
+      const row = (await entrada(24).expect(201)).body as Row;
+
+      expect(row.currentStock).toBe(168);
+      expect((await movements(row.ingredientId!)).map((m) => m.quantity)).toEqual([144, 24]);
+    });
+
+    it('la nota explica el número en el libro mayor', async () => {
+      const row = (await entrada(144, '6 cajas × 24').expect(201)).body as Row;
+      expect((await movements(row.ingredientId!))[0].reason).toBe('Compra · 6 cajas × 24');
+    });
+
+    it('suma sobre lo que hay, no sobre lo que la pantalla leyó', async () => {
+      await setStock(12).expect(200);
+      const row = (await entrada(24).expect(201)).body as Row;
+      expect(row.currentStock).toBe(36);
+    });
+
+    /**
+     * La razón de ser del endpoint.
+     *
+     * Con «llegó mercancía» escrito como un `PUT` al total, la pantalla mandaba `12 + 24`: el 12 lo
+     * había leído al abrir el diálogo, así que lo que saliera del stock entre medias
+     * **desaparecía** y el libro mayor no dejaba ninguna señal. Aquí viaja el delta, y el delta lo
+     * aplica `apply` con la fila ya bloqueada.
+     *
+     * No se afirma una ordenación —quién llega primero es justo lo que una carrera no garantiza—,
+     * sino la invariante: los dos movimientos existen, la cadena `previous → new` es continua, y
+     * la salida sigue restando. 12 − 1 + 24 = 35 salga en el orden que salga.
+     */
+    it('una entrada mientras sale otro movimiento no se lo traga', async () => {
+      await setStock(12).expect(200);
+      const row = rowOf(await list(), product.id);
+
+      const stock = app.get(StockService);
+      const servicio = app.get(ProductStockService);
+      await Promise.all([
+        servicio.addEntry(product.id, { quantity: 24 }, adminId),
+        stock.record(
+          { ingredientId: row.ingredientId!, type: 'waste', quantity: 1, reason: 'rotura' },
+          adminId,
+        ),
+      ]);
+
+      const movs = await movements(row.ingredientId!);
+      expect(movs).toHaveLength(3);
+      for (let i = 1; i < movs.length; i++) {
+        expect(movs[i].previousStock).toBe(movs[i - 1].newStock);
+      }
+      expect(rowOf(await list(), product.id).currentStock).toBe(35);
+    });
+
+    it('una entrada de cero se rechaza: «llegaron cero» no es un hecho', async () => {
+      await entrada(0).expect(400);
+    });
+
+    it('un producto que descuenta por receta no puede recibir entradas', async () => {
+      const insumo = await crearInsumo();
+      await http()
+        .put(`/api/inventory/recipes/${product.id}`)
+        .set('Cookie', admin)
+        .send({ lines: [{ ingredientId: insumo, quantity: 1 }] })
+        .expect(200);
+
+      const res = await entrada(24);
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/receta/i);
+    });
+
+    it('exige inventory:update, no basta con poder leer', async () => {
+      const soloLectura = await sessionAs(app, 'admin@loklflow.com', ['inventory:read']);
+      await entrada(24, undefined, soloLectura).expect(403);
     });
   });
 

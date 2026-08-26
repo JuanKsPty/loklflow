@@ -22,6 +22,7 @@ import { UpdateIngredientDto } from './dto/update-ingredient.dto';
 import { CreateMovementDto } from './dto/create-movement.dto';
 import { SetRecipeDto } from './dto/set-recipe.dto';
 import { SetStockDto } from './dto/set-stock.dto';
+import { AddStockEntryDto } from './dto/add-stock-entry.dto';
 import { QueryProductStockDto } from './dto/query-product-stock.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -63,6 +64,24 @@ export class InventoryController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.productStock.setStock(productId, dto, user.sub);
+  }
+
+  /**
+   * «Llegó mercancía.» **Suma** lo que llegó, no fija un total.
+   *
+   * Ruta propia y no un `POST` sobre `products/:id/stock` a secas: distinguir «suma» de «fija»
+   * solo por el verbo HTTP es justo el matiz que se lee mal a las once de la noche. `POST` porque
+   * **no** es idempotente —reenviarla suma dos veces—, igual que `POST movements`; la pantalla lo
+   * cubre deshabilitando el botón mientras envía.
+   */
+  @Post('products/:productId/stock/entry')
+  @RequirePermissions('inventory:update')
+  addProductStockEntry(
+    @Param('productId', ParseUuidPipe) productId: string,
+    @Body() dto: AddStockEntryDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.productStock.addEntry(productId, dto, user.sub);
   }
 
   // Baja lógica del espejo, no borrado: el libro mayor tiene que sobrevivir.

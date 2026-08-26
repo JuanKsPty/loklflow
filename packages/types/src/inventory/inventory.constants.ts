@@ -45,3 +45,14 @@ export const STOCK_SET_REASON_PROMPTS: Record<StockSetReason, string> = {
   purchase: 'Llegó mercancía',
   waste: 'Se dañó o se perdió',
 };
+
+/**
+ * Cuántas unidades trae una caja, por defecto.
+ *
+ * Es el cartón de cerveza, que es de lo único que se compra por caja en un local así. Vive aquí
+ * y **no en la base de datos** a propósito: es el valor con el que arranca la calculadora de la
+ * pantalla de existencias, y quien la usa puede cambiarlo en el momento —hay cartones de 20, de
+ * 12 y de 6—. Lo que viaja al servidor es siempre el total ya multiplicado, así que ningún dato
+ * guardado depende de este número.
+ */
+export const DEFAULT_UNITS_PER_PACK = 24;
