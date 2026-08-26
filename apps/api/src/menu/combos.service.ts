@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { matchesText } from '../common/search';
 import { Combo } from './entities/combo.entity';
 import { ComboItem } from './entities/combo-item.entity';
 import { Product } from './entities/product.entity';
@@ -16,8 +17,9 @@ export class CombosService {
     private productsRepo: Repository<Product>,
   ) {}
 
-  findAll() {
+  findAll(q?: string) {
     return this.combosRepo.find({
+      where: q ? { name: matchesText(q) } : {},
       relations: { items: { product: true } },
       order: { name: 'ASC' },
     });

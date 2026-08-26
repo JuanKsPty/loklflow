@@ -9,12 +9,14 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ModifiersService } from './modifiers.service';
 import { CreateModifierDto } from './dto/create-modifier.dto';
 import { UpdateModifierDto } from './dto/update-modifier.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { ParseUuidPipe } from '../common/pipes/parse-uuid.pipe';
+import { QueryModifiersDto } from './dto/query-modifiers.dto';
 
 @ApiTags('menu')
 @Controller('menu/modifiers')
@@ -23,8 +25,8 @@ export class ModifiersController {
 
   @Get()
   @RequirePermissions('menu:read')
-  findAll() {
-    return this.modifiersService.findAll();
+  findAll(@Query() query: QueryModifiersDto) {
+    return this.modifiersService.findAll(query.q);
   }
 
   @Get(':id')

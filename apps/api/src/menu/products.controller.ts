@@ -11,6 +11,7 @@ import {
   Patch,
   Post,
   StreamableFile,
+  Query,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -21,6 +22,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Audit } from '../common/decorators/audit.decorator';
 import { ProductsImportService } from './products-import.service';
 import { ImportProductsDto } from './dto/import-products.dto';
+import { QueryProductsDto } from './dto/query-products.dto';
 import { UTF8_BOM, toCsv, type CsvColumn } from '../common/csv';
 import type { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 
@@ -101,8 +103,8 @@ export class ProductsController {
 
   @Get()
   @RequirePermissions('menu:read')
-  findAll() {
-    return this.productsService.findAll();
+  findAll(@Query() query: QueryProductsDto) {
+    return this.productsService.findAll(query);
   }
 
   @Get(':id')

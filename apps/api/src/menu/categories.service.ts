@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { matchesText } from '../common/search';
 import { Category } from './entities/category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -12,8 +13,11 @@ export class CategoriesService {
     private categoriesRepo: Repository<Category>,
   ) {}
 
-  findAll() {
-    return this.categoriesRepo.find({ order: { sortOrder: 'ASC', name: 'ASC' } });
+  findAll(q?: string) {
+    return this.categoriesRepo.find({
+      where: q ? { name: matchesText(q) } : {},
+      order: { sortOrder: 'ASC', name: 'ASC' },
+    });
   }
 
   async findOne(id: string) {

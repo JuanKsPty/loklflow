@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, type FindOptionsWhere } from 'typeorm';
+import { equalsText, matchesText } from '../common/search';
 import { Product } from './entities/product.entity';
 import { Modifier } from './entities/modifier.entity';
 import { ProductAvailability } from './entities/product-availability.entity';
@@ -34,8 +35,25 @@ export class ProductsService {
     availableAt?: Date;
     /** Zona del negocio. Sin ella se usaría la del servidor, que es de otro sitio. */
     timeZone?: string;
+    /** Texto libre sobre el nombre del producto, sin acentos ni mayúsculas. */
+    q?: string;
+    /** Nombre —no uuid— de la categoría. */
+    category?: string;
+    /** Tri-estado del panel: `undefined` son todos, `true` los activos, `false` los de baja. */
+    active?: boolean;
   }) {
+    // Los filtros del panel se resuelven **en SQL**, no recorriendo el resultado. Los de
+    // disponibilidad siguen abajo, en memoria, porque comparan contra un horario y no contra
+    // una columna.
+    const where: FindOptionsWhere<Product> = {};
+    if (opts?.q) where.name = matchesText(opts.q);
+    // El `where` anidado solo se pone cuando hay filtro: si no, TypeORM convertiría el LEFT JOIN
+    // de `relations` en un INNER JOIN y los productos sin categoría desaparecerían del listado.
+    if (opts?.category) where.category = { name: equalsText(opts.category, 'categoryTerm') };
+    if (opts?.active !== undefined) where.isActive = opts.active;
+
     const products = await this.productsRepo.find({
+      where,
       // `modifiers.options` anidado y no `modifiers: true`: sin las opciones, un grupo de
       // modificadores llega vacío y un producto con modificador obligatorio no se puede pedir.
       // Las pantallas del personal lo tapaban pidiendo los modificadores por separado.
